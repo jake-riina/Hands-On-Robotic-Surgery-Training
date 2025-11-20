@@ -2,16 +2,16 @@ import type { User } from './types';
 
 // Mock authentication API
 export const mockAuth = {
-  login: async (email: string, password: string): Promise<User> => {
+  login: async (email: string, password: string, role: 'trainee' | 'physician'): Promise<User> => {
     // Simulate API delay
     await new Promise((resolve) => setTimeout(resolve, 500));
 
-    // Mock user data
+    // Mock user data based on role
     const mockUser: User = {
       id: '1',
       email,
-      name: 'John Doe',
-      role: 'trainee',
+      name: role === 'trainee' ? 'John Doe' : 'Dr. Jane Smith',
+      role,
     };
 
     // In real app, this would validate credentials
@@ -20,6 +20,21 @@ export const mockAuth = {
     }
 
     throw new Error('Invalid credentials');
+  },
+
+  loginWithGoogle: async (role: 'trainee' | 'physician'): Promise<User> => {
+    // Simulate API delay
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    // Mock user data based on role
+    const mockUser: User = {
+      id: '1',
+      email: 'user@gmail.com',
+      name: role === 'trainee' ? 'John Doe' : 'Dr. Jane Smith',
+      role,
+    };
+
+    return mockUser;
   },
 
   logout: async (): Promise<void> => {

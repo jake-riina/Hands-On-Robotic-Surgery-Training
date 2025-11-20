@@ -4,7 +4,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  role: 'trainee' | 'instructor' | 'admin';
+  role: 'trainee' | 'physician' | 'instructor' | 'admin';
 }
 
 export interface Module {
