@@ -147,19 +147,30 @@ const Module1Exercise1Start = () => {
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#26313E' }}>
       {/* Header Container - Top Bar */}
-      <header className="flex items-center justify-between px-6 py-4" style={{ backgroundColor: '#26313E' }}>
+      <header className="flex items-center justify-between px-6 py-4" style={{ backgroundColor: '#1E2733' }}>
         <div className="flex items-center gap-4">
-          {/* Logo placeholder */}
-          <div className="w-10 h-8 bg-gray-400 rounded"></div>
-          {/* Application title */}
-          <h1 className="text-white text-xl font-semibold">Hands On</h1>
+          {/* Logo container - allows positioning/tweaking as needed */}
+          <div className="flex items-center justify-center overflow-hidden" style={{ width: '100px', height: '100px' }}>
+            <img 
+              src="/Logo.png" 
+              alt="Logo" 
+              className="object-contain"
+              style={{ 
+                width: '100px', 
+                height: '100px', 
+                maxWidth: '100px', 
+                maxHeight: '100px',
+                objectFit: 'contain'
+              }}
+            />
+          </div>
         </div>
         {/* Profile picture */}
-        <div className="w-10 h-10 rounded-full bg-gray-500 overflow-hidden">
-          <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="20" cy="20" r="20" fill="#9CA3AF"/>
-            <circle cx="20" cy="16" r="6" fill="#4B5563"/>
-            <path d="M 8 32 Q 8 26 12 26 L 28 26 Q 32 26 32 32 L 32 40 L 8 40 Z" fill="#4B5563"/>
+        <div className="w-10 h-10 rounded-full bg-gray-500 overflow-hidden flex items-center justify-center">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="14" cy="14" r="14" fill="#9CA3AF"/>
+            <circle cx="14" cy="10" r="4" fill="#4B5563"/>
+            <path d="M 6 22 Q 6 18 10 18 L 18 18 Q 22 18 22 22 L 22 28 L 6 28 Z" fill="#4B5563"/>
           </svg>
         </div>
       </header>

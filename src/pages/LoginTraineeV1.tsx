@@ -96,35 +96,6 @@ const LoginTraineeV1: React.FC = () => {
           </div>
         </div>
 
-        {/* ========== TEMPORARY NAVIGATION BUTTON - DELETE WHEN NO LONGER NEEDED ========== */}
-        {/* This button is for navigation purposes only - navigates to Module1Exercise1Start */}
-        {/* To remove: Delete this entire comment block and the button div below */}
-        <div className="mb-4 flex justify-center">
-          <button
-            onClick={() => navigate('/module/1/exercise/1/start')}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 hover:bg-blue-700"
-            style={{ 
-              backgroundColor: '#2563eb', 
-              color: 'white',
-              border: 'none',
-              cursor: 'pointer'
-            }}
-            aria-label="Navigate to Module 1 Exercise 1 Start"
-          >
-            <span>Navigate to Module 1 Exercise 1</span>
-            <svg 
-              xmlns="http://www.w3.org/2000/svg" 
-              className="h-5 w-5" 
-              viewBox="0 0 20 20" 
-              fill="currentColor"
-            >
-              <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
-            </svg>
-          </button>
-        </div>
-        {/* ========== END TEMPORARY NAVIGATION BUTTON ========== */}
-
-
         {/* Role Selector - Pill-shaped segmented control - Centered above Sign In box */}
         <div
           className="flex justify-center mb-8"
