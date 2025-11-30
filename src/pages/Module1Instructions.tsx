@@ -103,6 +103,10 @@ const Module1Instructions = () => {
     navigate('/module/1/exercise/1/start');
   };
 
+  const handleViewCompletedModule = () => {
+    navigate('/module/1/completed');
+  };
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#26313E' }}>
       {/* Header Container - Top Bar */}
@@ -213,7 +217,7 @@ const Module1Instructions = () => {
             {/* Bottom Section - Achievements and Begin Button */}
             <div className="flex items-center justify-between">
               {/* Achievements */}
-              <div className="flex items-center gap-8">
+              <div className="flex items-center" style={{ gap: '32px' }}>
                 <div className="flex items-center gap-2">
                   <StarIcon />
                   <span className="text-lg" style={{ color: 'white' }}>Optimal Pressure</span>
@@ -224,14 +228,25 @@ const Module1Instructions = () => {
                 </div>
               </div>
 
-              {/* Begin Training Button */}
-              <button
-                onClick={handleBeginTraining}
-                className="px-8 py-4 rounded-lg font-semibold text-white text-lg transition-colors hover:opacity-90"
-                style={{ backgroundColor: '#1DA5FF' }}
-              >
-                Begin Training
-              </button>
+              {/* Action Buttons */}
+              <div className="flex gap-4">
+                {/* Placeholder button to view completed module */}
+                <button
+                  onClick={handleViewCompletedModule}
+                  className="px-6 py-4 rounded-lg font-semibold text-white text-lg transition-colors hover:opacity-90 border-2"
+                  style={{ backgroundColor: 'transparent', borderColor: '#1DA5FF', color: '#1DA5FF' }}
+                >
+                  View Score
+                </button>
+                {/* Begin Training Button */}
+                <button
+                  onClick={handleBeginTraining}
+                  className="px-8 py-4 rounded-lg font-semibold text-white text-lg transition-colors hover:opacity-90"
+                  style={{ backgroundColor: '#1DA5FF' }}
+                >
+                  Begin Training
+                </button>
+              </div>
             </div>
           </div>
         </main>
