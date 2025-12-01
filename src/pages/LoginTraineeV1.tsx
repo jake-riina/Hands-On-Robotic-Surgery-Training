@@ -12,10 +12,10 @@ interface User {
 const mockAuth = async (email: string, password: string, role: UserRole): Promise<User> => {
   return new Promise<User>((resolve, reject) => {
     setTimeout(() => {
-      if (email && password) {
+      if (email.includes('test') && password === 'password') {
         resolve({ email, role });
       } else {
-        reject(new Error('Email and password are required'));
+        reject(new Error('Invalid email, password, or role'));
       }
     }, 500);
   });
@@ -53,10 +53,11 @@ const LoginTraineeV1: React.FC = () => {
     setError('');
 
     try {
-      await mockAuth(email, password, role);
-      navigate('/module/1/instructions');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to sign in');
+      const user: User = await mockAuth(email, password, role);
+      // Navigate to dashboard
+      navigate('/dashboard');
+    } catch (err: any) {
+      setError(err.message || 'Failed to sign in');
     } finally {
       setIsLoading(false);
     }
@@ -72,81 +73,89 @@ const LoginTraineeV1: React.FC = () => {
         setTimeout(() => resolve({ email: 'googleuser@test.com', role: 'trainee' }), 500)
       );
 
-      if (googleUser.role === 'trainee') navigate('/dashboard');
-      else navigate('/dashboard');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Google sign-in failed');
+      // Navigate to dashboard
+      navigate('/dashboard');
+    } catch (err: any) {
+      setError(err.message || 'Google sign-in failed');
     } finally {
       setIsLoading(false);
     }
   };
 
-  
-
   return (
     <div className="min-h-screen flex" style={{ backgroundColor: '#26313E' }}>
-      {/* Sticky Logo in top-left corner */}
-      <div className="fixed top-0 left-0 z-50 p-4 bg-white rounded-br-lg shadow">
-        <img
-          src="/Logo.png"
-          alt="HandsOn Logo"
-          className="h-12 w-auto max-w-[140px] object-contain"
-          onError={() => console.error('Logo image failed to load')}
-        />
-      </div>
-
       {/* Left Panel - Authentication */}
-      <div className="w-1/2 flex flex-col items-center justify-center p-8" style={{ backgroundColor: '#26313E' }}>
-        {/* Centered Sign In Container */}
-        <div className="flex flex-col items-center justify-center w-full">
-          {/* Role Selector - Pill-shaped segmented control - Centered above Sign In box */}
-          <div className="flex justify-center mb-8">
-            <div
-              className="inline-flex rounded-full p-1"
-              style={{ backgroundColor: '#26313E' }}
-            >
-              <button
-                onClick={() => setRole('trainee')}
-                className={`px-6 py-2 font-medium transition-all duration-200 ${
-                  role === 'trainee' ? 'rounded-full' : ''
-                }`}
-                style={
-                  role === 'trainee'
-                    ? { backgroundColor: '#2563eb', color: 'white', borderRadius: '9999px' }
-                    : { backgroundColor: 'transparent', color: 'white' }
-                }
-              >
-                Trainee
-              </button>
-              <button
-                onClick={() => setRole('physician')}
-                className={`px-6 py-2 font-medium transition-all duration-200 ${
-                  role === 'physician' ? 'rounded-full' : ''
-                }`}
-                style={
-                  role === 'physician'
-                    ? { backgroundColor: '#2563eb', color: 'white', borderRadius: '9999px' }
-                    : { backgroundColor: 'transparent', color: 'white' }
-                }
-              >
-                Physician
-              </button>
+      <div className="w-1/2 flex flex-col p-8" style={{ backgroundColor: '#26313E' }}>
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-6">
+            <div className="w-8 h-8 bg-gray-300 rounded flex items-center justify-center text-xs text-gray-600">
+              Logo
             </div>
+            <h1 className="text-2xl font-semibold" style={{ color: 'white' }}>Hands On</h1>
           </div>
+        </div>
 
-          {/* Sign In Form - White rounded box */}
+
+        {/* Role Selector - Pill-shaped segmented control - Centered above Sign In box */}
+        <div
+          className="flex justify-center mb-8"
+          style={{
+            width: '25vw',
+            minWidth: '400px',
+            maxWidth: '500px',
+            margin: '0 auto'
+          }}
+        >
           <div
-            className="bg-white rounded-lg p-8 shadow-lg flex flex-col items-center justify-center"
-            style={{
-              backgroundColor: '#ffffff',
-              width: '25vw',
-              minWidth: '400px',
-              maxWidth: '500px',
-              height: '500px',
-              borderRadius: '0.5rem',
-              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)'
-            }}
+            className="inline-flex rounded-full p-1"
+            style={{ backgroundColor: '#26313E' }}
           >
+            <button
+              onClick={() => setRole('trainee')}
+              className={`px-6 py-2 font-medium transition-all duration-200 ${
+                role === 'trainee' ? 'rounded-full' : ''
+              }`}
+              style={
+                role === 'trainee'
+                  ? { backgroundColor: '#2563eb', color: 'white', borderRadius: '9999px' }
+                  : { backgroundColor: 'transparent', color: 'white' }
+              }
+            >
+              Trainee
+            </button>
+            <button
+              onClick={() => setRole('physician')}
+              className={`px-6 py-2 font-medium transition-all duration-200 ${
+                role === 'physician' ? 'rounded-full' : ''
+              }`}
+              style={
+                role === 'physician'
+                  ? { backgroundColor: '#2563eb', color: 'white', borderRadius: '9999px' }
+                  : { backgroundColor: 'transparent', color: 'white' }
+              }
+            >
+              Physician
+            </button>
+          </div>
+        </div>
+
+
+        {/* Sign In Form - White rounded box */}
+        <div
+          className="bg-white rounded-lg p-8 shadow-lg flex flex-col items-center justify-center"
+          style={{
+            backgroundColor: '#ffffff',
+            width: '25vw',
+            minWidth: '400px',
+            maxWidth: '500px',
+            margin: 'auto',
+            marginTop: '10px',
+            height: '500px',
+            borderRadius: '0.5rem',
+            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)'
+          }}
+        >
           <div
             className="w-full text-center"
             style={{ padding: '0 2rem', marginBottom: '1rem', marginTop: '-40px' }}
@@ -158,11 +167,6 @@ const LoginTraineeV1: React.FC = () => {
             className="space-y-4 w-full"
             onSubmit={handleSignIn}
           >
-            {error && (
-              <div className="px-1 w-full flex justify-center mb-4">
-                <div className="text-red-500 text-sm text-center" style={{ width: '75%' }}>{error}</div>
-              </div>
-            )}
             {/* Email Input */}
             <div className="px-1 w-full flex justify-center mb-8">
               <div style={{ minWidth: '0', width: '75%' }}>
@@ -223,28 +227,21 @@ const LoginTraineeV1: React.FC = () => {
 
 
             {/* Sign In Button */}
-            <div
-              style={{
-                minWidth: '0',
-                width: '60%',
-                margin: '1rem auto',
-              }}
-            >
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors w-full disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ 
-                  backgroundColor: '#2563eb', 
-                  color: 'white', 
-                  height: '50px',
-                  borderRadius: '0.75rem',
-                  boxSizing: 'border-box',
-                  padding: '0px'
-                }}
-              >
-                {isLoading ? 'Signing in...' : 'Sign in'}
-              </button>
+            <div className="px-1 w-full flex justify-center" style={{ marginTop: '1rem', marginBottom: '1rem' }}>
+              <div style={{ minWidth: '0', width: '75%' }}>
+                <button
+                  type="submit"
+                  className="bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors w-full"
+                  style={{ backgroundColor: '#2563eb', color: 'white', height: '50px' }}
+                >
+                  {isLoading ? 'Signing in...' : 'Sign in'}
+                </button>
+                {error && (
+                  <div className="mt-2 text-sm text-red-600 text-center" style={{ width: '75%', margin: '0.5rem auto 0' }}>
+                    {error}
+                  </div>
+                )}
+              </div>
             </div>
           </form>
 
@@ -266,28 +263,22 @@ const LoginTraineeV1: React.FC = () => {
             }}
           >
             <button
-              onClick={handleGoogleSignIn}
-              disabled={isLoading}
               type="button"
-              className="bg-transparent border-none rounded-lg font-medium transition-colors flex items-center justify-center w-full disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleGoogleSignIn}
+              className="bg-white border border-gray-300 text-gray-700 py-2 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 w-full"
               style={{
+                paddingLeft: '10px',
+                paddingRight: '10px',
                 boxSizing: 'border-box',
-                height: '50px',
-                padding: '0px'
+                height: '50px'
               }}
             >
-              <img
-                src="/Google.png"
-                alt="Google logo"
-                className="object-contain"
-                style={{ 
-                  width: '115%', 
-                  height: '115%'
-                }}
-              />
+              <div className="w-5 h-5 bg-white border border-gray-300 rounded flex items-center justify-center font-bold text-gray-600">
+                G
+              </div>
+              Continue With Google
             </button>
           </div>
-
 
 
           {/* Sign Up Link */}
@@ -298,12 +289,12 @@ const LoginTraineeV1: React.FC = () => {
             </a>
           </div>
         </div>
-        </div>
       </div>
 
+
       {/* RIGHT COLUMN */}
-      <div className="w-1/2 bg-[#1E2733] flex flex-col items-center justify-center relative" style={{ backgroundColor: '#26313E' }}>
-        <div className="w-[75%] max-w-[600px] bg-[#151B24] rounded-lg p-4 sm:p-6 flex flex-col items-center text-white relative min-h-[500px] pb-16">
+      <div className="w-1/2 bg-[#1E2733] flex flex-col items-center justify-center relative">
+        <div className="w-[75%] max-w-[600px] bg-[#151B24] rounded-xl p-4 sm:p-6 flex flex-col items-center text-white relative min-h-[500px] pb-16">
           <div className="text-center mt-10 mb-6 relative z-20">
             <h1 className="text-4xl font-semibold leading-tight mb-2 text-white" style={{ color: '#ffffff' }}>
               Democratizing Access to Robotic Surgery Training
