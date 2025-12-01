@@ -248,6 +248,39 @@ const LoginTraineeV1: React.FC = () => {
             </div>
           </form>
 
+          {/* ============================================
+              TEMPORARY DESIGN BUTTON - DELETE THIS SECTION
+              ============================================
+              This button is for design/testing purposes only.
+              Remove this entire section (including comments) when no longer needed.
+              ============================================ */}
+          <div
+            style={{
+              minWidth: '0',
+              width: '60%',
+              margin: '1rem auto',
+            }}
+          >
+            <button
+              onClick={() => navigate('/module/1/exercise/1/start')}
+              type="button"
+              className="bg-orange-500 text-white font-medium hover:bg-orange-600 transition-colors w-full"
+              style={{ 
+                backgroundColor: '#f97316', 
+                color: 'white', 
+                height: '50px',
+                borderRadius: '0.75rem',
+                boxSizing: 'border-box',
+                padding: '0px'
+              }}
+            >
+              [TEMP] Go to Module1Exercise1Start
+            </button>
+          </div>
+          {/* ============================================
+              END OF TEMPORARY DESIGN BUTTON SECTION
+              ============================================ */}
+
 
           {/* OR Separator */}
           <div className="flex items-center my-6">
