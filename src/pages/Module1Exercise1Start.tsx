@@ -150,7 +150,7 @@ const Module1Exercise1Start = () => {
    if (exerciseStarted && timeRemaining === 0) {
      if (mockSensorRef.current) clearInterval(mockSensorRef.current);
      setTimeout(() => {
-       navigate('/DashboardGlovesConnected');
+       navigate('/Module1Exercise2Start');
      }, 1000);
    }
  }, [exerciseStarted, timeRemaining, navigate]);
