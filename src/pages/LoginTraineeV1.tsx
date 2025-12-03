@@ -1,25 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabaseClient';
 
-/* ---------------- MOCK AUTH AND TYPES ---------------- */
+/* ---------------- TYPES ---------------- */
 type UserRole = 'trainee' | 'physician';
-
-interface User {
-  email: string;
-  role: UserRole;
-}
-
-const mockAuth = async (email: string, password: string, role: UserRole): Promise<User> => {
-  return new Promise<User>((resolve, reject) => {
-    setTimeout(() => {
-      if (email.includes('test') && password === 'password') {
-        resolve({ email, role });
-      } else {
-        reject(new Error('Invalid email, password, or role'));
-      }
-    }, 500);
-  });
-};
 
 /* ---------------- LOGIN COMPONENT ---------------- */
 const images = [
@@ -37,6 +21,7 @@ const LoginTraineeV1: React.FC = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [current, setCurrent] = useState(0);
+  const [isSignUp, setIsSignUp] = useState(false);
 
   /* ---------- Carousel auto-rotate ---------- */
   useEffect(() => {
@@ -46,6 +31,17 @@ const LoginTraineeV1: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
+  /* ---------- Check if user is already logged in ---------- */
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        navigate('/dashboard');
+      }
+    };
+    checkSession();
+  }, [navigate]);
+
   /* ---------- Sign-In Handler ---------- */
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,11 +49,46 @@ const LoginTraineeV1: React.FC = () => {
     setError('');
 
     try {
-      const user: User = await mockAuth(email, password, role);
-      // Navigate to dashboard
-      navigate('/dashboard');
+      if (isSignUp) {
+        // Sign up new user
+        const { data, error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+
+        if (signUpError) throw signUpError;
+
+        if (data.user) {
+          // Create user profile with selected role
+          const { error: profileError } = await supabase
+            .from('user_profiles')
+            .insert({
+              user_id: data.user.id,
+              email: data.user.email,
+              role: role,
+            });
+
+          if (profileError) throw profileError;
+
+          // Navigate to dashboard
+          navigate('/dashboard');
+        }
+      } else {
+        // Sign in existing user
+        const { data, error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (signInError) throw signInError;
+
+        // Navigate to dashboard
+        if (data.user) {
+          navigate('/dashboard');
+        }
+      }
     } catch (err: any) {
-      setError(err.message || 'Failed to sign in');
+      setError(err.message || 'Failed to authenticate');
     } finally {
       setIsLoading(false);
     }
@@ -69,15 +100,20 @@ const LoginTraineeV1: React.FC = () => {
     setError('');
 
     try {
-      const googleUser: User = await new Promise<User>((resolve) =>
-        setTimeout(() => resolve({ email: 'googleuser@test.com', role: 'trainee' }), 500)
-      );
+      const { data, error: googleError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`,
+        },
+      });
 
-      // Navigate to dashboard
-      navigate('/dashboard');
+      if (googleError) throw googleError;
+
+      // Note: User will be redirected to Google, then back to your app
+      // The user_profiles row will be created automatically by the trigger
+      // But we need to update the role after they return
     } catch (err: any) {
       setError(err.message || 'Google sign-in failed');
-    } finally {
       setIsLoading(false);
     }
   };
@@ -96,8 +132,7 @@ const LoginTraineeV1: React.FC = () => {
           </div>
         </div>
 
-
-        {/* Role Selector - Pill-shaped segmented control - Centered above Sign In box */}
+        {/* Role Selector - Pill-shaped segmented control */}
         <div
           className="flex justify-center mb-8"
           style={{
@@ -140,7 +175,6 @@ const LoginTraineeV1: React.FC = () => {
           </div>
         </div>
 
-
         {/* Sign In Form - White rounded box */}
         <div
           className="bg-white rounded-lg p-8 shadow-lg flex flex-col items-center justify-center"
@@ -160,13 +194,15 @@ const LoginTraineeV1: React.FC = () => {
             className="w-full text-center"
             style={{ padding: '0 2rem', marginBottom: '1rem', marginTop: '-40px' }}
           >
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Sign In</h2>
-            <p className="text-gray-600">Welcome Back! Please enter your details</p>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              {isSignUp ? 'Sign Up' : 'Sign In'}
+            </h2>
+            <p className="text-gray-600">
+              {isSignUp ? 'Create your account' : 'Welcome Back! Please enter your details'}
+            </p>
           </div>
-          <form
-            className="space-y-4 w-full"
-            onSubmit={handleSignIn}
-          >
+
+          <form className="space-y-4 w-full" onSubmit={handleSignIn}>
             {/* Email Input */}
             <div className="px-1 w-full flex justify-center mb-8">
               <div style={{ minWidth: '0', width: '75%' }}>
@@ -181,10 +217,10 @@ const LoginTraineeV1: React.FC = () => {
                   className="py-6 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full"
                   style={{ paddingLeft: '10px', paddingRight: '10px', boxSizing: 'border-box', height: '50px' }}
                   placeholder="Enter your email"
+                  required
                 />
               </div>
             </div>
-
 
             {/* Password Input */}
             <div className="px-1 w-full flex justify-center">
@@ -200,44 +236,46 @@ const LoginTraineeV1: React.FC = () => {
                   className="py-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full"
                   style={{ paddingLeft: '10px', paddingRight: '10px', boxSizing: 'border-box', height: '50px' }}
                   placeholder="Enter your password"
+                  required
                 />
               </div>
             </div>
 
-
             {/* Remember Me & Forgot Password */}
-            <div className="px-1 w-full flex justify-center">
-              <div style={{ minWidth: '0', width: '75%' }}>
-                <div className="flex items-center justify-between w-full">
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                    <span className="ml-2 text-xs text-gray-700">Remember for 30 Days</span>
-                  </label>
-                  <a href="#" className="text-xs text-blue-600 hover:underline" style={{ color: '#2563eb' }}>
-                    Forgot Password?
-                  </a>
+            {!isSignUp && (
+              <div className="px-1 w-full flex justify-center">
+                <div style={{ minWidth: '0', width: '75%' }}>
+                  <div className="flex items-center justify-between w-full">
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={rememberMe}
+                        onChange={(e) => setRememberMe(e.target.checked)}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <span className="ml-2 text-xs text-gray-700">Remember for 30 Days</span>
+                    </label>
+                    <a href="#" className="text-xs text-blue-600 hover:underline" style={{ color: '#2563eb' }}>
+                      Forgot Password?
+                    </a>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
-
-            {/* Sign In Button */}
+            {/* Sign In/Up Button */}
             <div className="px-1 w-full flex justify-center" style={{ marginTop: '1rem', marginBottom: '1rem' }}>
               <div style={{ minWidth: '0', width: '75%' }}>
                 <button
                   type="submit"
-                  className="bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors w-full"
+                  disabled={isLoading}
+                  className="bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors w-full disabled:opacity-50"
                   style={{ backgroundColor: '#2563eb', color: 'white', height: '50px' }}
                 >
-                  {isLoading ? 'Signing in...' : 'Sign in'}
+                  {isLoading ? (isSignUp ? 'Creating account...' : 'Signing in...') : (isSignUp ? 'Sign up' : 'Sign in')}
                 </button>
                 {error && (
-                  <div className="mt-2 text-sm text-red-600 text-center" style={{ width: '75%', margin: '0.5rem auto 0' }}>
+                  <div className="mt-2 text-sm text-red-600 text-center">
                     {error}
                   </div>
                 )}
@@ -245,14 +283,12 @@ const LoginTraineeV1: React.FC = () => {
             </div>
           </form>
 
-
           {/* OR Separator */}
           <div className="flex items-center my-6">
             <div className="flex-1 border-t border-gray-300"></div>
             <span className="px-4 text-sm text-gray-500">OR</span>
             <div className="flex-1 border-t border-gray-300"></div>
           </div>
-
 
           {/* Google Sign In Button */}
           <div
@@ -265,7 +301,8 @@ const LoginTraineeV1: React.FC = () => {
             <button
               type="button"
               onClick={handleGoogleSignIn}
-              className="bg-white border border-gray-300 text-gray-700 py-2 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 w-full"
+              disabled={isLoading}
+              className="bg-white border border-gray-300 text-gray-700 py-2 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 w-full disabled:opacity-50"
               style={{
                 paddingLeft: '10px',
                 paddingRight: '10px',
@@ -280,19 +317,27 @@ const LoginTraineeV1: React.FC = () => {
             </button>
           </div>
 
-
-          {/* Sign Up Link */}
+          {/* Sign Up/In Toggle Link */}
           <div className="mt-6 text-center">
-            <span className="text-sm text-gray-600">Don't have an account? </span>
-            <a href="#" className="text-sm text-blue-600 hover:underline font-medium" style={{ color: '#2563eb' }}>
-              Sign up
-            </a>
+            <span className="text-sm text-gray-600">
+              {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setIsSignUp(!isSignUp);
+                setError('');
+              }}
+              className="text-sm text-blue-600 hover:underline font-medium"
+              style={{ color: '#2563eb', background: 'none', border: 'none', cursor: 'pointer' }}
+            >
+              {isSignUp ? 'Sign in' : 'Sign up'}
+            </button>
           </div>
         </div>
       </div>
 
-
-      {/* RIGHT COLUMN */}
+      {/* RIGHT COLUMN - Carousel */}
       <div className="w-1/2 bg-[#1E2733] flex flex-col items-center justify-center relative">
         <div className="w-[75%] max-w-[600px] bg-[#151B24] rounded-xl p-4 sm:p-6 flex flex-col items-center text-white relative min-h-[500px] pb-16">
           <div className="text-center mt-10 mb-6 relative z-20">
@@ -327,7 +372,6 @@ const LoginTraineeV1: React.FC = () => {
             })}
           </div>
 
-          {/* Indicator buttons - positioned 25% below carousel images, horizontally centered, responsive */}
           <div className="flex gap-2 justify-center z-20 items-center w-full mt-[100px] sm:mt-[100px]">
             {images.map((_, i) => {
               const isActive = i === current;
