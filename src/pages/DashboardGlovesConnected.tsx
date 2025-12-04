@@ -1,8 +1,53 @@
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useState } from 'react';
 
 const DashboardGlovesConnected = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [isConnected, setIsConnected] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+const [connectMessage, setConnectMessage] = useState<string | null>(null);
+
+const handleConnectGloves = async () => {
+  if (!navigator.bluetooth) {
+    setConnectMessage('Bluetooth is not supported in this browser.');
+    return;
+  }
+
+  setIsConnecting(true);
+  setConnectMessage(null);
+
+  try {
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [
+        {
+          // Environmental Sensing service (0x181A)
+          services: [0x181A],
+        },
+      ],
+    });
+
+    const server = await device.gatt?.connect();
+    if (!server) {
+      throw new Error('Failed to connect to device.');
+    }
+
+    setIsConnected(true);
+    setConnectMessage('Gloves connected.');
+
+    device.addEventListener('gattserverdisconnected', () => {
+      setIsConnected(false);
+      setConnectMessage('Connection lost.');
+    });
+  } catch (error) {
+    console.error(error);
+    setIsConnected(false);
+    setConnectMessage('Connection failed or was cancelled.');
+  } finally {
+    setIsConnecting(false);
+  }
+};
+
 
   // Navigation items with icons
   const navItems = [
@@ -161,7 +206,7 @@ const DashboardGlovesConnected = () => {
               >
                 <div className="flex items-start justify-between mb-4">
                   <h3 className="text-lg font-semibold" style={{ color: 'white' }}>
-                    Jake's Hands On Gloves
+                    Jake's HandsOn Gloves
                   </h3>
                   <button className="text-gray-400 hover:text-gray-300">
                     <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -170,25 +215,43 @@ const DashboardGlovesConnected = () => {
                     </svg>
                   </button>
                 </div>
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#10B981' }}></div>
-                  <span className="text-sm" style={{ color: '#9CA3AF' }}>Connected</span>
-                </div>
-                  <div className="flex items-center gap-2">
-                    <div className="relative" style={{ width: '32px', height: '18px' }}>
-                      <svg width="32" height="18" viewBox="0 0 32 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <rect x="2" y="4" width="24" height="10" rx="2" stroke="white" strokeWidth="1.5" fill="none" opacity="0.3"/>
-                        <path d="M28 7v4" stroke="white" strokeWidth="1.5" strokeLinecap="round" opacity="0.3"/>
-                      </svg>
-                      <div className="absolute inset-0 flex items-center" style={{ paddingLeft: '6px', paddingRight: '8px', gap: '3px' }}>
-                        <div className="w-1.5 h-3 rounded-sm" style={{ backgroundColor: '#10B981' }}></div>
-                        <div className="w-1.5 h-3 rounded-sm" style={{ backgroundColor: '#10B981' }}></div>
-                        <div className="w-1.5 h-3 rounded-sm" style={{ backgroundColor: '#10B981' }}></div>
-                      </div>
-                    </div>
-                    <span className="text-sm font-medium" style={{ color: 'white' }}>70%</span>
-                  </div>
-              </div>
+                  {/* Connection status row */}
+  <div className="flex items-center gap-2 mb-2">
+    <div
+      className="w-2 h-2 rounded-full"
+      style={{ backgroundColor: isConnected ? '#10B981' : '#EF4444' }} // green vs red
+    ></div>
+    <span className="text-sm" style={{ color: '#9CA3AF' }}>
+      {isConnected ? 'Connected' : 'Not connected'}
+    </span>
+  </div>
+
+  {/* Connect / status button */}
+  <button
+    type="button"
+    onClick={handleConnectGloves}
+    disabled={isConnecting}
+    className="mt-2 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-60"
+    style={{
+      backgroundColor: isConnected ? '#10B981' : '#1DA5FF',
+      color: 'white',
+    }}
+  >
+    {isConnecting
+      ? 'Connecting...'
+      : isConnected
+      ? 'Connected'
+      : 'Not Connected'}
+  </button>
+
+  {/* Optional status message */}
+  {connectMessage && (
+    <p className="mt-2 text-xs" style={{ color: '#9CA3AF' }}>
+      {connectMessage}
+    </p>
+  )}
+</div>
+
 
               {/* Box 4: Daily Challenge Card */}
               <div 
