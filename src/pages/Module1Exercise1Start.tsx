@@ -4,6 +4,9 @@ import { useState, useEffect, useRef } from 'react';
 const Module1Exercise1Start = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const sessionId = location.state?.sessionId;
+
+  console.log('Current session ID:', sessionId);
 
   // Navigation items with icons (using simple SVG icons;no bullet points))
   const navItems = [
@@ -294,6 +297,11 @@ const Module1Exercise1Start = () => {
             <h2 className="text-6xl font-bold mb-6" style={{ color: 'white' }}>
               Exercise 1: Find the Right Pressure
             </h2>
+            {sessionId && (
+              <p className="text-sm mb-4" style={{ color: '#9CA3AF' }}>
+                Session ID: {sessionId}
+              </p>
+            )}
 
             <div className="flex gap-12 items-start">
               {/* Left Section - Instructions */}
