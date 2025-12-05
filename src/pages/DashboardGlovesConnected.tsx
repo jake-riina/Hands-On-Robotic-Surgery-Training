@@ -1,52 +1,27 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useState } from 'react';
+import { useBLE } from '../contexts/BLEContext';
 
 const DashboardGlovesConnected = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [isConnected, setIsConnected] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
-const [connectMessage, setConnectMessage] = useState<string | null>(null);
+  
+  // Use shared BLE context
+  const { 
+    isConnected, 
+    isConnecting, 
+    connectionStatus,
+    connect: connectBLE,
+    disconnect: disconnectBLE
+  } = useBLE();
 
-const handleConnectGloves = async () => {
-  if (!navigator.bluetooth) {
-    setConnectMessage('Bluetooth is not supported in this browser.');
-    return;
-  }
-
-  setIsConnecting(true);
-  setConnectMessage(null);
-
-  try {
-    const device = await navigator.bluetooth.requestDevice({
-      filters: [
-        {
-          // Environmental Sensing service (0x181A)
-          services: [0x181A],
-        },
-      ],
-    });
-
-    const server = await device.gatt?.connect();
-    if (!server) {
-      throw new Error('Failed to connect to device.');
-    }
-
-    setIsConnected(true);
-    setConnectMessage('Gloves connected.');
-
-    device.addEventListener('gattserverdisconnected', () => {
-      setIsConnected(false);
-      setConnectMessage('Connection lost.');
-    });
-  } catch (error) {
-    console.error(error);
-    setIsConnected(false);
-    setConnectMessage('Connection failed or was cancelled.');
-  } finally {
-    setIsConnecting(false);
-  }
-};
+  const handleConnectGloves = async () => {
+    await connectBLE();
+  };
+  
+  const handleDisconnectGloves = async () => {
+    await disconnectBLE();
+  };
 
 
   // Navigation items with icons
@@ -226,30 +201,39 @@ const handleConnectGloves = async () => {
     </span>
   </div>
 
-  {/* Connect / status button */}
-  <button
-    type="button"
-    onClick={handleConnectGloves}
-    disabled={isConnecting}
-    className="mt-2 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-60"
-    style={{
-      backgroundColor: isConnected ? '#10B981' : '#1DA5FF',
-      color: 'white',
-    }}
-  >
-    {isConnecting
-      ? 'Connecting...'
-      : isConnected
-      ? 'Connected'
-      : 'Not Connected'}
-  </button>
-
-  {/* Optional status message */}
-  {connectMessage && (
-    <p className="mt-2 text-xs" style={{ color: '#9CA3AF' }}>
-      {connectMessage}
-    </p>
+  {/* Connect / Disconnect button */}
+  {isConnected ? (
+    <button
+      type="button"
+      onClick={handleDisconnectGloves}
+      disabled={isConnecting}
+      className="mt-2 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-60"
+      style={{
+        backgroundColor: '#EF4444',
+        color: 'white',
+      }}
+    >
+      Disconnect
+    </button>
+  ) : (
+    <button
+      type="button"
+      onClick={handleConnectGloves}
+      disabled={isConnecting}
+      className="mt-2 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-60"
+      style={{
+        backgroundColor: '#1DA5FF',
+        color: 'white',
+      }}
+    >
+      {isConnecting ? 'Connecting...' : 'Connect'}
+    </button>
   )}
+
+  {/* Status message */}
+  <p className="mt-2 text-xs" style={{ color: '#9CA3AF' }}>
+    {connectionStatus}
+  </p>
 </div>
 
 
