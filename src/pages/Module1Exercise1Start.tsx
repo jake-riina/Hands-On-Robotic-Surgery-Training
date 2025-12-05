@@ -1,5 +1,49 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
+import { supabase } from '../lib/supabaseClient';
+import { useBLE } from '../contexts/BLEContext';
+
+// Web Bluetooth API types
+declare global {
+  interface Navigator {
+    bluetooth?: Bluetooth;
+  }
+}
+
+interface Bluetooth {
+  requestDevice(options: RequestDeviceOptions): Promise<BluetoothDevice>;
+}
+
+interface RequestDeviceOptions {
+  filters: Array<{ services: number[] }>;
+}
+
+interface BluetoothDevice extends EventTarget {
+  gatt?: BluetoothRemoteGATTServer;
+  name?: string;
+  id?: string;
+  addEventListener(type: 'gattserverdisconnected', listener: () => void): void;
+}
+
+interface BluetoothRemoteGATTServer {
+  connect(): Promise<BluetoothRemoteGATTServer>;
+  getPrimaryService(service: number): Promise<BluetoothRemoteGATTService>;
+  connected: boolean;
+  disconnect(): void;
+}
+
+interface BluetoothRemoteGATTService {
+  getCharacteristic(characteristic: number): Promise<BluetoothRemoteGATTCharacteristic>;
+}
+
+interface BluetoothRemoteGATTCharacteristic extends EventTarget {
+  startNotifications(): Promise<BluetoothRemoteGATTCharacteristic>;
+  stopNotifications(): Promise<BluetoothRemoteGATTCharacteristic>;
+  readValue(): Promise<DataView>;
+  value?: DataView;
+  service?: BluetoothRemoteGATTService;
+  addEventListener(type: 'characteristicvaluechanged', listener: (event: Event) => void): void;
+}
 
 const Module1Exercise1Start = () => {
   const navigate = useNavigate();
@@ -88,51 +132,183 @@ const Module1Exercise1Start = () => {
     }
   };
 
+ // Get BLE connection from shared context
+ const { 
+   isConnected: bleIsConnected,
+   connectionStatus: bleConnectionStatus,
+   pressure: blePressure
+ } = useBLE();
+
  // Exercise state
- const [pressure, setPressure] = useState(0);
  const [isExerciseActive, setIsExerciseActive] = useState(false);
  const [timeRemaining, setTimeRemaining] = useState(20);
  const [exerciseStarted, setExerciseStarted] = useState(false);
+ const [score, setScore] = useState<number | null>(null);
+ 
+ // Use pressure from BLE context
+ const pressure = blePressure;
  
  const intervalRef = useRef<number | null>(null);
  const mockSensorRef = useRef<number | null>(null);
+ const startTimeRef = useRef<number | null>(null);
+ const timeOnThresholdRef = useRef<number>(0);
+ const lastCheckTimeRef = useRef<number | null>(null);
+ const thresholdCheckIntervalRef = useRef<number | null>(null);
+ const readingsBufferRef = useRef<Array<{timestamp_ms: number, force_psi: number}>>([]);
+ const saveIntervalRef = useRef<number | null>(null);
+ const exerciseStartedRef = useRef<boolean>(false);
+ const sessionIdRef = useRef<string | undefined>(sessionId);
 
- // Calculate triangle position based on pressure (0-35 PSI range)
- const getTrianglePosition = () => {
-   const maxPressure = 35;
-   const percentage = Math.min((pressure / maxPressure) * 100, 100);
-   return percentage;
- };
+ // Target pressure range (15-20 PSI)
+ const TARGET_MIN = 15;
+ const TARGET_MAX = 20;
 
- // Mock sensor - simulates pressure fluctuations
- const startMockSensor = () => {
-   mockSensorRef.current = setInterval(() => {
-     setPressure(prev => {
-       const change = (Math.random() - 0.5) * 3;
-       const newPressure = Math.max(0, prev + change);
-       return Math.min(newPressure, 35);
-     });
-   }, 100);
- };
+ // Mock sensor - simulates pressure fluctuations (fallback if BLE not available)
+ // Note: This is kept for potential fallback, but BLE context handles pressure updates
 
- // Start exercise on spacebar press
- useEffect(() => {
-   const handleKeyPress = (e: KeyboardEvent) => {
-     if (e.code === 'Space' && !exerciseStarted) {
-       e.preventDefault();
-       setExerciseStarted(true);
-       setIsExerciseActive(true);
-       setPressure(17.5);
-       startMockSensor();
+ // Function to save readings to Supabase (batched)
+ const saveReadingsToSupabase = async (readings: Array<{timestamp_ms: number, force_psi: number}>) => {
+   const currentSessionId = sessionIdRef.current;
+   if (!currentSessionId || readings.length === 0) {
+     console.warn('Cannot save readings - sessionId:', currentSessionId, 'readings count:', readings.length);
+     return;
+   }
+
+   try {
+     console.log(`Attempting to save ${readings.length} readings to Supabase for session:`, currentSessionId);
+     const { data, error } = await supabase
+       .from('trainee_readings')
+       .insert(
+         readings.map(reading => ({
+           trainee_session_id: currentSessionId,
+           timestamp_ms: reading.timestamp_ms,
+           force_psi: reading.force_psi,
+           flex_value: null,
+           imu_value: null
+         }))
+       )
+       .select();
+
+     if (error) {
+       console.error('Error saving readings to Supabase:', error);
+       console.error('Error details:', JSON.stringify(error, null, 2));
+     } else {
+       console.log(`Successfully saved ${readings.length} readings to Supabase. Data:`, data);
      }
-   };
-   window.addEventListener('keydown', handleKeyPress);
-   return () => window.removeEventListener('keydown', handleKeyPress);
+   } catch (err) {
+     console.error('Exception saving readings:', err);
+   }
+ };
+
+ // Update refs when state changes
+ useEffect(() => {
+   exerciseStartedRef.current = exerciseStarted;
  }, [exerciseStarted]);
 
- // Timer countdown
+ useEffect(() => {
+   sessionIdRef.current = sessionId;
+ }, [sessionId]);
+
+ // Periodic save of readings buffer (every 1 second)
+ useEffect(() => {
+   if (sessionId) {
+     saveIntervalRef.current = setInterval(() => {
+       if (readingsBufferRef.current.length > 0) {
+         const readingsToSave = [...readingsBufferRef.current];
+         readingsBufferRef.current = [];
+         saveReadingsToSupabase(readingsToSave);
+       }
+     }, 1000);
+   }
+
+   return () => {
+     if (saveIntervalRef.current) {
+       clearInterval(saveIntervalRef.current);
+       saveIntervalRef.current = null;
+     }
+   };
+ }, [sessionId]);
+
+
+// Use shared BLE connection from context
+// Save readings to Supabase when pressure changes from BLE
+useEffect(() => {
+  if (bleIsConnected && pressure > 0 && sessionIdRef.current) {
+    const timestamp = Date.now();
+    readingsBufferRef.current.push({
+      timestamp_ms: timestamp,
+      force_psi: pressure
+    });
+    
+    console.log('Added reading to buffer. Buffer size:', readingsBufferRef.current.length);
+
+    // Batch save every 10 readings
+    if (readingsBufferRef.current.length >= 10) {
+      const readingsToSave = [...readingsBufferRef.current];
+      readingsBufferRef.current = [];
+      console.log('Saving batch of', readingsToSave.length, 'readings to Supabase');
+      saveReadingsToSupabase(readingsToSave);
+    }
+  }
+}, [pressure, bleIsConnected]);
+
+// Start exercise when first non-zero pressure is detected
+useEffect(() => {
+  if (!exerciseStartedRef.current && pressure > 0 && bleIsConnected) {
+    console.log('Starting exercise - first non-zero pressure detected:', pressure);
+    setExerciseStarted(true);
+    setIsExerciseActive(true);
+    startTimeRef.current = Date.now();
+    lastCheckTimeRef.current = Date.now();
+    // Stop mock sensor if it was running
+    if (mockSensorRef.current) {
+      clearInterval(mockSensorRef.current);
+      mockSensorRef.current = null;
+    }
+  }
+}, [pressure, bleIsConnected]);
+
+ // Track time spent in target threshold
+ useEffect(() => {
+   if (isExerciseActive && exerciseStarted) {
+     // Initialize start time on first activation
+     if (startTimeRef.current === null) {
+       startTimeRef.current = Date.now();
+       lastCheckTimeRef.current = Date.now();
+     }
+
+     // Check every 100ms if pressure is in target range
+     thresholdCheckIntervalRef.current = setInterval(() => {
+       const now = Date.now();
+       const lastCheck = lastCheckTimeRef.current || now;
+       const timeDelta = now - lastCheck;
+       
+       // Check if current pressure is in target range (15-20 PSI)
+       if (pressure >= TARGET_MIN && pressure <= TARGET_MAX) {
+         timeOnThresholdRef.current += timeDelta;
+       }
+       
+       lastCheckTimeRef.current = now;
+     }, 100);
+   }
+
+   return () => {
+     if (thresholdCheckIntervalRef.current) {
+       clearInterval(thresholdCheckIntervalRef.current);
+       thresholdCheckIntervalRef.current = null;
+     }
+   };
+ }, [isExerciseActive, exerciseStarted, pressure]);
+
+ // Timer countdown - starts immediately when exercise becomes active
  useEffect(() => {
    if (isExerciseActive && timeRemaining > 0) {
+     // Clear any existing interval first
+     if (intervalRef.current) {
+       clearInterval(intervalRef.current);
+     }
+     
+     // Start the timer immediately
      intervalRef.current = setInterval(() => {
        setTimeRemaining(prev => {
          if (prev <= 1) {
@@ -143,47 +319,96 @@ const Module1Exercise1Start = () => {
        });
      }, 1000);
    }
+   
    return () => {
-     if (intervalRef.current) clearInterval(intervalRef.current);
+     if (intervalRef.current) {
+       clearInterval(intervalRef.current);
+       intervalRef.current = null;
+     }
    };
  }, [isExerciseActive, timeRemaining]);
 
- // Navigate when complete
+ // Calculate score when exercise completes
  useEffect(() => {
-   if (exerciseStarted && timeRemaining === 0) {
+   if (exerciseStarted && timeRemaining === 0 && startTimeRef.current !== null) {
+     const endTime = Date.now();
+     const duration = endTime - startTimeRef.current;
+     const timeOnThreshold = timeOnThresholdRef.current;
+     
+     // Calculate score: (time_on_threshold / duration) * 100
+     const calculatedScore = duration > 0 ? (timeOnThreshold / duration) * 100 : 0;
+     setScore(calculatedScore);
+     console.log('Exercise completed. Score:', calculatedScore.toFixed(1), '%');
+
+     // Save any remaining readings in buffer
+     if (readingsBufferRef.current.length > 0 && sessionIdRef.current) {
+       const readingsToSave = [...readingsBufferRef.current];
+       readingsBufferRef.current = [];
+       console.log('Saving final', readingsToSave.length, 'readings to Supabase');
+       saveReadingsToSupabase(readingsToSave);
+     }
+   }
+ }, [exerciseStarted, timeRemaining]);
+
+ // Navigate when complete (with delay to show score)
+ useEffect(() => {
+   if (exerciseStarted && timeRemaining === 0 && score !== null) {
      if (mockSensorRef.current) clearInterval(mockSensorRef.current);
+     // Show score for 3 seconds before navigating
      setTimeout(() => {
        navigate('/Module1Exercise2Start');
-     }, 1000);
+     }, 3000);
    }
- }, [exerciseStarted, timeRemaining, navigate]);
+ }, [exerciseStarted, timeRemaining, navigate, score]);
 
  // Cleanup on unmount
  useEffect(() => {
    return () => {
      if (intervalRef.current) clearInterval(intervalRef.current);
      if (mockSensorRef.current) clearInterval(mockSensorRef.current);
+     if (thresholdCheckIntervalRef.current) clearInterval(thresholdCheckIntervalRef.current);
+     if (saveIntervalRef.current) clearInterval(saveIntervalRef.current);
+     // Save any remaining readings before unmount
+     if (readingsBufferRef.current.length > 0 && sessionId) {
+       const readingsToSave = [...readingsBufferRef.current];
+       readingsBufferRef.current = [];
+       saveReadingsToSupabase(readingsToSave);
+     }
    };
- }, []);
+ }, [sessionId]);
 
  // Gauge component
  const PressureGauge = () => {
-   const trianglePosition = getTrianglePosition();
+   // Calculate triangle position directly using current pressure state
+   const maxPressure = 35;
+   const trianglePosition = Math.min((pressure / maxPressure) * 100, 100);
+   
+   // Debug logging
+   useEffect(() => {
+     console.log('PressureGauge render - Pressure:', pressure, 'PSI, Triangle Position:', trianglePosition.toFixed(1), '%');
+   }, [pressure, trianglePosition]);
 
    return (
      <div className="flex flex-col items-center">
        {!exerciseStarted ? (
          <p className="text-white text-lg mb-4">
-           Press SPACEBAR to Begin!
+           Apply Pressure to Begin!
          </p>
        ) : timeRemaining > 0 ? (
          <p className="text-white text-2xl font-bold mb-4">
            {timeRemaining}s
          </p>
        ) : (
-         <p className="text-white text-2xl font-bold mb-4" style={{ color: '#22c55e' }}>
-           Exercise Complete!
-         </p>
+         <div className="flex flex-col items-center mb-4">
+           <p className="text-white text-2xl font-bold mb-2" style={{ color: '#22c55e' }}>
+             Exercise Complete!
+           </p>
+           {score !== null && (
+             <p className="text-white text-xl font-semibold" style={{ color: '#1DA5FF' }}>
+               Score: {score.toFixed(1)}%
+             </p>
+           )}
+         </div>
        )}
        
        <div className="relative w-[480px] max-w-full mb-10">
@@ -209,16 +434,16 @@ const Module1Exercise1Start = () => {
            </svg>
          </div>
 
-         {exerciseStarted && (
-           <div className="text-center mt-12">
-             <p className="text-white text-sm">
-               Current Pressure: <span className="font-bold">{pressure.toFixed(1)} PSI</span>
-             </p>
+         <div className="text-center mt-12">
+           <p className="text-white text-sm">
+             Current Pressure: <span className="font-bold">{pressure.toFixed(1)} PSI</span>
+           </p>
+           {exerciseStarted && (
              <p className="text-white text-xs mt-1" style={{ opacity: 0.75 }}>
                Target: 15-20 PSI
              </p>
-           </div>
-         )}
+           )}
+         </div>
        </div>
      </div>
    );
@@ -301,6 +526,16 @@ const Module1Exercise1Start = () => {
               <p className="text-sm mb-4" style={{ color: '#9CA3AF' }}>
                 Session ID: {sessionId}
               </p>
+            )}
+            {!bleIsConnected && (
+              <div className="mb-4 p-3 rounded-lg" style={{ backgroundColor: '#1E2733', border: '1px solid #ef4444' }}>
+                <p className="text-sm" style={{ color: '#ef4444' }}>
+                  ⚠️ BLE Status: {bleConnectionStatus}
+                </p>
+                <p className="text-xs mt-1" style={{ color: '#9CA3AF' }}>
+                  Please connect your device on the Dashboard first.
+                </p>
+              </div>
             )}
 
             <div className="flex gap-12 items-start">
