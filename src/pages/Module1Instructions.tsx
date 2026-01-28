@@ -169,25 +169,25 @@ const Module1Instructions = () => {
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#26313E' }}>
       {/* Header Container - Top Bar */}
-      <header className="flex items-center justify-between px-6 py-4" style={{ backgroundColor: '#1E2733' }}>
+      <header className="flex items-center justify-between px-6 py-2" style={{ backgroundColor: '#1E2733' }}>
         <div className="flex items-center gap-4">
-          <div className="flex items-center justify-center overflow-hidden" style={{ width: '100px', height: '100px' }}>
+          <div className="flex items-center justify-center overflow-hidden" style={{ width: '72px', height: '72px' }}>
             <img 
               src="/Logo.png" 
               alt="Logo" 
               className="object-contain"
               style={{ 
-                width: '100px', 
-                height: '100px', 
-                maxWidth: '100px', 
-                maxHeight: '100px',
+                width: '72px', 
+                height: '72px', 
+                maxWidth: '72px', 
+                maxHeight: '72px',
                 objectFit: 'contain'
               }}
             />
           </div>
         </div>
         {/* Profile picture */}
-        <div className="w-10 h-10 rounded-full bg-gray-500 overflow-hidden flex items-center justify-center">
+        <div className="w-9 h-9 rounded-full bg-gray-500 overflow-hidden flex items-center justify-center">
           <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
             <circle cx="14" cy="14" r="14" fill="#9CA3AF"/>
             <circle cx="14" cy="10" r="4" fill="#4B5563"/>
@@ -214,7 +214,7 @@ const Module1Instructions = () => {
                     key={item.path}
                     onClick={() => navigate(item.path)}
                     style={{ 
-                      backgroundColor: isActive ? '#1DA5FF' : '#1E2733',
+                      backgroundColor: '#1E2733',
                       border: 'none',
                       paddingTop: '1.5rem',
                       paddingBottom: '1.5rem',
@@ -222,8 +222,8 @@ const Module1Instructions = () => {
                     }}
                     className={`w-full flex items-center gap-3 px-6 mx-2 rounded-lg transition-colors border-none text-white`}
                   >
-                    <span className="flex-shrink-0" style={{ color: 'white' }}>{getIcon(item.icon)}</span>
-                    <span className="font-medium" style={{ color: 'white' }}>{item.label}</span>
+                    <span className="flex-shrink-0" style={{ color: isActive ? '#1DA5FF' : 'white' }}>{getIcon(item.icon)}</span>
+                    <span className="font-medium" style={{ color: isActive ? '#1DA5FF' : 'white' }}>{item.label}</span>
                   </button>
                 );
               })}
@@ -237,44 +237,74 @@ const Module1Instructions = () => {
             {/* Back Button */}
             <button
               onClick={() => navigate('/modules')}
-              className="flex items-center gap-2 text-white mb-6 hover:opacity-80 transition-opacity"
+              className="flex items-center gap-2 text-white mb-4 hover:opacity-80 transition-opacity"
             >
               <ArrowLeftIcon />
               <span className="text-lg">Modules</span>
             </button>
 
             {/* Module Title */}
-            <h1 className="text-4xl font-bold mb-6" style={{ color: 'white' }}>
+            <h1 className="text-4xl font-bold mb-4 text-center" style={{ color: 'white' }}>
               Module 1: Pressure Control
             </h1>
 
             {/* Instructional Text */}
-            <p className="text-lg leading-relaxed max-w-4xl" style={{ color: 'white', marginBottom: '60px' }}>
+            <p className="text-lg leading-relaxed mx-auto text-center" style={{ color: 'white', marginBottom: '60px', maxWidth: '900px' }}>
               In robotic surgery, your hands guide every movement of the instruments. The amount of pressure you apply to the console controls determines how firmly the robot interacts with tissue. Too much pressure can cause harm; too little can make movements imprecise.
             </p>
 
             {/* Embedded Application Preview */}
-            <div className="flex justify-center" style={{ marginTop: '60px', marginBottom: '60px', gap: '40px' }}>
-              {/* Exercise 1 Preview */}
-              <div className="relative rounded-lg overflow-hidden shadow-lg" style={{ width: '100%', maxWidth: '500px', backgroundColor: '#26313E' }}>
+            <div className="flex justify-center items-center" style={{ marginTop: '60px', marginBottom: '60px', gap: '80px' }}>
+              <div className="relative rounded-lg overflow-hidden shadow-lg" style={{ width: '100%', maxWidth: '350px', backgroundColor: '#26313E' }}>
                 <img 
-                  src="/Exercise 1.png" 
-                  alt="Exercise 1 Preview" 
+                  src="/image.png" 
+                  alt="Controller Preview" 
                   className="w-full h-auto object-contain"
+                  onError={(e) => {
+                    console.error('Image failed to load:', e.currentTarget.src);
+                  }}
                 />
               </div>
-              {/* Exercise 2 Preview */}
-              <div className="relative rounded-lg overflow-hidden shadow-lg" style={{ width: '100%', maxWidth: '500px', backgroundColor: '#26313E' }}>
-                <img 
-                  src="/Exercise 2.png" 
-                  alt="Exercise 2 Preview" 
-                  className="w-full h-auto object-contain"
-                />
+              
+              {/* Pressure Gauge Bar - Non-functional */}
+              <div className="flex flex-col items-center" style={{ maxWidth: '300px' }}>
+                <div className="relative w-[300px] max-w-full">
+                  <div
+                    className="w-full h-[36px] rounded-[14px] shadow-lg mx-auto"
+                    style={{
+                      background: "linear-gradient(90deg, #ef4444 10%, #f97316 28%, #22c55e 50%, #f97316 72%, #ef4444 90%)",
+                      border: "1.5px solid #e2e8f0",
+                      boxShadow: "0 4px 24px 2px rgba(0,0,0,0.04)"
+                    }}
+                  />
+                  
+                  {/* Triangle arrow positioned in the green zone (around 50%) */}
+                  <div 
+                    className="absolute top-full"
+                    style={{ 
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      marginTop: '12px'
+                    }}
+                  >
+                    <svg width="22" height="16" viewBox="0 0 22 16" className="text-white">
+                      <path d="M11 16L0 0h22L11 16z" fill="white" />
+                      <path d="M11 15L1.5 1h19L11 15z" fill="#e5e7eb" opacity="0.25" />
+                    </svg>
+                  </div>
+                </div>
               </div>
             </div>
 
+            {/* Step-by-step instructions */}
+            <div className="mx-auto text-center" style={{ marginBottom: '48px', maxWidth: '900px' }}>
+              <p className="text-lg leading-relaxed" style={{ color: 'white', marginBottom: '16px' }}>
+                Slide your fingers through the loops on the mock controller and apply steady pressure. Keep the bar in the <strong style={{ color: '#22c55e' }}>green zone</strong> for as much of the <strong>20 seconds</strong> as you can. When time is up, you’ll receive a score based on how long you held optimal pressure.
+              </p>
+            </div>
+
             {/* Bottom Section - Achievements and Begin Button */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between" style={{ marginTop: '120px' }}>
               {/* Achievements */}
               <div className="flex items-center" style={{ gap: '32px' }}>
                 <div className="flex items-center gap-2">

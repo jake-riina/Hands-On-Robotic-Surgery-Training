@@ -1,8 +1,32 @@
 
-Port 5173 is in use, trying another one...
 
-  VITE v7.2.2  ready in 269 ms
+  VITE v7.2.2  ready in 189 ms
 
-  ➜  Local:   http://localhost:5174/
+  ➜  Local:   http://localhost:5173/
   ➜  Network: use --host to expose
   ➜  press h + enter to show help
+[baseline-browser-mapping] The data in this module is over two mo
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm 
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+4:40:52 PM [vite] vite.config.ts changed, restarting server...
+4:40:52 PM [vite] server restarted.
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://100.65.118.99:5173/
+  ➜  Network: http://10.211.55.2:5173/
+  ➜  Network: http://10.37.129.2:5173/
+npm run dev
+^C^Cnpm run dev
+(base) riinajake@Jakes-MacBook-Air-77 Hands-On-Robotic-Surgery-Training % > hands-on@0.0.0 dev
+zsh: command not found: de
+
+npm run dev
+(base) riinajake@Jakes-MacBook-Air-77 Hands-On-Robotic-Surgery-Training % > hands-on@0.0.0 dev
+zsh: command not found: dev
+
+
+npm run dev
+(base) riinajake@Jakes-MacBook-Air-77 Hands-On-Robotic-Surgery-Training % > hands-on@0.0.0 dev
+zsh: command not found: dev
+
+npm install

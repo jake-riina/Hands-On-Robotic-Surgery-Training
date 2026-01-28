@@ -84,10 +84,8 @@ const CompletedModule = () => {
     }
   };
 
-  // Placeholder scores
-  const overallScore = 77.5;
-  const exercise1Score = 70;
-  const exercise2Score = 85;
+  // Score from exercise (Continue) or fallback when visiting directly
+  const score = (location.state as { score?: number } | null)?.score ?? 0;
 
   const handleRepeatModule = () => {
     navigate('/module/1/instructions');
@@ -104,25 +102,25 @@ const CompletedModule = () => {
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#26313E' }}>
       {/* Header Container - Top Bar */}
-      <header className="flex items-center justify-between px-6 py-4" style={{ backgroundColor: '#1E2733' }}>
+      <header className="flex items-center justify-between px-6 py-2" style={{ backgroundColor: '#1E2733' }}>
         <div className="flex items-center gap-4">
-          <div className="flex items-center justify-center overflow-hidden" style={{ width: '100px', height: '100px' }}>
+          <div className="flex items-center justify-center overflow-hidden" style={{ width: '72px', height: '72px' }}>
             <img 
               src="/Logo.png" 
               alt="Logo" 
               className="object-contain"
               style={{ 
-                width: '100px', 
-                height: '100px', 
-                maxWidth: '100px', 
-                maxHeight: '100px',
+                width: '72px', 
+                height: '72px', 
+                maxWidth: '72px', 
+                maxHeight: '72px',
                 objectFit: 'contain'
               }}
             />
           </div>
         </div>
         {/* Profile picture */}
-        <div className="w-10 h-10 rounded-full bg-gray-500 overflow-hidden flex items-center justify-center">
+        <div className="w-9 h-9 rounded-full bg-gray-500 overflow-hidden flex items-center justify-center">
           <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
             <circle cx="14" cy="14" r="14" fill="#9CA3AF"/>
             <circle cx="14" cy="10" r="4" fill="#4B5563"/>
@@ -149,16 +147,16 @@ const CompletedModule = () => {
                     key={item.path}
                     onClick={() => navigate(item.path)}
                     style={{ 
-                      backgroundColor: isActive ? '#1DA5FF' : '#1E2733',
+                      backgroundColor: '#1E2733',
                       border: 'none',
                       paddingTop: '1.5rem',
                       paddingBottom: '1.5rem',
-                      color: 'white'
+                      color: isActive ? '#1DA5FF' : 'white'
                     }}
-                    className={`w-full flex items-center gap-3 px-6 mx-2 rounded-lg transition-colors border-none text-white`}
+                    className="w-full flex items-center gap-3 px-6 mx-2 rounded-lg transition-colors border-none"
                   >
-                    <span className="flex-shrink-0" style={{ color: 'white' }}>{getIcon(item.icon)}</span>
-                    <span className="font-medium" style={{ color: 'white' }}>{item.label}</span>
+                    <span className="flex-shrink-0" style={{ color: isActive ? '#1DA5FF' : 'white' }}>{getIcon(item.icon)}</span>
+                    <span className="font-medium" style={{ color: isActive ? '#1DA5FF' : 'white' }}>{item.label}</span>
                   </button>
                 );
               })}
@@ -170,7 +168,7 @@ const CompletedModule = () => {
         <main className="flex-1" style={{ padding: '32px 48px' }}>
           <div className="max-w-6xl mx-auto">
             {/* Congratulations Title */}
-            <div className="text-center mb-16">
+            <div className="text-center mb-12">
               <h1 className="text-5xl font-bold mb-4" style={{ color: 'white' }}>
                 Congratulations!
               </h1>
@@ -179,80 +177,68 @@ const CompletedModule = () => {
               </h2>
             </div>
 
-            {/* Exercise Cards and Overall Accuracy */}
-            <div className="flex justify-center items-start" style={{ gap: '40px', marginTop: '60px', width: '100%' }}>
-              {/* Exercise 1 Card - Left */}
-              <div className="bg-gray-800 rounded-lg shadow-lg text-center" style={{ width: '300px', height: '300px', backgroundColor: '#1E2733', padding: '32px 24px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <h3 className="text-xl font-semibold mb-4" style={{ color: 'white' }}>Exercise 1</h3>
-                <p className="text-sm mb-6" style={{ color: '#9CA3AF' }}>
-                  You maintained steady, controlled pressure for most of the session.
-                </p>
-                <div className="text-4xl font-bold mb-2" style={{ color: 'white' }}>{exercise1Score}%</div>
-                <div className="text-sm" style={{ color: '#9CA3AF' }}>Accuracy</div>
-              </div>
-
-              {/* Overall Accuracy Box - Center with dark container */}
-              <div className="relative flex justify-center" style={{ width: '340px' }}>
-                {/* Dark background container behind */}
-                <div 
-                  className="absolute bg-gray-800 rounded-lg shadow-lg" 
-                  style={{ 
-                    width: '400px', 
-                    height: '100%', 
-                    top: '-30px', 
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    zIndex: 1,
-                    minHeight: '400px',
-                    backgroundColor: '#1E2733'
-                  }}
-                ></div>
-                {/* Overall Accuracy Box */}
-                <div className="relative bg-gray-800 rounded-lg shadow-2xl text-center" style={{ width: '340px', zIndex: 10, padding: '48px 32px', backgroundColor: '#1E2733' }}>
-                  <h3 className="text-2xl font-bold mb-6" style={{ color: 'white' }}>
-                    Overall Accuracy
-                  </h3>
-                  <div className="text-6xl font-bold mb-4" style={{ color: 'white' }}>
-                    {overallScore}%
-                  </div>
-                  <p className="text-lg mb-8" style={{ color: 'white' }}>
-                    Great job!
-                  </p>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={handleRepeatModule}
-                      className="flex-1 px-4 py-3 rounded-lg font-medium transition-colors text-white"
-                      style={{ backgroundColor: '#1DA5FF' }}
-                    >
-                      Repeat Module
-                    </button>
-                    <button
-                      onClick={handleHome}
-                      className="flex-1 px-4 py-3 rounded-lg font-medium transition-colors text-white"
-                      style={{ backgroundColor: '#1DA5FF' }}
-                    >
-                      Home
-                    </button>
-                    <button
-                      onClick={handleNextModule}
-                      className="flex-1 px-4 py-3 rounded-lg font-medium transition-colors text-white"
-                      style={{ backgroundColor: '#1DA5FF' }}
-                    >
-                      Next Module
-                    </button>
-                  </div>
+            {/* Circular Score Bar */}
+            <div className="flex flex-col items-center mb-12" style={{ marginTop: '80px' }}>
+              <div className="relative" style={{ width: '200px', height: '200px' }}>
+                <svg width="200" height="200" viewBox="0 0 200 200" className="transform -rotate-90">
+                  {/* Background ring */}
+                  <circle
+                    cx="100"
+                    cy="100"
+                    r="85"
+                    fill="none"
+                    stroke="#374151"
+                    strokeWidth="14"
+                  />
+                  {/* Score ring */}
+                  <circle
+                    cx="100"
+                    cy="100"
+                    r="85"
+                    fill="none"
+                    stroke="#1DA5FF"
+                    strokeWidth="14"
+                    strokeLinecap="round"
+                    strokeDasharray={2 * Math.PI * 85}
+                    strokeDashoffset={2 * Math.PI * 85 * (1 - Math.min(100, Math.max(0, score)) / 100)}
+                    className="transition-all duration-700 ease-out"
+                  />
+                </svg>
+                <div
+                  className="absolute inset-0 flex items-center justify-center"
+                  style={{ top: 0, left: 0, right: 0, bottom: 0 }}
+                >
+                  <span className="text-4xl font-bold" style={{ color: 'white' }}>
+                    {score.toFixed(0)}%
+                  </span>
                 </div>
               </div>
+              <p className="text-lg mt-4" style={{ color: '#9CA3AF' }}>Score</p>
+            </div>
 
-              {/* Exercise 2 Card - Right */}
-              <div className="bg-gray-800 rounded-lg shadow-lg text-center" style={{ width: '300px', height: '300px', backgroundColor: '#1E2733', padding: '32px 24px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <h3 className="text-xl font-semibold mb-4" style={{ color: 'white' }}>Exercise 2</h3>
-                <p className="text-sm mb-6" style={{ color: '#9CA3AF' }}>
-                  You accurately followed expert movements.
-                </p>
-                <div className="text-4xl font-bold mb-2" style={{ color: 'white' }}>{exercise2Score}%</div>
-                <div className="text-sm" style={{ color: '#9CA3AF' }}>Accuracy</div>
-              </div>
+            {/* Action buttons */}
+            <div className="flex justify-center gap-4 flex-wrap" style={{ marginTop: '48px' }}>
+              <button
+                onClick={handleRepeatModule}
+                className="px-6 py-3 rounded-lg font-medium transition-colors hover:opacity-90 text-white"
+                style={{ backgroundColor: '#1DA5FF' }}
+              >
+                Repeat Module
+              </button>
+              <button
+                onClick={handleHome}
+                className="px-6 py-3 rounded-lg font-medium transition-colors hover:opacity-90 text-white"
+                style={{ backgroundColor: '#1DA5FF' }}
+              >
+                Home
+              </button>
+              <button
+                onClick={handleNextModule}
+                className="px-6 py-3 rounded-lg font-medium transition-colors hover:opacity-90 text-white"
+                style={{ backgroundColor: '#1DA5FF' }}
+              >
+                Next Module
+              </button>
             </div>
           </div>
         </main>

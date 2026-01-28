@@ -2,6 +2,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useBLE } from '../contexts/BLEContext';
+import RoboticGripper from '../components/RoboticGripper';
 
 // Web Bluetooth API types
 declare global {
@@ -144,9 +145,94 @@ const Module1Exercise1Start = () => {
  const [timeRemaining, setTimeRemaining] = useState(20);
  const [exerciseStarted, setExerciseStarted] = useState(false);
  const [score, setScore] = useState<number | null>(null);
- 
+ const [overrideBleWarning, setOverrideBleWarning] = useState(false);
+ const [cheatPressure, setCheatPressure] = useState<number | null>(null);
+
  // Use pressure from BLE context
  const pressure = blePressure;
+
+ // Effective pressure: spacebar cheat overrides BLE when held
+ const effectivePressure = cheatPressure !== null ? cheatPressure : pressure;
+
+ // Spacebar cheat: hold = pressure ramps up, release = pressure ramps down
+ const cheatPressureRef = useRef<number>(0);
+ const rampUpIdRef = useRef<ReturnType<typeof setInterval> | null>(null);
+ const rampDownIdRef = useRef<ReturnType<typeof setInterval> | null>(null);
+ const RAMP_DURATION_MS = 2000; // Same speed for both up and down
+ const RAMP_INTERVAL_MS = 50;
+ const CHEAT_MAX_PSI = 35; // Arrow can go to right red; video caps at 20
+
+ // Keep ref in sync with cheat pressure (state updates from ramps)
+ useEffect(() => {
+   if (cheatPressure !== null) cheatPressureRef.current = cheatPressure;
+ }, [cheatPressure]);
+
+ useEffect(() => {
+   const stopRampUp = () => {
+     if (rampUpIdRef.current) {
+       clearInterval(rampUpIdRef.current);
+       rampUpIdRef.current = null;
+     }
+   };
+   const stopRampDown = () => {
+     if (rampDownIdRef.current) {
+       clearInterval(rampDownIdRef.current);
+       rampDownIdRef.current = null;
+     }
+   };
+
+   const onKeyDown = (e: KeyboardEvent) => {
+     if (e.code === 'Space' && !e.repeat) {
+       e.preventDefault();
+       stopRampDown();
+       if (rampUpIdRef.current) return;
+       const startPsi = cheatPressureRef.current;
+       const startTime = Date.now();
+       rampUpIdRef.current = setInterval(() => {
+         const elapsed = Date.now() - startTime;
+         const ratio = Math.min(elapsed / RAMP_DURATION_MS, 1);
+         const psi = startPsi + ratio * (CHEAT_MAX_PSI - startPsi);
+         cheatPressureRef.current = psi;
+         setCheatPressure(psi);
+         if (ratio >= 1) {
+           stopRampUp();
+         }
+       }, RAMP_INTERVAL_MS);
+     }
+   };
+
+   const onKeyUp = (e: KeyboardEvent) => {
+     if (e.code === 'Space' && !e.repeat) {
+       e.preventDefault();
+       stopRampUp();
+       if (rampDownIdRef.current) return;
+       const startPsi = cheatPressureRef.current;
+       const startTime = Date.now();
+       setCheatPressure(startPsi);
+       rampDownIdRef.current = setInterval(() => {
+         const elapsed = Date.now() - startTime;
+         const ratio = Math.min(elapsed / RAMP_DURATION_MS, 1);
+         const psi = Math.max(0, startPsi * (1 - ratio));
+         cheatPressureRef.current = psi;
+         setCheatPressure(psi);
+         if (ratio >= 1 || psi <= 0) {
+           stopRampDown();
+           setCheatPressure(null);
+           cheatPressureRef.current = 0;
+         }
+       }, RAMP_INTERVAL_MS);
+     }
+   };
+
+   window.addEventListener('keydown', onKeyDown);
+   window.addEventListener('keyup', onKeyUp);
+   return () => {
+     window.removeEventListener('keydown', onKeyDown);
+     window.removeEventListener('keyup', onKeyUp);
+     stopRampUp();
+     stopRampDown();
+   };
+ }, []);
  
  const intervalRef = useRef<number | null>(null);
  const mockSensorRef = useRef<number | null>(null);
@@ -252,21 +338,21 @@ useEffect(() => {
   }
 }, [pressure, bleIsConnected]);
 
-// Start exercise when first non-zero pressure is detected
+// Start exercise when first non-zero pressure is detected (BLE or spacebar cheat)
 useEffect(() => {
-  if (!exerciseStartedRef.current && pressure > 0 && bleIsConnected) {
-    console.log('Starting exercise - first non-zero pressure detected:', pressure);
+  const canStart = (bleIsConnected || overrideBleWarning) && effectivePressure > 0;
+  if (!exerciseStartedRef.current && canStart) {
+    console.log('Starting exercise - first non-zero pressure detected:', effectivePressure);
     setExerciseStarted(true);
     setIsExerciseActive(true);
     startTimeRef.current = Date.now();
     lastCheckTimeRef.current = Date.now();
-    // Stop mock sensor if it was running
     if (mockSensorRef.current) {
       clearInterval(mockSensorRef.current);
       mockSensorRef.current = null;
     }
   }
-}, [pressure, bleIsConnected]);
+}, [effectivePressure, bleIsConnected, overrideBleWarning]);
 
  // Track time spent in target threshold
  useEffect(() => {
@@ -282,12 +368,12 @@ useEffect(() => {
        const now = Date.now();
        const lastCheck = lastCheckTimeRef.current || now;
        const timeDelta = now - lastCheck;
-       
+
        // Check if current pressure is in target range (15-20 PSI)
-       if (pressure >= TARGET_MIN && pressure <= TARGET_MAX) {
+       if (effectivePressure >= TARGET_MIN && effectivePressure <= TARGET_MAX) {
          timeOnThresholdRef.current += timeDelta;
        }
-       
+
        lastCheckTimeRef.current = now;
      }, 100);
    }
@@ -298,7 +384,7 @@ useEffect(() => {
        thresholdCheckIntervalRef.current = null;
      }
    };
- }, [isExerciseActive, exerciseStarted, pressure]);
+ }, [isExerciseActive, exerciseStarted, effectivePressure]);
 
  // Timer countdown - starts immediately when exercise becomes active
  useEffect(() => {
@@ -350,16 +436,12 @@ useEffect(() => {
    }
  }, [exerciseStarted, timeRemaining]);
 
- // Navigate when complete (with delay to show score)
+ // Stop mock sensor when exercise completes
  useEffect(() => {
    if (exerciseStarted && timeRemaining === 0 && score !== null) {
      if (mockSensorRef.current) clearInterval(mockSensorRef.current);
-     // Show score for 3 seconds before navigating
-     setTimeout(() => {
-       navigate('/Module1Exercise2Start');
-     }, 3000);
    }
- }, [exerciseStarted, timeRemaining, navigate, score]);
+ }, [exerciseStarted, timeRemaining, score]);
 
  // Cleanup on unmount
  useEffect(() => {
@@ -379,14 +461,12 @@ useEffect(() => {
 
  // Gauge component
  const PressureGauge = () => {
-   // Calculate triangle position directly using current pressure state
    const maxPressure = 35;
-   const trianglePosition = Math.min((pressure / maxPressure) * 100, 100);
-   
-   // Debug logging
+   const trianglePosition = Math.min((effectivePressure / maxPressure) * 100, 100);
+
    useEffect(() => {
-     console.log('PressureGauge render - Pressure:', pressure, 'PSI, Triangle Position:', trianglePosition.toFixed(1), '%');
-   }, [pressure, trianglePosition]);
+     console.log('PressureGauge render - Pressure:', effectivePressure, 'PSI, Triangle Position:', trianglePosition.toFixed(1), '%');
+   }, [effectivePressure, trianglePosition]);
 
    return (
      <div className="flex flex-col items-center">
@@ -398,48 +478,61 @@ useEffect(() => {
          <p className="text-white text-2xl font-bold mb-4">
            {timeRemaining}s
          </p>
-       ) : (
-         <div className="flex flex-col items-center mb-4">
-           <p className="text-white text-2xl font-bold mb-2" style={{ color: '#22c55e' }}>
-             Exercise Complete!
-           </p>
-           {score !== null && (
-             <p className="text-white text-xl font-semibold" style={{ color: '#1DA5FF' }}>
-               Score: {score.toFixed(1)}%
-             </p>
-           )}
-         </div>
-       )}
+      ) : (
+        <div className="flex flex-col items-center mb-4">
+          <p className="text-white text-2xl font-bold mb-2" style={{ color: '#22c55e' }}>
+            Exercise Complete!
+          </p>
+          {score !== null && (
+            <div className="flex items-center" style={{ gap: '16px' }}>
+              <p className="text-white text-xl font-semibold" style={{ color: '#1DA5FF' }}>
+                Score: {score.toFixed(1)}%
+              </p>
+              <button
+                onClick={() => navigate('/module/1/completed', { state: { sessionId, score } })}
+                className="px-8 py-3 rounded-lg font-semibold text-white text-lg transition-colors hover:opacity-90"
+                style={{ backgroundColor: '#1DA5FF' }}
+              >
+                Continue
+              </button>
+            </div>
+          )}
+        </div>
+      )}
        
-       <div className="relative w-[480px] max-w-full mb-10">
-         <div
-           className="w-full h-[48px] rounded-[14px] shadow-lg mx-auto"
-           style={{
-             background: "linear-gradient(90deg, #ef4444 10%, #f97316 28%, #22c55e 50%, #f97316 72%, #ef4444 90%)",
-             border: "1.5px solid #e2e8f0",
-             boxShadow: "0 4px 24px 2px rgba(0,0,0,0.04)"
-           }}
-         />
-         
-         <div 
-           className="absolute top-full mt-2 transition-all duration-200 ease-out"
-           style={{ 
-             left: `${trianglePosition}%`,
-             transform: 'translateX(-50%)'
-           }}
-         >
-           <svg width="22" height="16" viewBox="0 0 22 16" className="text-white">
-             <path d="M11 16L0 0h22L11 16z" fill="white" />
-             <path d="M11 15L1.5 1h19L11 15z" fill="#e5e7eb" opacity="0.25" />
-           </svg>
+       <div className="w-[480px] max-w-full mb-4 mx-auto">
+         {/* Bar + arrow wrapper - arrow positioned relative to bar only */}
+         <div className="relative w-full">
+           <div
+             className="w-full h-[48px] rounded-[14px] shadow-lg"
+             style={{
+               background: "linear-gradient(90deg, #ef4444 10%, #f97316 28%, #22c55e 50%, #f97316 72%, #ef4444 90%)",
+               border: "1.5px solid #e2e8f0",
+               boxShadow: "0 4px 24px 2px rgba(0,0,0,0.04)"
+             }}
+           />
+           
+           <div 
+             className="absolute top-full transition-all duration-200 ease-out"
+             style={{ 
+               left: `${trianglePosition}%`,
+               transform: 'translateX(-50%)',
+               marginTop: '12px'
+             }}
+           >
+             <svg width="22" height="16" viewBox="0 0 22 16" className="text-white">
+               <path d="M11 16L0 0h22L11 16z" fill="white" />
+               <path d="M11 15L1.5 1h19L11 15z" fill="#e5e7eb" opacity="0.25" />
+             </svg>
+           </div>
          </div>
 
-         <div className="text-center mt-12">
+         <div className="text-center mt-[36px] flex flex-wrap items-center justify-center" style={{ gap: '32px' }}>
            <p className="text-white text-sm">
-             Current Pressure: <span className="font-bold">{pressure.toFixed(1)} PSI</span>
+             Current Pressure: <span className="font-bold">{effectivePressure.toFixed(1)} PSI</span>
            </p>
            {exerciseStarted && (
-             <p className="text-white text-xs mt-1" style={{ opacity: 0.75 }}>
+             <p className="text-white text-xs" style={{ opacity: 0.75 }}>
                Target: 15-20 PSI
              </p>
            )}
@@ -449,28 +542,83 @@ useEffect(() => {
    );
  };
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#26313E' }}>
+    <div className="min-h-screen relative" style={{ backgroundColor: '#26313E' }}>
+      {/* BLE Status Popup Overlay */}
+      {!bleIsConnected && !overrideBleWarning && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ 
+            backgroundColor: 'rgba(0, 0, 0, 0.25)',
+            backdropFilter: 'blur(4px)',
+            left: 0,
+            right: 0,
+            top: 0,
+            bottom: 0
+          }}
+        >
+          <div 
+            className="bg-[#1E2733] rounded-lg p-6 shadow-2xl border-2 flex-shrink-0"
+            style={{ 
+              borderColor: '#ef4444',
+              maxWidth: '400px',
+              width: '100%'
+            }}
+          >
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0" style={{ fontSize: '24px' }}>⚠️</div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold mb-2" style={{ color: '#ef4444' }}>
+                  BLE Device Not Connected
+                </h3>
+                <p className="text-sm mb-3" style={{ color: '#9CA3AF' }}>
+                  Status: {bleConnectionStatus}
+                </p>
+                <p className="text-sm mb-4" style={{ color: '#9CA3AF' }}>
+                  Please connect your device on the Dashboard first.
+                </p>
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => navigate('/dashboard')}
+                    className="w-full px-4 py-2 rounded-lg font-medium transition-colors hover:opacity-90"
+                    style={{ backgroundColor: '#1DA5FF', color: 'white' }}
+                  >
+                    Go to Dashboard
+                  </button>
+                  <button
+                    onClick={() => setOverrideBleWarning(true)}
+                    className="w-full px-4 py-2 rounded-lg font-medium transition-colors hover:opacity-90 border"
+                    style={{ backgroundColor: 'transparent', color: '#9CA3AF', borderColor: '#6B7280' }}
+                  >
+                    Override — continue editing
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header Container - Top Bar */}
-      <header className="flex items-center justify-between px-6 py-4" style={{ backgroundColor: '#1E2733' }}>
+      <header className="flex items-center justify-between px-6 py-2" style={{ backgroundColor: '#1E2733' }}>
         <div className="flex items-center gap-4">
           {/* Logo container - allows positioning/tweaking as needed */}
-          <div className="flex items-center justify-center overflow-hidden" style={{ width: '100px', height: '100px' }}>
+          <div className="flex items-center justify-center overflow-hidden" style={{ width: '72px', height: '72px' }}>
             <img 
               src="/Logo.png" 
               alt="Logo" 
               className="object-contain"
               style={{ 
-                width: '100px', 
-                height: '100px', 
-                maxWidth: '100px', 
-                maxHeight: '100px',
+                width: '72px', 
+                height: '72px', 
+                maxWidth: '72px', 
+                maxHeight: '72px',
                 objectFit: 'contain'
               }}
             />
           </div>
         </div>
         {/* Profile picture */}
-        <div className="w-10 h-10 rounded-full bg-gray-500 overflow-hidden flex items-center justify-center">
+        <div className="w-9 h-9 rounded-full bg-gray-500 overflow-hidden flex items-center justify-center">
           <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
             <circle cx="14" cy="14" r="14" fill="#9CA3AF"/>
             <circle cx="14" cy="10" r="4" fill="#4B5563"/>
@@ -498,7 +646,7 @@ useEffect(() => {
                     key={item.path}
                     onClick={() => navigate(item.path)}
                     style={{ 
-                      backgroundColor: isActive ? '#1DA5FF' : '#1E2733',
+                      backgroundColor: '#1E2733',
                       border: 'none',
                       paddingTop: '1.5rem',
                       paddingBottom: '1.5rem',
@@ -506,8 +654,8 @@ useEffect(() => {
                     }}
                     className={`w-full flex items-center gap-3 px-6 mx-2 rounded-lg transition-colors border-none text-white`}
                   >
-                    <span className="flex-shrink-0" style={{ color: 'white' }}>{getIcon(item.icon)}</span>
-                    <span className="font-medium" style={{ color: 'white' }}>{item.label}</span>
+                    <span className="flex-shrink-0" style={{ color: isActive ? '#1DA5FF' : 'white' }}>{getIcon(item.icon)}</span>
+                    <span className="font-medium" style={{ color: isActive ? '#1DA5FF' : 'white' }}>{item.label}</span>
                   </button>
                 );
               })}
@@ -516,45 +664,40 @@ useEffect(() => {
         </aside>
 
         {/* Main Content Area */}
-        <main className="flex-1 p-8" style={{ color: 'white', marginLeft: '2rem' }}>
+        <main className="flex-1 p-8" style={{ color: 'white', marginLeft: '2rem', paddingTop: '24px' }}>
           <div className="max-w-6xl mx-auto">
             {/* Exercise Title */}
-            <h2 className="text-6xl font-bold mb-6" style={{ color: 'white' }}>
+            <h2 className="text-6xl font-bold mb-4" style={{ color: 'white' }}>
               Exercise 1: Find the Right Pressure
             </h2>
-            {sessionId && (
-              <p className="text-sm mb-4" style={{ color: '#9CA3AF' }}>
-                Session ID: {sessionId}
-              </p>
-            )}
-            {!bleIsConnected && (
-              <div className="mb-4 p-3 rounded-lg" style={{ backgroundColor: '#1E2733', border: '1px solid #ef4444' }}>
-                <p className="text-sm" style={{ color: '#ef4444' }}>
-                  ⚠️ BLE Status: {bleConnectionStatus}
+            {/* Instructions Section - Above everything */}
+            <div className="mb-6" style={{ marginTop: '40px' }}>
+              <div className="space-y-4 text-center max-w-3xl mx-auto">
+                <p className="text-xl leading-relaxed" style={{ color: 'white' }}>
+                  Apply pressure to the control handles and watch the bar respond.
                 </p>
-                <p className="text-xs mt-1" style={{ color: '#9CA3AF' }}>
-                  Please connect your device on the Dashboard first.
+                <p className="text-lg leading-relaxed" style={{ color: 'white' }}>
+                  Keep the bar in the green zone for as much of the 20 seconds as possible. This zone represents optimal pressure for safe and precise movement!
                 </p>
               </div>
-            )}
+            </div>
 
-            <div className="flex gap-12 items-start">
-              {/* Left Section - Instructions */}
-              <div className="flex-1">
-                <div className="space-y-4">
-                  <p className="text-xl leading-relaxed" style={{ color: 'white' }}>
-                    Apply pressure to the control handles and watch the bar respond.
-                  </p>
-                  <p className="text-lg leading-relaxed" style={{ color: 'white' }}>
-                    Keep the bar in the green zone for as much of the 20 seconds as possible. This zone represents optimal pressure for safe and precise movement!
-                  </p>
-                </div>
+            {/* Animation and Bar - Centered */}
+            <div className="flex flex-col items-center gap-8">
+              <div 
+                className="relative flex items-center justify-center"
+                style={{ width: '560px', maxWidth: '100%', height: '450px' }}
+              >
+                <RoboticGripper 
+                  pressure={Math.min(effectivePressure, 20)} 
+                  freezeVideo={effectivePressure > 20} 
+                  showReducePressure={effectivePressure > 20}
+                  videoSrc="/vidu-video-3141028390928910.mov" 
+                />
               </div>
-
-              {/* Right Section - Pressure Gauge */}
-              <div className="flex-1 flex justify-center">
-                <PressureGauge />
-              </div>
+              
+              {/* Pressure Gauge - Below the animation, centered */}
+              <PressureGauge />
             </div>
           </div>
         </main>

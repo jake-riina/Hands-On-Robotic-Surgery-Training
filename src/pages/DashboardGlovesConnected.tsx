@@ -1,5 +1,4 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useState } from 'react';
 import { useBLE } from '../contexts/BLEContext';
 
 const DashboardGlovesConnected = () => {
@@ -99,25 +98,25 @@ const DashboardGlovesConnected = () => {
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#26313E' }}>
       {/* Header Container - Top Bar */}
-      <header className="flex items-center justify-between px-6 py-4" style={{ backgroundColor: '#1E2733' }}>
+      <header className="flex items-center justify-between px-6 py-2" style={{ backgroundColor: '#1E2733' }}>
         <div className="flex items-center gap-4">
-          <div className="flex items-center justify-center overflow-hidden" style={{ width: '100px', height: '100px' }}>
+          <div className="flex items-center justify-center overflow-hidden" style={{ width: '72px', height: '72px' }}>
             <img 
               src="/Logo.png" 
               alt="Logo" 
               className="object-contain"
               style={{ 
-                width: '100px', 
-                height: '100px', 
-                maxWidth: '100px', 
-                maxHeight: '100px',
+                width: '72px', 
+                height: '72px', 
+                maxWidth: '72px', 
+                maxHeight: '72px',
                 objectFit: 'contain'
               }}
             />
           </div>
         </div>
         {/* Profile picture */}
-        <div className="w-10 h-10 rounded-full bg-gray-500 overflow-hidden flex items-center justify-center">
+        <div className="w-9 h-9 rounded-full bg-gray-500 overflow-hidden flex items-center justify-center">
           <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
             <circle cx="14" cy="14" r="14" fill="#9CA3AF"/>
             <circle cx="14" cy="10" r="4" fill="#4B5563"/>
@@ -144,7 +143,7 @@ const DashboardGlovesConnected = () => {
                     key={item.path}
                     onClick={() => navigate(item.path)}
                     style={{ 
-                      backgroundColor: isActive ? '#1DA5FF' : '#1E2733',
+                      backgroundColor: '#1E2733',
                       border: 'none',
                       paddingTop: '1.5rem',
                       paddingBottom: '1.5rem',
@@ -152,8 +151,8 @@ const DashboardGlovesConnected = () => {
                     }}
                     className={`w-full flex items-center gap-3 px-6 mx-2 rounded-lg transition-colors border-none text-white`}
                   >
-                    <span className="flex-shrink-0" style={{ color: 'white' }}>{getIcon(item.icon)}</span>
-                    <span className="font-medium" style={{ color: 'white' }}>{item.label}</span>
+                    <span className="flex-shrink-0" style={{ color: isActive ? '#1DA5FF' : 'white' }}>{getIcon(item.icon)}</span>
+                    <span className="font-medium" style={{ color: isActive ? '#1DA5FF' : 'white' }}>{item.label}</span>
                   </button>
                 );
               })}
@@ -171,7 +170,7 @@ const DashboardGlovesConnected = () => {
             <div className="flex flex-col" style={{ height: '400px', gap: '24px', width: '320px' }}>
               {/* Box 1: Jake's Hands On Gloves Card */}
               <div 
-                className="rounded-lg p-4" 
+                className="rounded-lg p-4 relative" 
                 style={{ 
                   backgroundColor: '#1E2733',
                   boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3)',
@@ -179,6 +178,21 @@ const DashboardGlovesConnected = () => {
                   width: '100%'
                 }}
               >
+                {!isConnected && (
+                  <div className="absolute" style={{ top: '50px', right: '16px', width: '180px', height: '135px' }}>
+                    <img 
+                      src="/Screenshot-3.png" 
+                      alt="HandsOn Gloves" 
+                      className="object-contain"
+                      style={{ 
+                        width: '100%', 
+                        height: '100%',
+                        maxWidth: '180px',
+                        maxHeight: '135px'
+                      }}
+                    />
+                  </div>
+                )}
                 <div className="flex items-start justify-between mb-4">
                   <h3 className="text-lg font-semibold" style={{ color: 'white' }}>
                     Jake's HandsOn Gloves
@@ -191,14 +205,20 @@ const DashboardGlovesConnected = () => {
                   </button>
                 </div>
                   {/* Connection status row */}
-  <div className="flex items-center gap-2 mb-2">
-    <div
-      className="w-2 h-2 rounded-full"
-      style={{ backgroundColor: isConnected ? '#10B981' : '#EF4444' }} // green vs red
-    ></div>
-    <span className="text-sm" style={{ color: '#9CA3AF' }}>
-      {isConnected ? 'Connected' : 'Not connected'}
-    </span>
+  <div className="mb-2">
+    <div className="flex items-center gap-2">
+      <div
+        className="rounded-full flex-shrink-0"
+        style={{ 
+          width: '8px', 
+          height: '8px',
+          backgroundColor: isConnected ? '#10B981' : '#EF4444' // green vs red
+        }}
+      ></div>
+      <span className="text-sm" style={{ color: '#9CA3AF' }}>
+        {isConnected ? 'Connected' : 'Not connected'}
+      </span>
+    </div>
   </div>
 
   {/* Connect / Disconnect button */}
@@ -313,11 +333,11 @@ const DashboardGlovesConnected = () => {
                   }}
                 >
                   <img 
-                    src="/endowrist-scissors.png" 
-                    alt="Da Vinci Endowrist Scissors" 
+                    src="/Mod1Cover.png" 
+                    alt="Module 1: Pressure" 
                     style={{ 
-                      maxWidth: 'calc(100% - 24px)', 
-                      maxHeight: 'calc(100% - 24px)', 
+                      maxWidth: 'calc(100% - 12px)', 
+                      maxHeight: 'calc(100% - 12px)', 
                       width: 'auto', 
                       height: 'auto',
                       objectFit: 'contain',
@@ -326,32 +346,32 @@ const DashboardGlovesConnected = () => {
                       position: 'absolute',
                       left: '46%',
                       top: '50%',
-                      transform: 'translate(-50%, -50%)'
+                      transform: 'translate(-50%, -50%)',
+                      borderRadius: '8px'
                     }}
                     onError={(e) => {
-                      console.error('Image failed to load. Trying original path...');
+                      console.error('Image failed to load. Trying fallback...');
                       e.currentTarget.src = "/Screenshot 2025-12-01 at 5.46.00 PM.png";
                     }}
                     onLoad={() => console.log('Image loaded successfully')}
                   />
                 </div>
-                <h4 className="text-base font-semibold mb-2 flex-shrink-0" style={{ color: 'white' }}>
-                  Cutting (Endowrist Scissors)
+                <h4 className="text-base font-semibold flex-shrink-0" style={{ color: 'white', marginBottom: '4px' }}>
+                  Module 1: Pressure
                 </h4>
                 <p className="text-sm mb-4 leading-relaxed flex-shrink-0" style={{ color: '#9CA3AF' }}>
-                  Simulate cutting along a marked virtual line, maintaining consistent pressure and path.
+                  This module teaches trainees how to apply a consistent, controlled amount of pressure to the Da Vinci console.
                 </p>
                 <div className="mt-auto flex-shrink-0">
                   <button 
                     className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium"
                     style={{ backgroundColor: '#1DA5FF', color: 'white' }}
+                    onClick={() => navigate('/module/1/instructions')}
                   >
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect x="3" y="6" width="10" height="8" rx="1" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-                      <path d="M5 6V4a2 2 0 012-2h2a2 2 0 012 2v2" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-                      <path d="M8 9v2" stroke="currentColor" strokeWidth="1.5"/>
+                      <path d="M6 12l4-4-4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
-                    <span className="text-sm">Locked</span>
+                    <span className="text-sm">Go to Module</span>
                   </button>
                 </div>
               </div>
@@ -387,47 +407,54 @@ const DashboardGlovesConnected = () => {
                   </button>
                 </div>
               </div>
-              <div className="flex flex-col items-center flex-1 justify-center">
-                <div className="relative w-32 h-32 mb-4">
-                  <svg width="128" height="128" viewBox="0 0 128 128">
-                    <g transform="rotate(-90 64 64)">
-                      <circle
-                        cx="64"
-                        cy="64"
-                        r="56"
-                        stroke="#1E2733"
-                        strokeWidth="12"
-                        fill="none"
-                      />
-                      <circle
-                        cx="64"
-                        cy="64"
-                        r="56"
-                        stroke="#1DA5FF"
-                        strokeWidth="12"
-                        fill="none"
-                        strokeDasharray={`${2 * Math.PI * 56 * 0.77} ${2 * Math.PI * 56}`}
-                        strokeLinecap="round"
-                      />
-                    </g>
-                    <text
-                      x="64"
-                      y="64"
-                      textAnchor="middle"
-                      dominantBaseline="middle"
-                      style={{ 
-                        fontSize: '32px', 
-                        fontWeight: 'bold', 
-                        fill: 'white'
-                      }}
-                    >
-                      77%
-                    </text>
-                  </svg>
+              <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
+                <div 
+                  className="w-full rounded-lg mb-3 flex items-center justify-center flex-shrink-0" 
+                  style={{ height: '160px', marginTop: '24px' }}
+                >
+                  <div className="relative w-32 h-32">
+                    <svg width="128" height="128" viewBox="0 0 128 128">
+                      <g transform="rotate(-90 64 64)">
+                        <circle
+                          cx="64"
+                          cy="64"
+                          r="56"
+                          stroke="#1E2733"
+                          strokeWidth="12"
+                          fill="none"
+                        />
+                        <circle
+                          cx="64"
+                          cy="64"
+                          r="56"
+                          stroke="#1DA5FF"
+                          strokeWidth="12"
+                          fill="none"
+                          strokeDasharray={`${2 * Math.PI * 56 * 0.77} ${2 * Math.PI * 56}`}
+                          strokeLinecap="round"
+                        />
+                      </g>
+                      <text
+                        x="64"
+                        y="64"
+                        textAnchor="middle"
+                        dominantBaseline="middle"
+                        style={{ 
+                          fontSize: '32px', 
+                          fontWeight: 'bold', 
+                          fill: 'white'
+                        }}
+                      >
+                        77%
+                      </text>
+                    </svg>
+                  </div>
                 </div>
-                <p className="text-sm font-medium" style={{ color: 'white' }}>
-                  Pressure Accuracy (Module 1)
-                </p>
+                <h4 className="text-base font-semibold flex-shrink-0 text-center" style={{ color: 'white', marginBottom: '4px', marginTop: '48px' }}>
+                  Module 1: Pressure Control
+                  <br />
+                  (High Score)
+                </h4>
               </div>
             </div>
           </div>
@@ -440,13 +467,28 @@ const DashboardGlovesConnected = () => {
               backgroundColor: '#1E2733',
               boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3)',
               width: '1008px',
-              marginTop: '24px'
+              marginTop: '24px',
+              paddingBottom: '24px'
             }}
           >
-            <div className="flex gap-6">
-              <div className="w-32 h-32 rounded-lg overflow-hidden flex-shrink-0" style={{ backgroundColor: '#374151' }}>
-                {/* Placeholder for module image */}
-                <div className="w-full h-full bg-gradient-to-br from-gray-600 to-gray-800"></div>
+            <div className="flex" style={{ gap: '48px', alignItems: 'flex-start' }}>
+              <div 
+                className="rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center" 
+                style={{ 
+                  backgroundColor: '#374151', 
+                  width: '136px', 
+                  height: '136px', 
+                  marginLeft: '16px',
+                  marginTop: 'auto',
+                  marginBottom: 'auto',
+                  transform: 'translateY(12px)'
+                }}
+              >
+                <img
+                  src="/Mod1Cover.png"
+                  alt="Module 1: Pressure"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center center', display: 'block' }}
+                />
               </div>
               <div className="flex-1">
                 <h3 className="text-xl font-semibold mb-2" style={{ color: 'white' }}>
@@ -459,10 +501,6 @@ const DashboardGlovesConnected = () => {
                   Enhance your robotic surgery skills by mastering precise pressure control to ensure safe, accurate instrument handling.
                 </p>
                 <div className="flex items-center gap-2 mb-4">
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ color: '#9CA3AF' }}>
-                    <path d="M3 2h10a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-                    <path d="M5 2v14M11 2v14M3 6h10M3 10h10" stroke="currentColor" strokeWidth="1.5"/>
-                  </svg>
                   <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ backgroundColor: '#374151' }}>
                     <div 
                       className="h-full rounded-full"
@@ -472,7 +510,6 @@ const DashboardGlovesConnected = () => {
                       }}
                     ></div>
                   </div>
-                  <span className="text-sm" style={{ color: '#9CA3AF' }}>0%</span>
                 </div>
                 <button 
                   className="px-6 py-2 rounded-lg font-medium"
