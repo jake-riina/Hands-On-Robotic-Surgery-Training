@@ -37,7 +37,9 @@ const LoginTraineeV1: React.FC = () => {
   }, []);
 
   /* ---------- Check if user is already logged in ---------- */
+  /* Skip redirect in dev so "npm run dev" always opens login page */
   useEffect(() => {
+    if (import.meta.env.DEV) return;
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {

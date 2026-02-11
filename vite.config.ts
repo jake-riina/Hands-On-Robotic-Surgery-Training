@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    open: '/',
+    open: '/login-trainee-v1',
     host: '127.0.0.1',
   },
 })

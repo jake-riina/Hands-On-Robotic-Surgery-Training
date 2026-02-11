@@ -4,9 +4,9 @@ import type { Module, Exercise, ModuleProgress, ExerciseScore } from './types';
 const mockModules: Module[] = [
   {
     id: 1,
-    title: 'Module 1: Basic Techniques',
-    description: 'Learn fundamental robotic surgery techniques',
-    instructions: 'This module covers the basics of robotic surgery. Follow the instructions carefully.',
+    title: 'Pressure',
+    description: 'Learn to control and maintain consistent pressure with the robotic instruments.',
+    instructions: 'This module covers pressure control fundamentals. Follow the instructions carefully.',
     exercises: [
       {
         id: 1,
@@ -27,29 +27,49 @@ const mockModules: Module[] = [
         passingScore: 70,
       },
     ],
-    progress: 0,
+    progress: 77,
     completed: false,
     locked: false,
   },
   {
     id: 2,
-    title: 'Module 2: Advanced Techniques',
-    description: 'Advanced robotic surgery procedures',
-    instructions: 'This module builds on Module 1.',
+    title: 'Camera Control',
+    description: 'Master camera positioning and navigation for optimal surgical view.',
+    instructions: 'This module covers camera control and ergonomics.',
     exercises: [
       {
         id: 3,
         moduleId: 2,
-        title: 'Exercise 1: Complex Movements',
-        description: 'Practice complex hand coordination',
-        instructions: 'Coordinate both hands simultaneously.',
+        title: 'Exercise 1: Camera Positioning',
+        description: 'Practice optimal camera placement',
+        instructions: 'Position the camera for clear, stable views.',
         maxScore: 100,
         passingScore: 75,
       },
     ],
     progress: 0,
     completed: false,
-    locked: true, // Locked until Module 1 is completed
+    locked: true, // Coming soon
+  },
+  {
+    id: 3,
+    title: 'Peg Transfer',
+    description: 'Develop precision and dexterity by transferring pegs between targets.',
+    instructions: 'This module builds hand-eye coordination and instrument control.',
+    exercises: [
+      {
+        id: 4,
+        moduleId: 3,
+        title: 'Exercise 1: Peg Transfer',
+        description: 'Transfer pegs between pegs and targets',
+        instructions: 'Pick and place pegs accurately with both hands.',
+        maxScore: 100,
+        passingScore: 75,
+      },
+    ],
+    progress: 0,
+    completed: false,
+    locked: true, // Coming soon
   },
 ];
 
