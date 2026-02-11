@@ -11,6 +11,7 @@ import Module1Exercise1Score from '../pages/Module1Exercise1Score';
 import Module1Exercise2Start from '../pages/Module1Exercise2Start';
 import Module1Exercise2Score from '../pages/Module1Exercise2Score';
 import CompletedModule from '../pages/CompletedModule';
+import IncompleteModule1 from '../pages/IncompleteModule1';
 
 export const router = createBrowserRouter([
   {
@@ -64,6 +65,10 @@ export const router = createBrowserRouter([
   {
     path: '/module/1/completed',
     element: <CompletedModule />,
+  },
+  {
+    path: '/module/1/incomplete',
+    element: <IncompleteModule1 />,
   },
 ]);
 
