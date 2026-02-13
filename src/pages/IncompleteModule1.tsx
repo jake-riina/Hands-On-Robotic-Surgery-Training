@@ -1,72 +1,77 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import styles from './CompletedModule.module.css';
 
-const CompletedModule = () => {
+const IncompleteModule1 = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
   // Navigation items with icons
   const navItems = [
-    { 
-      path: '/dashboard', 
-      label: 'Dashboard', 
-      icon: 'dashboard', 
+    {
+      path: '/dashboard',
+      label: 'Dashboard',
+      icon: 'dashboard',
       className: 'text-white no-underline',
-      iconColor: 'white'
+      iconColor: 'white',
     },
-    { 
-      path: '/modules', 
-      label: 'Modules', 
-      icon: 'modules', 
+    {
+      path: '/modules',
+      label: 'Modules',
+      icon: 'modules',
       className: 'text-white no-underline',
-      iconColor: 'white'
+      iconColor: 'white',
     },
-    { 
-      path: '/analytics', 
-      label: 'Analytics', 
-      icon: 'analytics', 
+    {
+      path: '/analytics',
+      label: 'Analytics',
+      icon: 'analytics',
       className: 'text-white no-underline',
-      iconColor: 'white'
+      iconColor: 'white',
     },
-    { 
-      path: '/settings', 
-      label: 'Settings', 
-      icon: 'settings', 
+    {
+      path: '/settings',
+      label: 'Settings',
+      icon: 'settings',
       className: 'text-white no-underline',
-      iconColor: 'white'
+      iconColor: 'white',
     },
   ];
 
   // Icon components as inline SVGs
   const DashboardIcon = () => (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="3" y="3" width="6" height="6" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-      <rect x="11" y="3" width="6" height="6" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-      <rect x="3" y="11" width="6" height="6" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-      <rect x="11" y="11" width="6" height="6" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+      <rect x="3" y="3" width="6" height="6" stroke="currentColor" strokeWidth="1.5" fill="none" />
+      <rect x="11" y="3" width="6" height="6" stroke="currentColor" strokeWidth="1.5" fill="none" />
+      <rect x="3" y="11" width="6" height="6" stroke="currentColor" strokeWidth="1.5" fill="none" />
+      <rect x="11" y="11" width="6" height="6" stroke="currentColor" strokeWidth="1.5" fill="none" />
     </svg>
   );
 
   const ModulesIcon = () => (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="4" y="4" width="7" height="7" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-      <rect x="9" y="9" width="7" height="7" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+      <rect x="4" y="4" width="7" height="7" stroke="currentColor" strokeWidth="1.5" fill="none" />
+      <rect x="9" y="9" width="7" height="7" stroke="currentColor" strokeWidth="1.5" fill="none" />
     </svg>
   );
 
   const AnalyticsIcon = () => (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="3" y="15" width="3" height="2" fill="currentColor"/>
-      <rect x="7" y="11" width="3" height="6" fill="currentColor"/>
-      <rect x="11" y="8" width="3" height="9" fill="currentColor"/>
-      <rect x="15" y="4" width="3" height="13" fill="currentColor"/>
+      <rect x="3" y="15" width="3" height="2" fill="currentColor" />
+      <rect x="7" y="11" width="3" height="6" fill="currentColor" />
+      <rect x="11" y="8" width="3" height="9" fill="currentColor" />
+      <rect x="15" y="4" width="3" height="13" fill="currentColor" />
     </svg>
   );
 
   const SettingsIcon = () => (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-      <path d="M15.66 11.7l-.73-.42a3.5 3.5 0 000-1.56l.73-.42a.5.5 0 00.18-.68l-.68-1.18a.5.5 0 00-.69-.18l-.73.42a3.5 3.5 0 00-1.18-.68V6.5a.5.5 0 00-.5-.5H8.5a.5.5 0 00-.5.5v.84a3.5 3.5 0 00-1.18.68l-.73-.42a.5.5 0 00-.69.18l-.68 1.18a.5.5 0 00.18.68l.73.42a3.5 3.5 0 000 1.56l-.73.42a.5.5 0 00-.18.68l.68 1.18a.5.5 0 00.69.18l.73-.42a3.5 3.5 0 001.18.68v.84a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-.84a3.5 3.5 0 001.18-.68l.73.42a.5.5 0 00.69-.18l.68-1.18a.5.5 0 00-.18-.68z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+      <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" stroke="currentColor" strokeWidth="1.5" fill="none" />
+      <path
+        d="M15.66 11.7l-.73-.42a3.5 3.5 0 000-1.56l.73-.42a.5.5 0 00.18-.68l-.68-1.18a.5.5 0 00-.69-.18l-.73.42a3.5 3.5 0 00-1.18-.68V6.5a.5.5 0 00-.5-.5H8.5a.5.5 0 00-.5.5v.84a3.5 3.5 0 00-1.18.68l-.73-.42a.5.5 0 00-.69.18l-.68 1.18a.5.5 0 00.18.68l.73.42a3.5 3.5 0 000 1.56l-.73.42a.5.5 0 00-.18.68l.68 1.18a.5.5 0 00.69.18l.73-.42a3.5 3.5 0 001.18.68v.84a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-.84a3.5 3.5 0 001.18-.68l.73.42a.5.5 0 00.69-.18l.68-1.18a.5.5 0 00-.18-.68z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        fill="none"
+      />
     </svg>
   );
 
@@ -85,7 +90,7 @@ const CompletedModule = () => {
     }
   };
 
-  // Score from exercise (Continue) or fallback when visiting directly
+  // Score from exercise or fallback when visiting directly
   const score = (location.state as { score?: number } | null)?.score ?? 0;
 
   // Placeholder pressure distribution (TODO: wire to real data when available)
@@ -111,16 +116,16 @@ const CompletedModule = () => {
       <header className="flex items-center justify-between px-6 py-2" style={{ backgroundColor: '#1E2733' }}>
         <div className="flex items-center gap-4">
           <div className="flex items-center justify-center overflow-hidden" style={{ width: '72px', height: '72px' }}>
-            <img 
-              src="/Logo.png" 
-              alt="Logo" 
+            <img
+              src="/Logo.png"
+              alt="Logo"
               className="object-contain"
-              style={{ 
-                width: '72px', 
-                height: '72px', 
-                maxWidth: '72px', 
+              style={{
+                width: '72px',
+                height: '72px',
+                maxWidth: '72px',
                 maxHeight: '72px',
-                objectFit: 'contain'
+                objectFit: 'contain',
               }}
             />
           </div>
@@ -128,9 +133,9 @@ const CompletedModule = () => {
         {/* Profile picture */}
         <div className="w-9 h-9 rounded-full bg-gray-500 overflow-hidden flex items-center justify-center">
           <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="14" cy="14" r="14" fill="#9CA3AF"/>
-            <circle cx="14" cy="10" r="4" fill="#4B5563"/>
-            <path d="M 6 22 Q 6 18 10 18 L 18 18 Q 22 18 22 22 L 22 28 L 6 28 Z" fill="#4B5563"/>
+            <circle cx="14" cy="14" r="14" fill="#9CA3AF" />
+            <circle cx="14" cy="10" r="4" fill="#4B5563" />
+            <path d="M 6 22 Q 6 18 10 18 L 18 18 Q 22 18 22 22 L 22 28 L 6 28 Z" fill="#4B5563" />
           </svg>
         </div>
       </header>
@@ -142,27 +147,37 @@ const CompletedModule = () => {
           <nav className="py-6">
             <div className="space-y-2 pt-[30px]">
               {navItems.map((item) => {
-                const isActive = 
-                  (item.path === '/dashboard' && location.pathname.startsWith('/dashboard') && !location.pathname.startsWith('/modules')) ||
-                  (item.path === '/modules' && (location.pathname.startsWith('/modules') || location.pathname.startsWith('/module'))) ||
+                const isActive =
+                  (item.path === '/dashboard' &&
+                    location.pathname.startsWith('/dashboard') &&
+                    !location.pathname.startsWith('/modules')) ||
+                  (item.path === '/modules' &&
+                    (location.pathname.startsWith('/modules') || location.pathname.startsWith('/module'))) ||
                   (item.path === '/analytics' && location.pathname.startsWith('/analytics')) ||
                   (item.path === '/settings' && location.pathname.startsWith('/settings'));
-                
+
                 return (
                   <button
                     key={item.path}
                     onClick={() => navigate(item.path)}
-                    style={{ 
+                    style={{
                       backgroundColor: '#1E2733',
                       border: 'none',
                       paddingTop: '1.5rem',
                       paddingBottom: '1.5rem',
-                      color: isActive ? '#1DA5FF' : 'white'
+                      color: isActive ? '#1DA5FF' : 'white',
                     }}
                     className="w-full flex items-center gap-3 px-6 mx-2 rounded-lg transition-colors border-none"
                   >
-                    <span className="flex-shrink-0" style={{ color: isActive ? '#1DA5FF' : 'white' }}>{getIcon(item.icon)}</span>
-                    <span className="font-medium" style={{ color: isActive ? '#1DA5FF' : 'white' }}>{item.label}</span>
+                    <span
+                      className="flex-shrink-0"
+                      style={{ color: isActive ? '#1DA5FF' : 'white' }}
+                    >
+                      {getIcon(item.icon)}
+                    </span>
+                    <span className="font-medium" style={{ color: isActive ? '#1DA5FF' : 'white' }}>
+                      {item.label}
+                    </span>
                   </button>
                 );
               })}
@@ -176,10 +191,10 @@ const CompletedModule = () => {
             {/* Page header - centered above both columns */}
             <div className={`text-center ${styles.pageHeader}`}>
               <h1 className="text-5xl font-bold mb-4" style={{ color: 'white' }}>
-                Congratulations!
+                Module Incomplete
               </h1>
               <h2 className="text-3xl font-semibold" style={{ color: 'white' }}>
-                You have completed Module 1
+                Continue practicing to improve pressure control.
               </h2>
             </div>
 
@@ -190,7 +205,8 @@ const CompletedModule = () => {
                   <div
                     className="w-full h-[48px] rounded-[14px] shadow-lg"
                     style={{
-                      background: 'linear-gradient(90deg, #ef4444 10%, #f97316 28%, #22c55e 50%, #f97316 72%, #ef4444 90%)',
+                      background:
+                        'linear-gradient(90deg, #ef4444 10%, #f97316 28%, #22c55e 50%, #f97316 72%, #ef4444 90%)',
                       border: '1.5px solid #e2e8f0',
                       boxShadow: '0 4px 24px 2px rgba(0,0,0,0.04)',
                     }}
@@ -240,7 +256,9 @@ const CompletedModule = () => {
                           strokeWidth="14"
                           strokeLinecap="round"
                           strokeDasharray={2 * Math.PI * 85}
-                          strokeDashoffset={2 * Math.PI * 85 * (1 - Math.min(100, Math.max(0, score)) / 100)}
+                          strokeDashoffset={
+                            2 * Math.PI * 85 * (1 - Math.min(100, Math.max(0, score)) / 100)
+                          }
                           className="transition-all duration-700 ease-out"
                         />
                       </svg>
@@ -253,7 +271,9 @@ const CompletedModule = () => {
                         </span>
                       </div>
                     </div>
-                    <p className="text-lg mt-4" style={{ color: '#9CA3AF' }}>Score</p>
+                    <p className="text-lg mt-4" style={{ color: '#9CA3AF' }}>
+                      Score
+                    </p>
                   </div>
 
                   {/* Action buttons */}
@@ -274,7 +294,8 @@ const CompletedModule = () => {
                     </button>
                     <button
                       onClick={handleNextModule}
-                      className="px-6 py-3 rounded-lg font-medium transition-colors hover:opacity-90 text-white"
+                      disabled
+                      className="px-6 py-3 rounded-lg font-medium transition-colors text-white disabled:opacity-50 disabled:cursor-not-allowed"
                       style={{ backgroundColor: '#1DA5FF' }}
                     >
                       Next Module
@@ -290,4 +311,4 @@ const CompletedModule = () => {
   );
 };
 
-export default CompletedModule;
+export default IncompleteModule1;
