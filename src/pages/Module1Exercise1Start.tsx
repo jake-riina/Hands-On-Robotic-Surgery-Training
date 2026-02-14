@@ -489,7 +489,10 @@ useEffect(() => {
                 Score: {score.toFixed(1)}%
               </p>
               <button
-                onClick={() => navigate('/module/1/completed', { state: { sessionId, score } })}
+                onClick={() => {
+                  const path = score >= 80 ? '/module/1/completed' : '/module/1/incomplete';
+                  navigate(path, { state: { sessionId, score } });
+                }}
                 className="px-8 py-3 rounded-lg font-semibold text-white text-lg transition-colors hover:opacity-90"
                 style={{ backgroundColor: '#1DA5FF' }}
               >

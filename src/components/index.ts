@@ -6,4 +6,5 @@ export { default as ModuleCard } from './ModuleCard';
 export { default as ScorePopup } from './ScorePopup';
 export { default as PressureDisplay } from './PressureDisplay';
 export { default as Graph } from './Graph';
+export { default as AppLayout } from './AppLayout';
 
