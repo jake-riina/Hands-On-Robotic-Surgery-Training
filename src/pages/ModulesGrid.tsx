@@ -9,6 +9,7 @@ const ModulesGrid = () => {
   const location = useLocation();
   const [modules, setModules] = useState<Module[]>([]);
   const [loading, setLoading] = useState(true);
+  const [unlockedModuleIds, setUnlockedModuleIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     mockModulesAPI.getAllModules().then((data) => {
@@ -145,7 +146,8 @@ const ModulesGrid = () => {
               }}
             >
               {modules.map((module) => {
-                const isLocked = module.locked;
+                const isUnlockedByUser = unlockedModuleIds.has(module.id);
+                const isLocked = module.locked && !isUnlockedByUser;
                 const content = (
                   <div
                     className="rounded-lg p-6 flex flex-col h-full transition-all"
@@ -242,15 +244,47 @@ const ModulesGrid = () => {
                     )}
                     <div className="mt-auto pt-2 flex justify-end">
                       {isLocked ? (
-                        <span
-                          className="inline-block px-8 py-2 rounded-lg font-medium text-center text-sm cursor-not-allowed"
-                          style={{ backgroundColor: '#374151', color: '#9CA3AF', minWidth: '180px' }}
-                        >
-                          Go To Module
-                        </span>
+                        module.id === 2 ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setUnlockedModuleIds((prev) => new Set(prev).add(2));
+                              navigate('/module/2/camera-control');
+                            }}
+                            className="inline-block px-8 py-2 rounded-lg font-medium text-center text-sm cursor-pointer hover:opacity-90 border-0"
+                            style={{ backgroundColor: '#1DA5FF', color: 'white', minWidth: '180px' }}
+                          >
+                            Go To Module
+                          </button>
+                        ) : module.id === 3 ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setUnlockedModuleIds((prev) => new Set(prev).add(3));
+                              navigate('/module/3/peg-transfer');
+                            }}
+                            className="inline-block px-8 py-2 rounded-lg font-medium text-center text-sm cursor-pointer hover:opacity-90 border-0"
+                            style={{ backgroundColor: '#1DA5FF', color: 'white', minWidth: '180px' }}
+                          >
+                            Go To Module
+                          </button>
+                        ) : (
+                          <span
+                            className="inline-block px-8 py-2 rounded-lg font-medium text-center text-sm cursor-not-allowed"
+                            style={{ backgroundColor: '#374151', color: '#9CA3AF', minWidth: '180px' }}
+                          >
+                            Go To Module
+                          </span>
+                        )
                       ) : (
                         <Link
-                          to={`/module/${module.id}/instructions`}
+                          to={
+                            module.id === 2
+                              ? '/module/2/camera-control'
+                              : module.id === 3
+                                ? '/module/3/peg-transfer'
+                                : `/module/${module.id}/instructions`
+                          }
                           className="inline-block px-8 py-2 rounded-lg font-medium text-center transition-colors hover:opacity-90 text-sm"
                           style={{ backgroundColor: '#1DA5FF', color: 'white', textDecoration: 'none', minWidth: '180px' }}
                         >
