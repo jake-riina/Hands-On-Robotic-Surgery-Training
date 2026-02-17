@@ -11,6 +11,8 @@ import Module1Exercise1Score from '../pages/Module1Exercise1Score';
 import Module1Exercise2Start from '../pages/Module1Exercise2Start';
 import Module1Exercise2Score from '../pages/Module1Exercise2Score';
 import CompletedModule from '../pages/CompletedModule';
+import PegTransfer from '../pages/PegTransfer';
+import CameraControl from '../pages/CameraControl';
 import IncompleteModule1 from '../pages/IncompleteModule1';
 
 export const router = createBrowserRouter([
@@ -69,6 +71,14 @@ export const router = createBrowserRouter([
   {
     path: '/module/1/incomplete',
     element: <IncompleteModule1 />,
+  },
+  {
+    path: '/module/2/camera-control',
+    element: <CameraControl />,
+  },
+  {
+    path: '/module/3/peg-transfer',
+    element: <PegTransfer />,
   },
 ]);
 
