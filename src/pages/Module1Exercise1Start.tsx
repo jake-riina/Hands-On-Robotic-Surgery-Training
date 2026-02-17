@@ -426,6 +426,15 @@ useEffect(() => {
      setScore(calculatedScore);
      console.log('Exercise completed. Score:', calculatedScore.toFixed(1), '%');
 
+    // Persist latest Module 1 score so it can be shown even when revisiting later
+    try {
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('module1_last_score', String(calculatedScore));
+      }
+    } catch (err) {
+      console.warn('Unable to persist module 1 score to localStorage:', err);
+    }
+
      // Save any remaining readings in buffer
      if (readingsBufferRef.current.length > 0 && sessionIdRef.current) {
        const readingsToSave = [...readingsBufferRef.current];

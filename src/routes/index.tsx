@@ -10,6 +10,7 @@ import Module1Exercise1Start from '../pages/Module1Exercise1Start';
 import Module1Exercise1Score from '../pages/Module1Exercise1Score';
 import Module1Exercise2Start from '../pages/Module1Exercise2Start';
 import Module1Exercise2Score from '../pages/Module1Exercise2Score';
+import Module2Instructions from '../pages/Module2Instructions';
 import CompletedModule from '../pages/CompletedModule';
 import PegTransfer from '../pages/PegTransfer';
 import CameraControl from '../pages/CameraControl';
@@ -47,6 +48,10 @@ export const router = createBrowserRouter([
   {
     path: '/module/1/instructions',
     element: <Module1Instructions />,
+  },
+  {
+    path: '/module/2/instructions',
+    element: <Module2Instructions />,
   },
   {
     path: '/module/1/exercise/1/start',
