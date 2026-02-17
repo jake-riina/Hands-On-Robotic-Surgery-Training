@@ -85,8 +85,18 @@ const CompletedModule = () => {
     }
   };
 
-  // Score from exercise (Continue) or fallback when visiting directly
-  const score = (location.state as { score?: number } | null)?.score ?? 0;
+  // Score from exercise (Continue) or fallback when visiting directly.
+  // Prefer the score passed via navigation state; otherwise fall back to the last
+  // saved Module 1 score in localStorage so repeat visits don't show 0%.
+  const stateScore = (location.state as { score?: number } | null)?.score;
+  let persistedScore: number | null = null;
+  if (typeof window !== 'undefined') {
+    const stored = window.localStorage.getItem('module1_last_score');
+    if (stored !== null && !Number.isNaN(Number(stored))) {
+      persistedScore = Number(stored);
+    }
+  }
+  const score = stateScore ?? persistedScore ?? 0;
 
   // Placeholder pressure distribution (TODO: wire to real data when available)
   const INSUFFICIENT_PRESSURE_PCT = 10;
@@ -102,7 +112,7 @@ const CompletedModule = () => {
   };
 
   const handleNextModule = () => {
-    navigate('/modules');
+    navigate('/module/2/instructions');
   };
 
   return (

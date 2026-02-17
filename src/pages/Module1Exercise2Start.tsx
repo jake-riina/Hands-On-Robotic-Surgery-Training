@@ -1,4 +1,6 @@
 import AppLayout from '../components/AppLayout';
+import { useEffect, useRef, useState } from 'react';
+import { useBLE } from '../contexts/BLEContext';
 
 const ForceSensorGraph = () => {
   const width = 400;
@@ -176,7 +178,219 @@ const ForceSensorGraph = () => {
   );
 };
 
+const TARGET_MIN = 15;
+const TARGET_MAX = 20;
+const TOTAL_DURATION_SECONDS = 20;
+const PASSING_SCORE = 80;
+
 const Module1Exercise2Start = () => {
+  const { pressure } = useBLE();
+
+  const [exerciseStarted, setExerciseStarted] = useState(false);
+  const [isExerciseActive, setIsExerciseActive] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState(TOTAL_DURATION_SECONDS);
+  const [score, setScore] = useState<number | null>(null);
+  const [hasPassed, setHasPassed] = useState<boolean | null>(null);
+
+  // Spacebar testing / cheat pressure (same pattern as Exercise 1)
+  const [cheatPressure, setCheatPressure] = useState<number | null>(null);
+  const effectivePressure = cheatPressure !== null ? cheatPressure : pressure;
+
+  const cheatPressureRef = useRef<number>(0);
+  const rampUpIdRef = useRef<number | null>(null);
+  const rampDownIdRef = useRef<number | null>(null);
+  const RAMP_DURATION_MS = 2000;
+  const RAMP_INTERVAL_MS = 50;
+  const CHEAT_MAX_PSI = 35;
+
+  // Keep ref in sync with cheat pressure
+  useEffect(() => {
+    if (cheatPressure !== null) cheatPressureRef.current = cheatPressure;
+  }, [cheatPressure]);
+
+  // Spacebar handlers to ramp pressure up/down for testing
+  useEffect(() => {
+    const stopRampUp = () => {
+      if (rampUpIdRef.current !== null) {
+        clearInterval(rampUpIdRef.current);
+        rampUpIdRef.current = null;
+      }
+    };
+
+    const stopRampDown = () => {
+      if (rampDownIdRef.current !== null) {
+        clearInterval(rampDownIdRef.current);
+        rampDownIdRef.current = null;
+      }
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !e.repeat) {
+        e.preventDefault();
+        stopRampDown();
+        if (rampUpIdRef.current !== null) return;
+
+        const startPsi = cheatPressureRef.current;
+        const startTime = Date.now();
+
+        rampUpIdRef.current = window.setInterval(() => {
+          const elapsed = Date.now() - startTime;
+          const ratio = Math.min(elapsed / RAMP_DURATION_MS, 1);
+          const psi = startPsi + ratio * (CHEAT_MAX_PSI - startPsi);
+          cheatPressureRef.current = psi;
+          setCheatPressure(psi);
+          if (ratio >= 1) {
+            stopRampUp();
+          }
+        }, RAMP_INTERVAL_MS);
+      }
+    };
+
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !e.repeat) {
+        e.preventDefault();
+        stopRampUp();
+        if (rampDownIdRef.current !== null) return;
+
+        const startPsi = cheatPressureRef.current;
+        const startTime = Date.now();
+        setCheatPressure(startPsi);
+
+        rampDownIdRef.current = window.setInterval(() => {
+          const elapsed = Date.now() - startTime;
+          const ratio = Math.min(elapsed / RAMP_DURATION_MS, 1);
+          const psi = Math.max(0, startPsi * (1 - ratio));
+          cheatPressureRef.current = psi;
+          setCheatPressure(psi);
+          if (ratio >= 1 || psi <= 0) {
+            stopRampDown();
+            setCheatPressure(null);
+            cheatPressureRef.current = 0;
+          }
+        }, RAMP_INTERVAL_MS);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      stopRampUp();
+      stopRampDown();
+    };
+  }, []);
+
+  const startTimeRef = useRef<number | null>(null);
+  const timeOnTargetRef = useRef<number>(0);
+  const lastCheckTimeRef = useRef<number | null>(null);
+  const thresholdIntervalRef = useRef<number | null>(null);
+  const timerIntervalRef = useRef<number | null>(null);
+
+  // Start the exercise when we first see non-zero pressure
+  useEffect(() => {
+    if (!exerciseStarted && effectivePressure > 0) {
+      setExerciseStarted(true);
+      setIsExerciseActive(true);
+      startTimeRef.current = Date.now();
+      lastCheckTimeRef.current = Date.now();
+      console.log('Exercise 2 started, initial pressure:', effectivePressure);
+    }
+  }, [effectivePressure, exerciseStarted]);
+
+  // Track time spent in the target pressure range (15–20 PSI)
+  useEffect(() => {
+    if (!isExerciseActive || !exerciseStarted) {
+      return;
+    }
+
+    thresholdIntervalRef.current = window.setInterval(() => {
+      const now = Date.now();
+      const last = lastCheckTimeRef.current ?? now;
+      const delta = now - last;
+
+      if (effectivePressure >= TARGET_MIN && effectivePressure <= TARGET_MAX) {
+        timeOnTargetRef.current += delta;
+      }
+
+      lastCheckTimeRef.current = now;
+    }, 100);
+
+    return () => {
+      if (thresholdIntervalRef.current !== null) {
+        clearInterval(thresholdIntervalRef.current);
+        thresholdIntervalRef.current = null;
+      }
+    };
+  }, [isExerciseActive, exerciseStarted, effectivePressure]);
+
+  // 20-second countdown timer
+  useEffect(() => {
+    if (!isExerciseActive || timeRemaining <= 0) {
+      return;
+    }
+
+    if (timerIntervalRef.current !== null) {
+      clearInterval(timerIntervalRef.current);
+    }
+
+    timerIntervalRef.current = window.setInterval(() => {
+      setTimeRemaining((prev) => {
+        if (prev <= 1) {
+          setIsExerciseActive(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      if (timerIntervalRef.current !== null) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+    };
+  }, [isExerciseActive, timeRemaining]);
+
+  // Calculate score once the exercise finishes
+  useEffect(() => {
+    if (!exerciseStarted || timeRemaining !== 0 || startTimeRef.current === null) {
+      return;
+    }
+
+    const durationMs = Date.now() - startTimeRef.current;
+    const timeOnTargetMs = timeOnTargetRef.current;
+
+    // Score is percentage of time spent in 15–20 PSI over the whole exercise
+    const rawScore = durationMs > 0 ? (timeOnTargetMs / durationMs) * 100 : 0;
+    const clampedScore = Math.max(0, Math.min(100, rawScore));
+
+    setScore(clampedScore);
+    setHasPassed(clampedScore >= PASSING_SCORE);
+
+    console.log(
+      '[Exercise 2] duration(ms):',
+      durationMs,
+      'timeOnTarget(ms):',
+      timeOnTargetMs,
+      'score(%):',
+      clampedScore.toFixed(1),
+    );
+  }, [exerciseStarted, timeRemaining]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (thresholdIntervalRef.current !== null) {
+        clearInterval(thresholdIntervalRef.current);
+      }
+      if (timerIntervalRef.current !== null) {
+        clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, []);
+
   return (
     <AppLayout>
       {/* Main content area */}
@@ -186,7 +400,6 @@ const Module1Exercise2Start = () => {
       >
         {/* Two-column layout: LEFT = text + graph, RIGHT = image */}
         <div className="grid grid-cols-2 gap-10 items-center">
-          
           {/* LEFT COLUMN: title + text + graph */}
           <section className="flex flex-col ml-12">
             <h1 className="text-4xl lg:text-5xl font-bold mb-6 leading-tight text-white">
@@ -198,9 +411,34 @@ const Module1Exercise2Start = () => {
               <p>Follow the red line!</p>
             </div>
 
-            <p className="text-center text-lg font-semibold mb-8 text-white">
-              Apply Pressure To Begin!
+            <p className="text-center text-lg font-semibold mb-2 text-white">
+              {!exerciseStarted
+                ? 'Apply pressure to begin!'
+                : timeRemaining > 0
+                ? `${timeRemaining}s remaining`
+                : 'Exercise complete'}
             </p>
+
+            <p className="text-center text-sm mb-2" style={{ color: '#D1D5DB' }}>
+              Target range: {TARGET_MIN}–{TARGET_MAX} PSI over {TOTAL_DURATION_SECONDS} seconds.
+              Passing score: {PASSING_SCORE}%.
+            </p>
+
+            <p className="text-center text-sm mb-6" style={{ color: '#D1D5DB' }}>
+              Current pressure:{' '}
+              <span className="font-semibold">
+                {effectivePressure.toFixed(1)} PSI
+              </span>
+            </p>
+
+            {score !== null && (
+              <p
+                className="text-center text-xl font-semibold mb-6"
+                style={{ color: hasPassed ? '#22c55e' : '#f97316' }}
+              >
+                Score: {score.toFixed(1)}% — {hasPassed ? 'Pass' : 'Try again'}
+              </p>
+            )}
 
             <div className="flex justify-center">
               <ForceSensorGraph />
