@@ -15,6 +15,8 @@ import CompletedModule from '../pages/CompletedModule';
 import PegTransfer from '../pages/PegTransfer';
 import CameraControl from '../pages/CameraControl';
 import IncompleteModule1 from '../pages/IncompleteModule1';
+import AdminDashboard from '../pages/AdminDashboard';
+import TraineeRegistration from '../pages/TraineeRegistration';
 
 export const router = createBrowserRouter([
   {
@@ -32,6 +34,14 @@ export const router = createBrowserRouter([
   {
     path: '/dashboard',
     element: <DashboardGlovesConnected />,
+  },
+  {
+    path: '/admin/dashboard',
+    element: <AdminDashboard />,
+  },
+  {
+    path: '/register/:token',
+    element: <TraineeRegistration />,
   },
   {
     path: '/dashboard/logout',

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 
 /* ---------------- TYPES ---------------- */
-type UserRole = 'trainee' | 'physician';
+type UserRole = 'trainee' | 'admin';
 
 interface User {
   email: string;
@@ -42,8 +42,19 @@ const LoginTraineeV1: React.FC = () => {
     if (import.meta.env.DEV) return;
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        navigate('/dashboard');
+      if (session?.user) {
+        // Check user role and redirect accordingly
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .single();
+        
+        if (profile?.role === 'admin') {
+          navigate('/admin/dashboard');
+        } else {
+          navigate('/dashboard');
+        }
       }
     };
     checkSession();
@@ -65,16 +76,21 @@ const LoginTraineeV1: React.FC = () => {
         if (signUpError) throw signUpError;
         if (data.user) {
           // Create user profile with selected role
+          // Note: 'admin' role is selected when "Physician" button is clicked
           const { error: profileError } = await supabase
             .from('user_profiles')
-            .insert({
+            .upsert({
               user_id: data.user.id,
               email: data.user.email,
-              role: role,
+              role: role, // role is 'admin' or 'trainee'
             });
           if (profileError) throw profileError;
-          // Navigate to dashboard
-          navigate('/dashboard');
+          // Navigate based on role
+          if (role === 'admin') {
+            navigate('/admin/dashboard');
+          } else {
+            navigate('/dashboard');
+          }
         }
       } else {
         // Sign in existing user
@@ -83,9 +99,19 @@ const LoginTraineeV1: React.FC = () => {
           password,
         });
         if (signInError) throw signInError;
-        // Navigate to dashboard
+        // Navigate based on role
         if (data.user) {
-          navigate('/dashboard');
+          const { data: profile } = await supabase
+            .from('user_profiles')
+            .select('role')
+            .eq('user_id', data.user.id)
+            .single();
+          
+          if (profile?.role === 'admin') {
+            navigate('/admin/dashboard');
+          } else {
+            navigate('/dashboard');
+          }
         }
       }
     } catch (err: any) {
@@ -152,17 +178,17 @@ const LoginTraineeV1: React.FC = () => {
                 Trainee
               </button>
               <button
-                onClick={() => setRole('physician')}
+                onClick={() => setRole('admin')}
                 className={`px-6 py-2 font-medium transition-all duration-200 ${
-                  role === 'physician' ? 'rounded-full' : ''
+                  role === 'admin' ? 'rounded-full' : ''
                 }`}
                 style={
-                  role === 'physician'
+                  role === 'admin'
                     ? { backgroundColor: '#2563eb', color: 'white', borderRadius: '9999px' }
                     : { backgroundColor: 'transparent', color: 'white' }
                 }
               >
-                Physician
+                Admin
               </button>
             </div>
           </div>
