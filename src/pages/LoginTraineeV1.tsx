@@ -5,11 +5,6 @@ import { supabase } from '../lib/supabaseClient';
 /* ---------------- TYPES ---------------- */
 type UserRole = 'trainee' | 'admin';
 
-interface User {
-  email: string;
-  role: UserRole;
-}
-
 /* ---------------- LOGIN COMPONENT ---------------- */
 const images = [
   '/Screenshot-1.png',
@@ -121,26 +116,6 @@ const LoginTraineeV1: React.FC = () => {
     }
   };
 
-  /* ---------- Google Sign-In ---------- */
-  const handleGoogleSignIn = async () => {
-    setIsLoading(true);
-    setError('');
-
-    try {
-      const googleUser: User = await new Promise<User>((resolve) =>
-        setTimeout(() => resolve({ email: 'googleuser@test.com', role: 'trainee' }), 500)
-      );
-
-      if (googleUser.role === 'trainee') navigate('/dashboard');
-      else navigate('/dashboard');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Google sign-in failed');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  
 
   return (
     <div className="min-h-screen flex" style={{ backgroundColor: '#26313E' }}>
@@ -161,31 +136,52 @@ const LoginTraineeV1: React.FC = () => {
           {/* Role Selector - Pill-shaped segmented control - Centered above Sign In box */}
           <div className="flex justify-center mb-8">
             <div
-              className="inline-flex rounded-full p-1"
-              style={{ backgroundColor: '#26313E' }}
+              className="inline-flex rounded-full overflow-hidden"
+              style={{ 
+                backgroundColor: '#ffffff',
+                borderRadius: '9999px'
+              }}
             >
               <button
-                onClick={() => setRole('trainee')}
-                className={`px-6 py-2 font-medium transition-all duration-200 ${
-                  role === 'trainee' ? 'rounded-full' : ''
-                }`}
+                onClick={() => {
+                  setRole('trainee');
+                  setIsSignUp(false); // Reset to sign in when switching
+                }}
+                className="px-6 py-2 font-medium transition-all duration-200"
                 style={
                   role === 'trainee'
-                    ? { backgroundColor: '#2563eb', color: 'white', borderRadius: '9999px' }
-                    : { backgroundColor: 'transparent', color: 'white' }
+                    ? { 
+                        backgroundColor: '#2563eb', 
+                        color: 'white',
+                        borderTopLeftRadius: '9999px',
+                        borderBottomLeftRadius: '9999px'
+                      }
+                    : { 
+                        backgroundColor: '#ffffff', 
+                        color: '#000000'
+                      }
                 }
               >
                 Trainee
               </button>
               <button
-                onClick={() => setRole('admin')}
-                className={`px-6 py-2 font-medium transition-all duration-200 ${
-                  role === 'admin' ? 'rounded-full' : ''
-                }`}
+                onClick={() => {
+                  setRole('admin');
+                  setIsSignUp(false); // Reset to sign in when switching
+                }}
+                className="px-6 py-2 font-medium transition-all duration-200"
                 style={
                   role === 'admin'
-                    ? { backgroundColor: '#2563eb', color: 'white', borderRadius: '9999px' }
-                    : { backgroundColor: 'transparent', color: 'white' }
+                    ? { 
+                        backgroundColor: '#2563eb', 
+                        color: 'white',
+                        borderTopRightRadius: '9999px',
+                        borderBottomRightRadius: '9999px'
+                      }
+                    : { 
+                        backgroundColor: '#ffffff', 
+                        color: '#000000'
+                      }
                 }
               >
                 Admin
@@ -278,9 +274,9 @@ const LoginTraineeV1: React.FC = () => {
                       onChange={(e) => setRememberMe(e.target.checked)}
                       className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                     />
-                    <span className="ml-2 text-xs text-gray-700">Remember for 30 Days</span>
+                    <span className="ml-2 text-gray-700" style={{ fontSize: '10px' }}>Remember for 30 Days</span>
                   </label>
-                  <a href="#" className="text-xs text-blue-600 hover:underline" style={{ color: '#2563eb' }}>
+                  <a href="#" className="text-blue-600 hover:underline" style={{ color: '#2563eb', fontSize: '10px' }}>
                     Forgot Password?
                   </a>
                 </div>
@@ -321,47 +317,6 @@ const LoginTraineeV1: React.FC = () => {
 
 
 
-          {/* OR Separator */}
-          <div className="flex items-center my-6">
-            <div className="flex-1 border-t border-gray-300"></div>
-            <span className="px-4 text-sm text-gray-500">OR</span>
-            <div className="flex-1 border-t border-gray-300"></div>
-          </div>
-
-
-
-
-
-          {/* Google Sign In Button */}
-          <div
-            style={{
-              minWidth: '0',
-              width: '75%',
-              margin: '1rem auto',
-            }}
-          >
-            <button
-              onClick={handleGoogleSignIn}
-              disabled={isLoading}
-              type="button"
-              className="bg-transparent border-none rounded-lg font-medium transition-colors flex items-center justify-center w-full disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{
-                boxSizing: 'border-box',
-                height: '50px',
-                padding: '0px'
-              }}
-            >
-              <img
-                src="/Google.png"
-                alt="Google logo"
-                className="object-contain"
-                style={{ 
-                  width: '115%', 
-                  height: '115%'
-                }}
-              />
-            </button>
-          </div>
 
 
 
@@ -369,34 +324,41 @@ const LoginTraineeV1: React.FC = () => {
 
 
 
-          {/* Sign Up/Sign In Toggle Link */}
-          <div className="mt-6 text-center">
-            {isSignUp ? (
-              <>
-                <span className="text-sm text-gray-600">Already have an account? </span>
-                <a 
-                  href="#" 
-                  onClick={(e) => { e.preventDefault(); setIsSignUp(false); }}
-                  className="text-sm text-blue-600 hover:underline font-medium" 
-                  style={{ color: '#2563eb' }}
-                >
-                  Sign in
-                </a>
-              </>
-            ) : (
-              <>
-                <span className="text-sm text-gray-600">Don't have an account? </span>
-                <a 
-                  href="#" 
-                  onClick={(e) => { e.preventDefault(); setIsSignUp(true); }}
-                  className="text-sm text-blue-600 hover:underline font-medium" 
-                  style={{ color: '#2563eb' }}
-                >
-                  Sign up
-                </a>
-              </>
-            )}
-          </div>
+
+
+
+
+
+          {/* Sign Up/Sign In Toggle Link - Only show for Admin */}
+          {role === 'admin' && (
+            <div className="mt-6 text-center">
+              {isSignUp ? (
+                <>
+                  <span className="text-sm text-gray-600">Already have an account? </span>
+                  <a 
+                    href="#" 
+                    onClick={(e) => { e.preventDefault(); setIsSignUp(false); }}
+                    className="text-sm text-blue-600 hover:underline font-medium" 
+                    style={{ color: '#2563eb' }}
+                  >
+                    Sign in
+                  </a>
+                </>
+              ) : (
+                <>
+                  <span className="text-sm text-gray-600">Don't have an account? </span>
+                  <a 
+                    href="#" 
+                    onClick={(e) => { e.preventDefault(); setIsSignUp(true); }}
+                    className="text-sm text-blue-600 hover:underline font-medium" 
+                    style={{ color: '#2563eb' }}
+                  >
+                    Sign up
+                  </a>
+                </>
+              )}
+            </div>
+          )}
         </div>
         </div>
       </div>
