@@ -122,8 +122,8 @@ const AdminDashboard: React.FC = () => {
   // Data for charts
   const traineesData = [
     { name: 'Cardiothoracic', value: 10, color: '#ffffff' },
-    { name: 'ENT', value: 6, color: '#1DA5FF' },
-    { name: 'Urology', value: 2, color: '#374151' },
+    { name: 'ENT', value: 6, color: '#374151' },
+    { name: 'Urology', value: 2, color: '#1DA5FF' },
   ];
 
   const moduleCompletionData = [
@@ -207,7 +207,7 @@ const AdminDashboard: React.FC = () => {
           <div className="grid" style={{ gridTemplateColumns: '1fr 1fr 1fr', gap: '24px' }}>
             {/* Container 1: Number of Trainees by Department */}
             <div
-              className="rounded-lg p-6"
+              className="rounded-lg p-6 flex flex-col"
               style={{
                 backgroundColor: '#1E2733',
                 boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3)',
@@ -237,19 +237,24 @@ const AdminDashboard: React.FC = () => {
               </div>
 
               {/* Summary Table */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: 'white' }}></div>
-                  <span className="text-sm" style={{ color: '#ffffff' }}>Cardiothoracic - 10 trainees</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#1DA5FF' }}></div>
-                  <span className="text-sm" style={{ color: '#ffffff' }}>ENT - 6 trainees</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#374151' }}></div>
-                  <span className="text-sm" style={{ color: '#ffffff' }}>Urology - 2 trainees</span>
-                </div>
+              <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {traineesData.map((entry, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <div 
+                      style={{ 
+                        width: '16px', 
+                        height: '16px', 
+                        borderRadius: '50%',
+                        backgroundColor: entry.color,
+                        display: 'inline-block',
+                        flexShrink: 0
+                      }}
+                    ></div>
+                    <span className="text-sm" style={{ color: '#ffffff' }}>
+                      {entry.name} - {entry.value} {entry.value === 1 ? 'trainee' : 'trainees'}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -275,16 +280,16 @@ const AdminDashboard: React.FC = () => {
 
             {/* Container 3: Module Completion by Department */}
             <div
-              className="rounded-lg p-6"
+              className="rounded-lg p-6 flex flex-col"
               style={{
                 backgroundColor: '#1E2733',
                 boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3)',
               }}
             >
-              <h3 className="text-lg font-semibold mb-4 text-center" style={{ color: '#ffffff' }}>Module Completion by Department</h3>
+              <h3 className="text-lg font-semibold mb-4 text-center" style={{ color: '#ffffff' }}>Highest Module by Department</h3>
               
               {/* Horizontal Bar Chart */}
-              <div className="mb-6" style={{ height: '150px' }}>
+              <div className="mb-6" style={{ height: '200px' }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={moduleCompletionData}
@@ -310,19 +315,24 @@ const AdminDashboard: React.FC = () => {
               </div>
 
               {/* Summary Table */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: 'white' }}></div>
-                  <span className="text-sm" style={{ color: '#ffffff' }}>Cardiothoracic - 5 completions</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#374151' }}></div>
-                  <span className="text-sm" style={{ color: '#ffffff' }}>ENT - 6 completions</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#1DA5FF' }}></div>
-                  <span className="text-sm" style={{ color: '#ffffff' }}>Urology - 12 completions</span>
-                </div>
+              <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {moduleCompletionData.map((entry, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <div 
+                      style={{ 
+                        width: '16px', 
+                        height: '16px', 
+                        borderRadius: '50%',
+                        backgroundColor: entry.color,
+                        display: 'inline-block',
+                        flexShrink: 0
+                      }}
+                    ></div>
+                    <span className="text-sm" style={{ color: '#ffffff' }}>
+                      {entry.name} - Module {entry.completions}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

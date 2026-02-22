@@ -154,11 +154,13 @@ const LoginTraineeV1: React.FC = () => {
                         backgroundColor: '#2563eb', 
                         color: 'white',
                         borderTopLeftRadius: '9999px',
-                        borderBottomLeftRadius: '9999px'
+                        borderBottomLeftRadius: '9999px',
+                        fontSize: '16px'
                       }
                     : { 
                         backgroundColor: '#ffffff', 
-                        color: '#000000'
+                        color: '#000000',
+                        fontSize: '16px'
                       }
                 }
               >
@@ -176,11 +178,13 @@ const LoginTraineeV1: React.FC = () => {
                         backgroundColor: '#2563eb', 
                         color: 'white',
                         borderTopRightRadius: '9999px',
-                        borderBottomRightRadius: '9999px'
+                        borderBottomRightRadius: '9999px',
+                        fontSize: '16px'
                       }
                     : { 
                         backgroundColor: '#ffffff', 
-                        color: '#000000'
+                        color: '#000000',
+                        fontSize: '16px'
                       }
                 }
               >
@@ -206,8 +210,8 @@ const LoginTraineeV1: React.FC = () => {
             className="w-full text-center"
             style={{ padding: '0 2rem', marginBottom: '1rem', marginTop: '-40px' }}
           >
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">{isSignUp ? 'Sign Up' : 'Sign In'}</h2>
-            <p className="text-gray-600">{isSignUp ? 'Create an account to get started' : 'Welcome Back! Please enter your details'}</p>
+            <h2 className="font-bold text-gray-900 mb-2" style={{ fontSize: '24px' }}>{isSignUp ? 'Sign Up' : 'Sign In'}</h2>
+            <p className="text-gray-600" style={{ fontSize: '16px' }}>{isSignUp ? 'Create an account to get started' : 'Welcome Back! Please enter your details'}</p>
           </div>
           <form
             className="space-y-4 w-full"
@@ -215,14 +219,14 @@ const LoginTraineeV1: React.FC = () => {
           >
             {error && (
               <div className="px-1 w-full flex justify-center mb-4">
-                <div className="text-red-500 text-sm text-center" style={{ width: '75%' }}>{error}</div>
+                <div className="text-red-500 text-center" style={{ width: '75%', fontSize: '13px' }}>{error}</div>
               </div>
             )}
 
             {/* Email Input */}
             <div className="px-1 w-full flex justify-center mb-8">
               <div style={{ minWidth: '0', width: '75%' }}>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="email" className="block font-medium text-gray-700 mb-1" style={{ fontSize: '13px' }}>
                   Email
                 </label>
                 <input
@@ -231,7 +235,7 @@ const LoginTraineeV1: React.FC = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="py-6 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full"
-                  style={{ paddingLeft: '10px', paddingRight: '10px', boxSizing: 'border-box', height: '50px' }}
+                  style={{ paddingLeft: '10px', paddingRight: '10px', boxSizing: 'border-box', height: '50px', fontSize: '16px' }}
                   placeholder="Enter your email"
                 />
               </div>
@@ -244,7 +248,7 @@ const LoginTraineeV1: React.FC = () => {
             {/* Password Input */}
             <div className="px-1 w-full flex justify-center">
               <div style={{ minWidth: '0', width: '75%' }}>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="password" className="block font-medium text-gray-700 mb-1" style={{ fontSize: '13px' }}>
                   Password
                 </label>
                 <input
@@ -253,7 +257,7 @@ const LoginTraineeV1: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="py-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full"
-                  style={{ paddingLeft: '10px', paddingRight: '10px', boxSizing: 'border-box', height: '50px' }}
+                  style={{ paddingLeft: '10px', paddingRight: '10px', boxSizing: 'border-box', height: '50px', fontSize: '16px' }}
                   placeholder="Enter your password"
                 />
               </div>
@@ -274,9 +278,9 @@ const LoginTraineeV1: React.FC = () => {
                       onChange={(e) => setRememberMe(e.target.checked)}
                       className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                     />
-                    <span className="ml-2 text-gray-700" style={{ fontSize: '10px' }}>Remember for 30 Days</span>
+                    <span className="ml-2 text-gray-700" style={{ fontSize: '13px' }}>Remember for 30 Days</span>
                   </label>
-                  <a href="#" className="text-blue-600 hover:underline" style={{ color: '#2563eb', fontSize: '10px' }}>
+                  <a href="#" className="text-blue-600 hover:underline" style={{ color: '#2563eb', fontSize: '13px' }}>
                     Forgot Password?
                   </a>
                 </div>
@@ -305,7 +309,8 @@ const LoginTraineeV1: React.FC = () => {
                   height: '50px',
                   borderRadius: '0.75rem',
                   boxSizing: 'border-box',
-                  padding: '0px'
+                  padding: '0px',
+                  fontSize: '16px'
                 }}
               >
                 {isLoading ? (isSignUp ? 'Signing up...' : 'Signing in...') : (isSignUp ? 'Sign up' : 'Sign in')}
@@ -334,24 +339,24 @@ const LoginTraineeV1: React.FC = () => {
             <div className="mt-6 text-center">
               {isSignUp ? (
                 <>
-                  <span className="text-sm text-gray-600">Already have an account? </span>
+                  <span className="text-gray-600" style={{ fontSize: '13px' }}>Already have an account? </span>
                   <a 
                     href="#" 
                     onClick={(e) => { e.preventDefault(); setIsSignUp(false); }}
-                    className="text-sm text-blue-600 hover:underline font-medium" 
-                    style={{ color: '#2563eb' }}
+                    className="text-blue-600 hover:underline font-medium" 
+                    style={{ color: '#2563eb', fontSize: '13px' }}
                   >
                     Sign in
                   </a>
                 </>
               ) : (
                 <>
-                  <span className="text-sm text-gray-600">Don't have an account? </span>
+                  <span className="text-gray-600" style={{ fontSize: '13px' }}>Don't have an account? </span>
                   <a 
                     href="#" 
                     onClick={(e) => { e.preventDefault(); setIsSignUp(true); }}
-                    className="text-sm text-blue-600 hover:underline font-medium" 
-                    style={{ color: '#2563eb' }}
+                    className="text-blue-600 hover:underline font-medium" 
+                    style={{ color: '#2563eb', fontSize: '13px' }}
                   >
                     Sign up
                   </a>
@@ -364,13 +369,13 @@ const LoginTraineeV1: React.FC = () => {
       </div>
 
       {/* RIGHT COLUMN */}
-      <div className="w-1/2 bg-[#1E2733] flex flex-col items-center justify-center relative" style={{ backgroundColor: '#26313E' }}>
+      <div className="w-1/2 bg-[#1E2733] flex flex-col items-center justify-center relative p-8" style={{ backgroundColor: '#26313E' }}>
         <div className="w-[75%] max-w-[600px] bg-[#151B24] rounded-lg p-4 sm:p-6 flex flex-col items-center text-white relative min-h-[500px] pb-16">
           <div className="text-center mt-10 mb-6 relative z-20">
-            <h1 className="text-4xl font-semibold leading-tight mb-2 text-white" style={{ color: '#ffffff' }}>
+            <h1 className="font-semibold leading-tight mb-2 text-white" style={{ color: '#ffffff', fontSize: '36px' }}>
               Democratizing Access to Robotic Surgery Training
             </h1>
-            <p className="text-lg opacity-90 text-white" style={{ color: '#ffffff' }}>
+            <p className="opacity-90 text-white" style={{ color: '#ffffff', fontSize: '19px' }}>
               Develop the right training habits with HandsOn
             </p>
           </div>
