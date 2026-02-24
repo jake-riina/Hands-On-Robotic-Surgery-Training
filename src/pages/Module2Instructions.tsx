@@ -151,14 +151,14 @@ const Module2Instructions = () => {
         console.log('Session ID:', sessionId);
       }
 
-      // Navigate to exercise with session ID
-      navigate('/module/2/exercise/1/start', { state: { sessionId } });
+      // Navigate to module 2 camera control (game) with session ID
+      navigate('/module/2/camera-control', { state: { sessionId } });
     } catch (err) {
       console.error('Error in handleBeginTraining:', err);
       alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
       // Still navigate even if there's an error
       const sessionId = uuidv4();
-      navigate('/module/2/exercise/1/start', { state: { sessionId } });
+      navigate('/module/2/camera-control', { state: { sessionId } });
     }
   };
 
