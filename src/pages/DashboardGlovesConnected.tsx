@@ -1,9 +1,34 @@
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 import { useBLE } from '../contexts/BLEContext';
+import { supabase } from '../lib/supabaseClient';
 
 const DashboardGlovesConnected = () => {
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Check user role and redirect if admin
+  useEffect(() => {
+    const checkUserRole = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        navigate('/');
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+
+      if (profile?.role === 'admin') {
+        navigate('/admin/dashboard');
+      }
+    };
+
+    checkUserRole();
+  }, [navigate]);
   
   // Use shared BLE context
   const { 

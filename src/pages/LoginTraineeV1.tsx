@@ -3,12 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 
 /* ---------------- TYPES ---------------- */
-type UserRole = 'trainee' | 'physician';
-
-interface User {
-  email: string;
-  role: UserRole;
-}
+type UserRole = 'trainee' | 'admin';
 
 /* ---------------- LOGIN COMPONENT ---------------- */
 const images = [
@@ -42,8 +37,19 @@ const LoginTraineeV1: React.FC = () => {
     if (import.meta.env.DEV) return;
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        navigate('/dashboard');
+      if (session?.user) {
+        // Check user role and redirect accordingly
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .single();
+        
+        if (profile?.role === 'admin') {
+          navigate('/admin/dashboard');
+        } else {
+          navigate('/dashboard');
+        }
       }
     };
     checkSession();
@@ -65,16 +71,21 @@ const LoginTraineeV1: React.FC = () => {
         if (signUpError) throw signUpError;
         if (data.user) {
           // Create user profile with selected role
+          // Note: 'admin' role is selected when "Physician" button is clicked
           const { error: profileError } = await supabase
             .from('user_profiles')
-            .insert({
+            .upsert({
               user_id: data.user.id,
               email: data.user.email,
-              role: role,
+              role: role, // role is 'admin' or 'trainee'
             });
           if (profileError) throw profileError;
-          // Navigate to dashboard
-          navigate('/dashboard');
+          // Navigate based on role
+          if (role === 'admin') {
+            navigate('/admin/dashboard');
+          } else {
+            navigate('/dashboard');
+          }
         }
       } else {
         // Sign in existing user
@@ -83,9 +94,19 @@ const LoginTraineeV1: React.FC = () => {
           password,
         });
         if (signInError) throw signInError;
-        // Navigate to dashboard
+        // Navigate based on role
         if (data.user) {
-          navigate('/dashboard');
+          const { data: profile } = await supabase
+            .from('user_profiles')
+            .select('role')
+            .eq('user_id', data.user.id)
+            .single();
+          
+          if (profile?.role === 'admin') {
+            navigate('/admin/dashboard');
+          } else {
+            navigate('/dashboard');
+          }
         }
       }
     } catch (err: any) {
@@ -95,26 +116,6 @@ const LoginTraineeV1: React.FC = () => {
     }
   };
 
-  /* ---------- Google Sign-In ---------- */
-  const handleGoogleSignIn = async () => {
-    setIsLoading(true);
-    setError('');
-
-    try {
-      const googleUser: User = await new Promise<User>((resolve) =>
-        setTimeout(() => resolve({ email: 'googleuser@test.com', role: 'trainee' }), 500)
-      );
-
-      if (googleUser.role === 'trainee') navigate('/dashboard');
-      else navigate('/dashboard');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Google sign-in failed');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  
 
   return (
     <div className="min-h-screen flex" style={{ backgroundColor: '#26313E' }}>
@@ -135,34 +136,59 @@ const LoginTraineeV1: React.FC = () => {
           {/* Role Selector - Pill-shaped segmented control - Centered above Sign In box */}
           <div className="flex justify-center mb-8">
             <div
-              className="inline-flex rounded-full p-1"
-              style={{ backgroundColor: '#26313E' }}
+              className="inline-flex rounded-full overflow-hidden"
+              style={{ 
+                backgroundColor: '#ffffff',
+                borderRadius: '9999px'
+              }}
             >
               <button
-                onClick={() => setRole('trainee')}
-                className={`px-6 py-2 font-medium transition-all duration-200 ${
-                  role === 'trainee' ? 'rounded-full' : ''
-                }`}
+                onClick={() => {
+                  setRole('trainee');
+                  setIsSignUp(false); // Reset to sign in when switching
+                }}
+                className="px-6 py-2 font-medium transition-all duration-200"
                 style={
                   role === 'trainee'
-                    ? { backgroundColor: '#2563eb', color: 'white', borderRadius: '9999px' }
-                    : { backgroundColor: 'transparent', color: 'white' }
+                    ? { 
+                        backgroundColor: '#2563eb', 
+                        color: 'white',
+                        borderTopLeftRadius: '9999px',
+                        borderBottomLeftRadius: '9999px',
+                        fontSize: '16px'
+                      }
+                    : { 
+                        backgroundColor: '#ffffff', 
+                        color: '#000000',
+                        fontSize: '16px'
+                      }
                 }
               >
                 Trainee
               </button>
               <button
-                onClick={() => setRole('physician')}
-                className={`px-6 py-2 font-medium transition-all duration-200 ${
-                  role === 'physician' ? 'rounded-full' : ''
-                }`}
+                onClick={() => {
+                  setRole('admin');
+                  setIsSignUp(false); // Reset to sign in when switching
+                }}
+                className="px-6 py-2 font-medium transition-all duration-200"
                 style={
-                  role === 'physician'
-                    ? { backgroundColor: '#2563eb', color: 'white', borderRadius: '9999px' }
-                    : { backgroundColor: 'transparent', color: 'white' }
+                  role === 'admin'
+                    ? { 
+                        backgroundColor: '#2563eb', 
+                        color: 'white',
+                        borderTopRightRadius: '9999px',
+                        borderBottomRightRadius: '9999px',
+                        fontSize: '16px'
+                      }
+                    : { 
+                        backgroundColor: '#ffffff', 
+                        color: '#000000',
+                        fontSize: '16px'
+                      }
                 }
               >
-                Physician
+                Admin
               </button>
             </div>
           </div>
@@ -184,8 +210,8 @@ const LoginTraineeV1: React.FC = () => {
             className="w-full text-center"
             style={{ padding: '0 2rem', marginBottom: '1rem', marginTop: '-40px' }}
           >
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">{isSignUp ? 'Sign Up' : 'Sign In'}</h2>
-            <p className="text-gray-600">{isSignUp ? 'Create an account to get started' : 'Welcome Back! Please enter your details'}</p>
+            <h2 className="font-bold text-gray-900 mb-2" style={{ fontSize: '24px' }}>{isSignUp ? 'Sign Up' : 'Sign In'}</h2>
+            <p className="text-gray-600" style={{ fontSize: '16px' }}>{isSignUp ? 'Create an account to get started' : 'Welcome Back! Please enter your details'}</p>
           </div>
           <form
             className="space-y-4 w-full"
@@ -193,14 +219,14 @@ const LoginTraineeV1: React.FC = () => {
           >
             {error && (
               <div className="px-1 w-full flex justify-center mb-4">
-                <div className="text-red-500 text-sm text-center" style={{ width: '75%' }}>{error}</div>
+                <div className="text-red-500 text-center" style={{ width: '75%', fontSize: '13px' }}>{error}</div>
               </div>
             )}
 
             {/* Email Input */}
             <div className="px-1 w-full flex justify-center mb-8">
               <div style={{ minWidth: '0', width: '75%' }}>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="email" className="block font-medium text-gray-700 mb-1" style={{ fontSize: '13px' }}>
                   Email
                 </label>
                 <input
@@ -209,7 +235,7 @@ const LoginTraineeV1: React.FC = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="py-6 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full"
-                  style={{ paddingLeft: '10px', paddingRight: '10px', boxSizing: 'border-box', height: '50px' }}
+                  style={{ paddingLeft: '10px', paddingRight: '10px', boxSizing: 'border-box', height: '50px', fontSize: '16px' }}
                   placeholder="Enter your email"
                 />
               </div>
@@ -222,7 +248,7 @@ const LoginTraineeV1: React.FC = () => {
             {/* Password Input */}
             <div className="px-1 w-full flex justify-center">
               <div style={{ minWidth: '0', width: '75%' }}>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="password" className="block font-medium text-gray-700 mb-1" style={{ fontSize: '13px' }}>
                   Password
                 </label>
                 <input
@@ -231,7 +257,7 @@ const LoginTraineeV1: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="py-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full"
-                  style={{ paddingLeft: '10px', paddingRight: '10px', boxSizing: 'border-box', height: '50px' }}
+                  style={{ paddingLeft: '10px', paddingRight: '10px', boxSizing: 'border-box', height: '50px', fontSize: '16px' }}
                   placeholder="Enter your password"
                 />
               </div>
@@ -252,9 +278,9 @@ const LoginTraineeV1: React.FC = () => {
                       onChange={(e) => setRememberMe(e.target.checked)}
                       className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                     />
-                    <span className="ml-2 text-xs text-gray-700">Remember for 30 Days</span>
+                    <span className="ml-2 text-gray-700" style={{ fontSize: '13px' }}>Remember for 30 Days</span>
                   </label>
-                  <a href="#" className="text-xs text-blue-600 hover:underline" style={{ color: '#2563eb' }}>
+                  <a href="#" className="text-blue-600 hover:underline" style={{ color: '#2563eb', fontSize: '13px' }}>
                     Forgot Password?
                   </a>
                 </div>
@@ -283,7 +309,8 @@ const LoginTraineeV1: React.FC = () => {
                   height: '50px',
                   borderRadius: '0.75rem',
                   boxSizing: 'border-box',
-                  padding: '0px'
+                  padding: '0px',
+                  fontSize: '16px'
                 }}
               >
                 {isLoading ? (isSignUp ? 'Signing up...' : 'Signing in...') : (isSignUp ? 'Sign up' : 'Sign in')}
@@ -295,47 +322,6 @@ const LoginTraineeV1: React.FC = () => {
 
 
 
-          {/* OR Separator */}
-          <div className="flex items-center my-6">
-            <div className="flex-1 border-t border-gray-300"></div>
-            <span className="px-4 text-sm text-gray-500">OR</span>
-            <div className="flex-1 border-t border-gray-300"></div>
-          </div>
-
-
-
-
-
-          {/* Google Sign In Button */}
-          <div
-            style={{
-              minWidth: '0',
-              width: '75%',
-              margin: '1rem auto',
-            }}
-          >
-            <button
-              onClick={handleGoogleSignIn}
-              disabled={isLoading}
-              type="button"
-              className="bg-transparent border-none rounded-lg font-medium transition-colors flex items-center justify-center w-full disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{
-                boxSizing: 'border-box',
-                height: '50px',
-                padding: '0px'
-              }}
-            >
-              <img
-                src="/Google.png"
-                alt="Google logo"
-                className="object-contain"
-                style={{ 
-                  width: '115%', 
-                  height: '115%'
-                }}
-              />
-            </button>
-          </div>
 
 
 
@@ -343,46 +329,53 @@ const LoginTraineeV1: React.FC = () => {
 
 
 
-          {/* Sign Up/Sign In Toggle Link */}
-          <div className="mt-6 text-center">
-            {isSignUp ? (
-              <>
-                <span className="text-sm text-gray-600">Already have an account? </span>
-                <a 
-                  href="#" 
-                  onClick={(e) => { e.preventDefault(); setIsSignUp(false); }}
-                  className="text-sm text-blue-600 hover:underline font-medium" 
-                  style={{ color: '#2563eb' }}
-                >
-                  Sign in
-                </a>
-              </>
-            ) : (
-              <>
-                <span className="text-sm text-gray-600">Don't have an account? </span>
-                <a 
-                  href="#" 
-                  onClick={(e) => { e.preventDefault(); setIsSignUp(true); }}
-                  className="text-sm text-blue-600 hover:underline font-medium" 
-                  style={{ color: '#2563eb' }}
-                >
-                  Sign up
-                </a>
-              </>
-            )}
-          </div>
+
+
+
+
+
+          {/* Sign Up/Sign In Toggle Link - Only show for Admin */}
+          {role === 'admin' && (
+            <div className="mt-6 text-center">
+              {isSignUp ? (
+                <>
+                  <span className="text-gray-600" style={{ fontSize: '13px' }}>Already have an account? </span>
+                  <a 
+                    href="#" 
+                    onClick={(e) => { e.preventDefault(); setIsSignUp(false); }}
+                    className="text-blue-600 hover:underline font-medium" 
+                    style={{ color: '#2563eb', fontSize: '13px' }}
+                  >
+                    Sign in
+                  </a>
+                </>
+              ) : (
+                <>
+                  <span className="text-gray-600" style={{ fontSize: '13px' }}>Don't have an account? </span>
+                  <a 
+                    href="#" 
+                    onClick={(e) => { e.preventDefault(); setIsSignUp(true); }}
+                    className="text-blue-600 hover:underline font-medium" 
+                    style={{ color: '#2563eb', fontSize: '13px' }}
+                  >
+                    Sign up
+                  </a>
+                </>
+              )}
+            </div>
+          )}
         </div>
         </div>
       </div>
 
       {/* RIGHT COLUMN */}
-      <div className="w-1/2 bg-[#1E2733] flex flex-col items-center justify-center relative" style={{ backgroundColor: '#26313E' }}>
+      <div className="w-1/2 bg-[#1E2733] flex flex-col items-center justify-center relative p-8" style={{ backgroundColor: '#26313E' }}>
         <div className="w-[75%] max-w-[600px] bg-[#151B24] rounded-lg p-4 sm:p-6 flex flex-col items-center text-white relative min-h-[500px] pb-16">
           <div className="text-center mt-10 mb-6 relative z-20">
-            <h1 className="text-4xl font-semibold leading-tight mb-2 text-white" style={{ color: '#ffffff' }}>
+            <h1 className="font-semibold leading-tight mb-2 text-white" style={{ color: '#ffffff', fontSize: '36px' }}>
               Democratizing Access to Robotic Surgery Training
             </h1>
-            <p className="text-lg opacity-90 text-white" style={{ color: '#ffffff' }}>
+            <p className="opacity-90 text-white" style={{ color: '#ffffff', fontSize: '19px' }}>
               Develop the right training habits with HandsOn
             </p>
           </div>
