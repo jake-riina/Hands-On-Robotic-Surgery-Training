@@ -1,6 +1,6 @@
 import { createBrowserRouter } from 'react-router-dom';
 import LoginTraineeV1 from '../pages/LoginTraineeV1';
-import LoginTraineeV2 from '../pages/LoginTraineeV2';
+import Settings from '../pages/SettingsPage';
 import DashboardGlovesConnected from '../pages/DashboardGlovesConnected';
 import DashboardLogout from '../pages/DashboardLogout';
 import DashboardLogoutConfirm from '../pages/DashboardLogoutConfirm';
@@ -28,8 +28,8 @@ export const router = createBrowserRouter([
     element: <LoginTraineeV1 />,
   },
   {
-    path: '/login-trainee-v2',
-    element: <LoginTraineeV2 />,
+    path: '/settings',
+    element: <Settings />,
   },
   {
     path: '/dashboard',
