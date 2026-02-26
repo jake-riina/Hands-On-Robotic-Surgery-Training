@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { type ReactNode } from 'react';
+import ProfileDropdown from './ProfileDropdown';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -89,13 +90,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
           </div>
         </div>
         {/* Profile picture */}
-        <div className="w-10 h-10 rounded-full bg-gray-500 overflow-hidden flex items-center justify-center">
-          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="14" cy="14" r="14" fill="#9CA3AF" />
-            <circle cx="14" cy="10" r="4" fill="#4B5563" />
-            <path d="M 6 22 Q 6 18 10 18 L 18 18 Q 22 18 22 22 L 22 28 L 6 28 Z" fill="#4B5563" />
-          </svg>
-        </div>
+        <ProfileDropdown size="md" />
       </header>
 
       {/* Main Layout Container */}

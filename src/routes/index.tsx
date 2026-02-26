@@ -1,6 +1,6 @@
 import { createBrowserRouter } from 'react-router-dom';
 import LoginTraineeV1 from '../pages/LoginTraineeV1';
-import LoginTraineeV2 from '../pages/LoginTraineeV2';
+import Settings from '../pages/SettingsPage';
 import DashboardGlovesConnected from '../pages/DashboardGlovesConnected';
 import DashboardLogout from '../pages/DashboardLogout';
 import DashboardLogoutConfirm from '../pages/DashboardLogoutConfirm';
@@ -16,6 +16,7 @@ import PegTransfer from '../pages/PegTransfer';
 import CameraControl from '../pages/CameraControl';
 import IncompleteModule1 from '../pages/IncompleteModule1';
 import AdminDashboard from '../pages/AdminDashboard';
+import AdminAnalytics from '../pages/AdminAnalytics';
 import TraineeRegistration from '../pages/TraineeRegistration';
 
 export const router = createBrowserRouter([
@@ -28,8 +29,8 @@ export const router = createBrowserRouter([
     element: <LoginTraineeV1 />,
   },
   {
-    path: '/login-trainee-v2',
-    element: <LoginTraineeV2 />,
+    path: '/settings',
+    element: <Settings />,
   },
   {
     path: '/dashboard',
@@ -38,6 +39,10 @@ export const router = createBrowserRouter([
   {
     path: '/admin/dashboard',
     element: <AdminDashboard />,
+  },
+  {
+    path: '/admin/analytics',
+    element: <AdminAnalytics />,
   },
   {
     path: '/register/:token',

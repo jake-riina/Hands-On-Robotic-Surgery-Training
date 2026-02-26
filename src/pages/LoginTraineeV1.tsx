@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 
 /* ---------------- TYPES ---------------- */
@@ -14,6 +14,7 @@ const images = [
 
 const LoginTraineeV1: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [role, setRole] = useState<UserRole>('trainee');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -22,6 +23,7 @@ const LoginTraineeV1: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [current, setCurrent] = useState(0);
   const [isSignUp, setIsSignUp] = useState(false);
+  const [showSignOutPopup, setShowSignOutPopup] = useState(false);
 
   /* ---------- Carousel auto-rotate ---------- */
   useEffect(() => {
@@ -30,6 +32,20 @@ const LoginTraineeV1: React.FC = () => {
     }, 3500);
     return () => clearInterval(interval);
   }, []);
+
+  /* ---------- Check for sign out parameter ---------- */
+  useEffect(() => {
+    if (searchParams.get('signedOut') === 'true') {
+      setShowSignOutPopup(true);
+      // Remove the parameter from URL
+      setSearchParams({});
+      // Auto-close popup after 3 seconds
+      const timer = setTimeout(() => {
+        setShowSignOutPopup(false);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams, setSearchParams]);
 
   /* ---------- Check if user is already logged in ---------- */
   /* Skip redirect in dev so "npm run dev" always opens login page */
@@ -119,6 +135,75 @@ const LoginTraineeV1: React.FC = () => {
 
   return (
     <div className="min-h-screen flex" style={{ backgroundColor: '#26313E' }}>
+      {/* Sign Out Complete Popup */}
+      {showSignOutPopup && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'center',
+            zIndex: 50,
+            paddingTop: '80px',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '8px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              padding: '32px',
+              maxWidth: '384px',
+              width: '100%',
+              marginLeft: '16px',
+              marginRight: '16px',
+            }}
+          >
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '36px', marginBottom: '16px' }}>✓</div>
+              <h2
+                style={{
+                  fontSize: '24px',
+                  fontWeight: '700',
+                  marginBottom: '8px',
+                  color: '#1F2937',
+                }}
+              >
+                Sign Out Complete
+              </h2>
+              <p style={{ color: '#4B5563', marginBottom: '24px' }}>
+                You have been successfully signed out.
+              </p>
+              <button
+                onClick={() => setShowSignOutPopup(false)}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#1d4ed8')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#2563eb')}
+                style={{
+                  backgroundColor: '#2563eb',
+                  color: '#ffffff',
+                  fontWeight: '500',
+                  paddingLeft: '24px',
+                  paddingRight: '24px',
+                  paddingTop: '8px',
+                  paddingBottom: '8px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s ease-in-out',
+                }}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Sticky Logo in top-left corner */}
       <div className="fixed top-0 left-0 z-50 p-4 bg-white rounded-br-lg shadow">
         <img
