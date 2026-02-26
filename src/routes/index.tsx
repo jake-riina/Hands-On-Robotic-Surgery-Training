@@ -16,6 +16,7 @@ import PegTransfer from '../pages/PegTransfer';
 import CameraControl from '../pages/CameraControl';
 import IncompleteModule1 from '../pages/IncompleteModule1';
 import AdminDashboard from '../pages/AdminDashboard';
+import AdminAnalytics from '../pages/AdminAnalytics';
 import TraineeRegistration from '../pages/TraineeRegistration';
 
 export const router = createBrowserRouter([
@@ -38,6 +39,10 @@ export const router = createBrowserRouter([
   {
     path: '/admin/dashboard',
     element: <AdminDashboard />,
+  },
+  {
+    path: '/admin/analytics',
+    element: <AdminAnalytics />,
   },
   {
     path: '/register/:token',

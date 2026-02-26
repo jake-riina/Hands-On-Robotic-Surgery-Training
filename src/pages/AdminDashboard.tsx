@@ -57,7 +57,7 @@ const AdminDashboard: React.FC = () => {
       icon: 'trainees'
     },
     { 
-      path: '/analytics', 
+      path: '/admin/analytics', 
       label: 'Analytics', 
       icon: 'analytics'
     },
@@ -165,9 +165,9 @@ const AdminDashboard: React.FC = () => {
             <div className="space-y-2 pt-[30px]">
               {navItems.map((item) => {
                 const isActive = 
-                  (item.path === '/admin/dashboard' && location.pathname.startsWith('/admin/dashboard') && !location.pathname.startsWith('/admin/trainees')) ||
+                  (item.path === '/admin/dashboard' && location.pathname.startsWith('/admin/dashboard') && !location.pathname.startsWith('/admin/trainees') && !location.pathname.startsWith('/admin/analytics')) ||
                   (item.path === '/admin/trainees' && location.pathname.startsWith('/admin/trainees')) ||
-                  (item.path === '/analytics' && location.pathname.startsWith('/analytics')) ||
+                  (item.path === '/admin/analytics' && location.pathname.startsWith('/admin/analytics')) ||
                   (item.path === '/settings' && location.pathname.startsWith('/settings'));
                 
                 return (
