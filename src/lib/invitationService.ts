@@ -24,7 +24,7 @@ export async function inviteTrainee(
     expiresAt.setHours(expiresAt.getHours() + 24);
 
     // Store invitation in database
-    const { data, error } = await supabase
+    const { data: _insertData, error } = await supabase
       .from('trainee_invitations')
       .insert({
         email: email.toLowerCase().trim(),

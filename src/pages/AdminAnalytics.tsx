@@ -7,7 +7,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, LineCh
 const AdminAnalytics: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [firstName, setFirstName] = useState<string>('');
+  const [_firstName, setFirstName] = useState<string>('');
   const [showTooltip, setShowTooltip] = useState<boolean>(false);
 
   useEffect(() => {

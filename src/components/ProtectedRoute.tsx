@@ -12,7 +12,7 @@ interface ProtectedRouteProps {
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
   requiredRole,
-  redirectTo,
+  redirectTo: _redirectTo,
 }) => {
   const location = useLocation();
   const [isLoading, setIsLoading] = useState(true);
