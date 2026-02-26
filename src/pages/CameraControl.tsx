@@ -93,15 +93,21 @@ function createGloveTexture() {
 /** Camera mounted on top of table: position never changes, only rotation (look around). Zoom = FOV. */
 const CAMERA_POSITION = new THREE.Vector3(0, 0.5, 0);
 
-function CameraMount({ rotX, rotY, fov }: { rotX: number; rotY: number; fov: number }) {
+function CameraMount({
+  rotRef,
+  fovRef,
+}: {
+  rotRef: React.MutableRefObject<{ x: number; y: number }>;
+  fovRef: React.MutableRefObject<number>;
+}) {
   useFrame(({ camera }) => {
     camera.position.copy(CAMERA_POSITION);
     camera.rotation.order = 'YXZ';
-    camera.rotation.y = rotY;
-    camera.rotation.x = rotX;
+    camera.rotation.y = rotRef.current.y;
+    camera.rotation.x = rotRef.current.x;
     camera.rotation.z = 0;
     if (camera instanceof THREE.PerspectiveCamera) {
-      camera.fov = fov;
+      camera.fov = fovRef.current;
       camera.updateProjectionMatrix();
     }
   });
@@ -173,7 +179,7 @@ function ProjectOrb({
       progressRef.current = 0;
     }
     const p = progressRef.current;
-    if (Math.abs(p - lastReportedRef.current) >= 0.02 || p === 0 || p >= 1) {
+    if (Math.abs(p - lastReportedRef.current) >= 0.06 || p === 0 || p >= 1) {
       lastReportedRef.current = p;
       onOrbProjection({ progress: p });
     }
@@ -308,9 +314,8 @@ function OrbHintUpdater({
 
 interface CameraControlSceneProps {
   showRedOrb?: boolean;
-  sceneRotX?: number;
-  sceneRotY?: number;
-  fov?: number;
+  sceneRotRef?: React.MutableRefObject<{ x: number; y: number }>;
+  fovRef?: React.MutableRefObject<number>;
   orbPosition?: [number, number, number];
   onOrbProjection?: (data: { progress: number }) => void;
   onCapture?: () => void;
@@ -319,9 +324,8 @@ interface CameraControlSceneProps {
 
 function CameraControlScene({
   showRedOrb = false,
-  sceneRotX = 0,
-  sceneRotY = 0,
-  fov = 50,
+  sceneRotRef,
+  fovRef,
   orbPosition = [1.4, 0.3, 4.05],
   onOrbProjection = () => {},
   onCapture = () => {},
@@ -332,9 +336,14 @@ function CameraControlScene({
   const syringesTexture = useMemo(() => createSyringesTexture(), []);
   const gloveTexture = useMemo(() => createGloveTexture(), []);
 
+  const defaultRotRef = useRef({ x: -0.28, y: 0 });
+  const defaultFovRef = useRef(FOV_MAX);
+  const rotRef = sceneRotRef ?? defaultRotRef;
+  const fov = fovRef ?? defaultFovRef;
+
   return (
     <>
-      <CameraMount rotX={sceneRotX} rotY={sceneRotY} fov={fov} />
+      <CameraMount rotRef={rotRef} fovRef={fov} />
       {showRedOrb && (
         <ProjectOrb
           orbPosition={orbPosition}
@@ -1879,16 +1888,14 @@ const CameraControl = () => {
   const [showRedOrb, setShowRedOrb] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(60);
   const [timerActive, setTimerActive] = useState(false);
-  /** Start facing the back wall (wall cabinets): horizontal toward -Z with slight tilt down at cabinet height */
-  const [sceneRotX, setSceneRotX] = useState(-0.28);
-  const [sceneRotY, setSceneRotY] = useState(0);
-  const [fov, setFov] = useState(FOV_MAX);
+  /** Start facing the back wall (wall cabinets): horizontal toward -Z with slight tilt down at cabinet height. Refs avoid re-renders on every drag/scroll. */
+  const sceneRotRef = useRef({ x: -0.28, y: 0 });
+  const fovRef = useRef(FOV_MAX);
   const [orbPosition, setOrbPosition] = useState<[number, number, number]>(
     ORB_SPAWN_POSITIONS_VALID[0] ?? ORB_SPAWN_POSITIONS[0]
   );
   const [orbsCollected, setOrbsCollected] = useState(0);
   const [captureProgress, setCaptureProgress] = useState(0);
-  const [showCongratulations, setShowCongratulations] = useState(false);
   const [flyingOrb, setFlyingOrb] = useState<{
     targetIndex: number;
     startX?: number;
@@ -1919,10 +1926,15 @@ const CameraControl = () => {
 
   useEffect(() => {
     if (orbsCollected !== 5) return;
-    const delay = 550;
-    const id = setTimeout(() => setShowCongratulations(true), delay);
+    const timeTakenSeconds = 60 - timerSeconds;
+    const delay = 600;
+    const id = setTimeout(() => {
+      navigate('/module/2/complete', {
+        state: { orbsCollected: 5, totalOrbs: 5, timeTakenSeconds },
+      });
+    }, delay);
     return () => clearTimeout(id);
-  }, [orbsCollected]);
+  }, [orbsCollected, timerSeconds, navigate]);
 
   useEffect(() => {
     if (!showRedOrb) setOrbHintState((prev) => ({ ...prev, hint: null }));
@@ -1967,7 +1979,7 @@ const CameraControl = () => {
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      setFov((f) => Math.max(FOV_MIN, Math.min(FOV_MAX, f - e.deltaY * ZOOM_SENSITIVITY)));
+      fovRef.current = Math.max(FOV_MIN, Math.min(FOV_MAX, fovRef.current - e.deltaY * ZOOM_SENSITIVITY));
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
@@ -1984,8 +1996,8 @@ const CameraControl = () => {
     const dx = e.clientX - dragRef.current.lastX;
     const dy = e.clientY - dragRef.current.lastY;
     dragRef.current = { lastX: e.clientX, lastY: e.clientY };
-    setSceneRotY((y) => y + dx * ROT_SENSITIVITY);
-    setSceneRotX((x) => Math.max(-ROT_X_MAX, Math.min(ROT_X_MAX, x - dy * ROT_SENSITIVITY)));
+    sceneRotRef.current.y += dx * ROT_SENSITIVITY;
+    sceneRotRef.current.x = Math.max(-ROT_X_MAX, Math.min(ROT_X_MAX, sceneRotRef.current.x - dy * ROT_SENSITIVITY));
   };
   const handlePointerUp = (e: React.PointerEvent) => {
     setIsDragging(false);
@@ -2025,6 +2037,12 @@ const CameraControl = () => {
     }, 1000);
     return () => clearInterval(id);
   }, [timerActive, timerSeconds]);
+
+  // When timer hits zero and not all orbs collected, go to incomplete page
+  useEffect(() => {
+    if (!timerActive || timerSeconds !== 0 || orbsCollected >= 5) return;
+    navigate('/module/2/incomplete', { state: { orbsCollected, totalOrbs: 5 } });
+  }, [timerActive, timerSeconds, orbsCollected, navigate]);
 
   const showCountdownOverlay = countdown !== null;
   const timerDisplay = timerActive
@@ -2080,13 +2098,12 @@ const CameraControl = () => {
           role="application"
           tabIndex={0}
         >
-          <Canvas camera={{ position: [0, 0.5, 0], fov: 50 }} dpr={[1, 2]} style={{ width: '100%', height: '100%', display: 'block' }}>
+          <Canvas camera={{ position: [0, 0.5, 0], fov: 50 }} dpr={1} style={{ width: '100%', height: '100%', display: 'block' }}>
             <Suspense fallback={null}>
               <CameraControlScene
                 showRedOrb={showRedOrb}
-                sceneRotX={sceneRotX}
-                sceneRotY={sceneRotY}
-                fov={fov}
+                sceneRotRef={sceneRotRef}
+                fovRef={fovRef}
                 orbPosition={orbPosition}
                 onOrbProjection={onOrbProjection}
                 onCapture={onCapture}
@@ -2105,7 +2122,7 @@ const CameraControl = () => {
             overflow: 'hidden',
           }}
         >
-          {/* Left: stick extends to x=-120 so segment -120→-60 is clipped and stick emerges from off-screen. */}
+          {/* Left: stick extends off-screen to x=-280 so it emerges from well outside the view. */}
           <svg
             viewBox="-60 0 360 400"
             preserveAspectRatio="xMaxYMax meet"
@@ -2131,7 +2148,7 @@ const CameraControl = () => {
               </linearGradient>
             </defs>
             <path
-              d="M -120 277 L 100 173 L 100 187 L -120 293 Z"
+              d="M -280 277 L 100 173 L 100 187 L -280 293 Z"
               fill="url(#arm2DarkL)"
               stroke="#171717"
               strokeWidth="0.4"
@@ -2139,7 +2156,7 @@ const CameraControl = () => {
             <path d="M 98 172 L 128 155 L 132 162 L 102 178 Z" fill="url(#arm2ProngL)" stroke="#e5e7eb" strokeWidth="0.4" />
             <path d="M 98 188 L 128 205 L 132 198 L 102 182 Z" fill="url(#arm2ProngL)" stroke="#e5e7eb" strokeWidth="0.4" />
           </svg>
-          {/* Right: stick extends to x=420 so segment 360→420 is clipped and stick goes off-screen. */}
+          {/* Right: stick extends off-screen to x=560 so it extends well outside the view. */}
           <svg
             viewBox="0 0 360 400"
             preserveAspectRatio="xMinYMax meet"
@@ -2165,7 +2182,7 @@ const CameraControl = () => {
               </linearGradient>
             </defs>
             <path
-              d="M 420 277 L 200 173 L 200 187 L 420 293 Z"
+              d="M 560 277 L 200 173 L 200 187 L 560 293 Z"
               fill="url(#arm2DarkR)"
               stroke="#171717"
               strokeWidth="0.4"
@@ -2341,50 +2358,6 @@ const CameraControl = () => {
             >
               {countdown}
             </span>
-          </div>
-        )}
-        {/* Congratulations popup when 5 orbs collected */}
-        {showCongratulations && (
-          <div
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: 'rgba(0,0,0,0.7)',
-              zIndex: 110,
-            }}
-          >
-            <div
-              style={{
-                backgroundColor: '#1E2733',
-                borderRadius: 12,
-                padding: '32px 40px',
-                maxWidth: 360,
-                textAlign: 'center',
-                border: '1px solid #374151',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-              }}
-            >
-              <p className="text-2xl font-bold" style={{ color: '#22c55e', marginBottom: 8 }}>
-                Congratulations!
-              </p>
-              <p className="text-base" style={{ color: '#e5e7eb', marginBottom: 24 }}>
-                You collected all 5 orbs. Great camera control!
-              </p>
-              <button
-                type="button"
-                onClick={() => setShowCongratulations(false)}
-                className="px-6 py-2 rounded-lg font-medium transition-opacity hover:opacity-90"
-                style={{ backgroundColor: '#374151', color: '#fff', border: 'none', cursor: 'pointer' }}
-              >
-                Close
-              </button>
-            </div>
           </div>
         )}
       </div>

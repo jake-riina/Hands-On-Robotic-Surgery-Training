@@ -15,6 +15,8 @@ import CompletedModule from '../pages/CompletedModule';
 import PegTransfer from '../pages/PegTransfer';
 import CameraControl from '../pages/CameraControl';
 import IncompleteModule1 from '../pages/IncompleteModule1';
+import IncompleteModule2 from '../pages/IncompleteModule2';
+import CompleteModule2 from '../pages/CompleteModule2';
 import AdminDashboard from '../pages/AdminDashboard';
 import AdminAnalytics from '../pages/AdminAnalytics';
 import TraineeRegistration from '../pages/TraineeRegistration';
@@ -95,6 +97,14 @@ export const router = createBrowserRouter([
   {
     path: '/module/2/camera-control',
     element: <CameraControl />,
+  },
+  {
+    path: '/module/2/incomplete',
+    element: <IncompleteModule2 />,
+  },
+  {
+    path: '/module/2/complete',
+    element: <CompleteModule2 />,
   },
   {
     path: '/module/3/peg-transfer',
