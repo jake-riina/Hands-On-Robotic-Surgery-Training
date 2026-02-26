@@ -1,6 +1,6 @@
 import { createBrowserRouter } from 'react-router-dom';
 import LoginTraineeV1 from '../pages/LoginTraineeV1';
-import LoginTraineeV2 from '../pages/LoginTraineeV2';
+import Settings from '../pages/SettingsPage';
 import DashboardGlovesConnected from '../pages/DashboardGlovesConnected';
 import DashboardLogout from '../pages/DashboardLogout';
 import DashboardLogoutConfirm from '../pages/DashboardLogoutConfirm';
@@ -21,6 +21,9 @@ import Module3Incomplete from '../pages/Module3Incomplete';
 import Module1Analytics from '../pages/Module1Analytics';
 import Module2Analytics from '../pages/Module2Analytics';
 import Module3Analytics from '../pages/Module3Analytics';
+import AdminDashboard from '../pages/AdminDashboard';
+import AdminAnalytics from '../pages/AdminAnalytics';
+import TraineeRegistration from '../pages/TraineeRegistration';
 
 export const router = createBrowserRouter([
   {
@@ -32,12 +35,24 @@ export const router = createBrowserRouter([
     element: <LoginTraineeV1 />,
   },
   {
-    path: '/login-trainee-v2',
-    element: <LoginTraineeV2 />,
+    path: '/settings',
+    element: <Settings />,
   },
   {
     path: '/dashboard',
     element: <DashboardGlovesConnected />,
+  },
+  {
+    path: '/admin/dashboard',
+    element: <AdminDashboard />,
+  },
+  {
+    path: '/admin/analytics',
+    element: <AdminAnalytics />,
+  },
+  {
+    path: '/register/:token',
+    element: <TraineeRegistration />,
   },
   {
     path: '/dashboard/logout',

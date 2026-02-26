@@ -1,9 +1,35 @@
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 import { useBLE } from '../contexts/BLEContext';
+import { supabase } from '../lib/supabaseClient';
+import ProfileDropdown from '../components/ProfileDropdown';
 
 const DashboardGlovesConnected = () => {
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Check user role and redirect if admin
+  useEffect(() => {
+    const checkUserRole = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        navigate('/');
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+
+      if (profile?.role === 'admin') {
+        navigate('/admin/dashboard');
+      }
+    };
+
+    checkUserRole();
+  }, [navigate]);
   
   // Use shared BLE context
   const { 
@@ -116,13 +142,7 @@ const DashboardGlovesConnected = () => {
           </div>
         </div>
         {/* Profile picture */}
-        <div className="w-9 h-9 rounded-full bg-gray-500 overflow-hidden flex items-center justify-center">
-          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="14" cy="14" r="14" fill="#9CA3AF"/>
-            <circle cx="14" cy="10" r="4" fill="#4B5563"/>
-            <path d="M 6 22 Q 6 18 10 18 L 18 18 Q 22 18 22 22 L 22 28 L 6 28 Z" fill="#4B5563"/>
-          </svg>
-        </div>
+        <ProfileDropdown />
       </header>
 
       {/* Main Layout Container */}

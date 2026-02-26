@@ -1,6 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '../lib/supabaseClient';
+import ProfileDropdown from '../components/ProfileDropdown';
 
 const Module2Instructions = () => {
   const navigate = useNavigate();
@@ -151,14 +152,14 @@ const Module2Instructions = () => {
         console.log('Session ID:', sessionId);
       }
 
-      // Navigate to exercise with session ID
-      navigate('/module/2/exercise/1/start', { state: { sessionId } });
+      // Navigate to module 2 camera control (game) with session ID
+      navigate('/module/2/camera-control', { state: { sessionId } });
     } catch (err) {
       console.error('Error in handleBeginTraining:', err);
       alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
       // Still navigate even if there's an error
       const sessionId = uuidv4();
-      navigate('/module/2/exercise/1/start', { state: { sessionId } });
+      navigate('/module/2/camera-control', { state: { sessionId } });
     }
   };
 
@@ -187,13 +188,7 @@ const Module2Instructions = () => {
           </div>
         </div>
         {/* Profile picture */}
-        <div className="w-9 h-9 rounded-full bg-gray-500 overflow-hidden flex items-center justify-center">
-          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="14" cy="14" r="14" fill="#9CA3AF"/>
-            <circle cx="14" cy="10" r="4" fill="#4B5563"/>
-            <path d="M 6 22 Q 6 18 10 18 L 18 18 Q 22 18 22 22 L 22 28 L 6 28 Z" fill="#4B5563"/>
-          </svg>
-        </div>
+        <ProfileDropdown />
       </header>
 
       {/* Main Layout Container */}

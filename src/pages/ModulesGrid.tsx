@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import type { Module } from '../api/mock/types';
 import { mockModulesAPI } from '../api/mock/modules';
+import ProfileDropdown from '../components/ProfileDropdown';
 
 const ModulesGrid = () => {
   const navigate = useNavigate();
@@ -91,13 +92,7 @@ const ModulesGrid = () => {
             />
           </div>
         </div>
-        <div className="w-9 h-9 rounded-full bg-gray-500 overflow-hidden flex items-center justify-center">
-          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="14" cy="14" r="14" fill="#9CA3AF"/>
-            <circle cx="14" cy="10" r="4" fill="#4B5563"/>
-            <path d="M 6 22 Q 6 18 10 18 L 18 18 Q 22 18 22 22 L 22 28 L 6 28 Z" fill="#4B5563"/>
-          </svg>
-        </div>
+        <ProfileDropdown />
       </header>
 
       <div className="flex" style={{ minHeight: 'calc(100vh - 72px)' }}>
@@ -249,7 +244,7 @@ const ModulesGrid = () => {
                             type="button"
                             onClick={() => {
                               setUnlockedModuleIds((prev) => new Set(prev).add(2));
-                              navigate('/module/2/camera-control');
+                              navigate('/module/2/instructions');
                             }}
                             className="inline-block px-8 py-2 rounded-lg font-medium text-center text-sm cursor-pointer hover:opacity-90 border-0"
                             style={{ backgroundColor: '#1DA5FF', color: 'white', minWidth: '180px' }}
@@ -280,7 +275,7 @@ const ModulesGrid = () => {
                         <Link
                           to={
                             module.id === 2
-                              ? '/module/2/camera-control'
+                              ? '/module/2/instructions'
                               : module.id === 3
                                 ? '/module/3/instructions'
                                 : `/module/${module.id}/instructions`
