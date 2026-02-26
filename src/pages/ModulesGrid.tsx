@@ -261,7 +261,7 @@ const ModulesGrid = () => {
                             type="button"
                             onClick={() => {
                               setUnlockedModuleIds((prev) => new Set(prev).add(3));
-                              navigate('/module/3/peg-transfer');
+                              navigate('/module/3/instructions');
                             }}
                             className="inline-block px-8 py-2 rounded-lg font-medium text-center text-sm cursor-pointer hover:opacity-90 border-0"
                             style={{ backgroundColor: '#1DA5FF', color: 'white', minWidth: '180px' }}
@@ -282,7 +282,7 @@ const ModulesGrid = () => {
                             module.id === 2
                               ? '/module/2/camera-control'
                               : module.id === 3
-                                ? '/module/3/peg-transfer'
+                                ? '/module/3/instructions'
                                 : `/module/${module.id}/instructions`
                           }
                           className="inline-block px-8 py-2 rounded-lg font-medium text-center transition-colors hover:opacity-90 text-sm"

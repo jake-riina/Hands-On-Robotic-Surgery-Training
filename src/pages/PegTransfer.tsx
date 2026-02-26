@@ -1,17 +1,117 @@
-import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Canvas, useThree } from '@react-three/fiber';
-import { Shape, Path, ExtrudeGeometry, Vector3, Vector2, Plane, Raycaster, Group, Mesh, type Camera } from 'three';
+import { Vector3, Vector2, Plane, Raycaster, Group, Mesh, type Camera } from 'three';
 import { useFrame } from '@react-three/fiber';
 
-const LEFT_PEG_POSITIONS: [number, number, number][] = [];
-[-1.25, -0.85].forEach((x) => [0.4, 0, -0.4].forEach((z) => LEFT_PEG_POSITIONS.push([x, 0.19, z])));
+const PEG_ROWS = 2;
+const PEG_COLS = 4;
+const TABLE_Y = 0.19;
+const GRID_SPACING_X = 0.4;
+const GRID_SPACING_Z = 0.4;
+const LEFT_GRID_CENTER_X = -1.05;
+const LEFT_GRID_CENTER_Z = 0;
+const RIGHT_GRID_CENTER_X = 1.05;
+const RIGHT_GRID_CENTER_Z = 0;
 
-const RIGHT_PEG_POSITIONS: [number, number, number][] = [];
-[1.25, 0.85].forEach((x) => [0.4, 0, -0.4].forEach((z) => RIGHT_PEG_POSITIONS.push([x, 0.19, z])));
+function makeGridPositions(options: {
+  rows: number;
+  cols: number;
+  spacingX: number;
+  spacingZ: number;
+  centerX: number;
+  centerZ: number;
+  y: number;
+}): [number, number, number][] {
+  const { rows, cols, spacingX, spacingZ, centerX, centerZ, y } = options;
+  const positions: [number, number, number][] = [];
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const x = centerX + (row - (rows - 1) / 2) * spacingX;
+      const z = centerZ + (col - (cols - 1) / 2) * spacingZ;
+      positions.push([x, y, z]);
+    }
+  }
+  return positions;
+}
+
+const LEFT_PEG_POSITIONS = makeGridPositions({
+  rows: PEG_ROWS,
+  cols: PEG_COLS,
+  spacingX: GRID_SPACING_X,
+  spacingZ: GRID_SPACING_Z,
+  centerX: LEFT_GRID_CENTER_X,
+  centerZ: LEFT_GRID_CENTER_Z,
+  y: TABLE_Y,
+});
+
+const RIGHT_PEG_POSITIONS = makeGridPositions({
+  rows: PEG_ROWS,
+  cols: PEG_COLS,
+  spacingX: GRID_SPACING_X,
+  spacingZ: GRID_SPACING_Z,
+  centerX: RIGHT_GRID_CENTER_X,
+  centerZ: RIGHT_GRID_CENTER_Z,
+  y: TABLE_Y,
+});
+
+/** Midpoint Z per group (from actual peg positions). Used to decide upper/back vs lower/front row by z. */
+const LEFT_MID_Z =
+  (Math.min(...LEFT_PEG_POSITIONS.map((p) => p[2])) + Math.max(...LEFT_PEG_POSITIONS.map((p) => p[2]))) / 2;
+const RIGHT_MID_Z =
+  (Math.min(...RIGHT_PEG_POSITIONS.map((p) => p[2])) + Math.max(...RIGHT_PEG_POSITIONS.map((p) => p[2]))) / 2;
+
+/**
+ * Ring placement by peg z relative to group midpoint (no row indices).
+ * Left: ring on "upper/back" row → peg z on the higher-z side of left midpoint.
+ * Right: ring on "lower/front" row → peg z on the lower-z side of right midpoint.
+ */
+function getHasRing(side: 'left' | 'right', pegZ: number): boolean {
+  if (side === 'left') return pegZ >= LEFT_MID_Z;
+  return pegZ <= RIGHT_MID_Z;
+}
+
+/** Build initial ring positions: left pegs with z >= leftMidZ, then right pegs with z <= rightMidZ. */
+function getInitialRingPositions(): [number, number, number][] {
+  const positions: [number, number, number][] = [];
+  for (const pos of LEFT_PEG_POSITIONS) {
+    if (getHasRing('left', pos[2])) positions.push([...pos] as [number, number, number]);
+  }
+  for (const pos of RIGHT_PEG_POSITIONS) {
+    if (getHasRing('right', pos[2])) positions.push([...pos] as [number, number, number]);
+  }
+  return positions;
+}
 
 const SNAP_RADIUS = 0.18;
-const TABLE_Y = 0.19;
+
+/** All peg sockets (left + right) as snap targets so snapping works both directions. */
+const ALL_SNAP_TARGETS: [number, number, number][] = [
+  ...LEFT_PEG_POSITIONS.map((p) => [p[0], p[1], p[2]] as [number, number, number]),
+  ...RIGHT_PEG_POSITIONS.map((p) => [p[0], p[1], p[2]] as [number, number, number]),
+];
+
+/**
+ * Find nearest snap target within SNAP_RADIUS (world-space xz distance).
+ * Direction-agnostic: same logic for left→right and right→left.
+ */
+function findNearestSnapTarget(
+  releasePos: [number, number, number]
+): { snapTo: [number, number, number]; distance: number } | null {
+  const [x, , z] = releasePos;
+  let bestDist = SNAP_RADIUS;
+  let snapTo: [number, number, number] | null = null;
+  for (const peg of ALL_SNAP_TARGETS) {
+    const dx = x - peg[0];
+    const dz = z - peg[2];
+    const d = Math.sqrt(dx * dx + dz * dz);
+    if (d < bestDist) {
+      bestDist = d;
+      snapTo = [peg[0], peg[1], peg[2]];
+    }
+  }
+  return snapTo ? { snapTo, distance: bestDist } : null;
+}
 
 const tablePlane = new Plane(new Vector3(0, 1, 0), 0);
 tablePlane.constant = -TABLE_Y;
@@ -91,38 +191,84 @@ function Instrument({ tipPosition }: { tipPosition: [number, number, number] }) 
   );
 }
 
-function TriangleRing({ position }: { position: [number, number, number] }) {
-  const geometry = useMemo(() => {
-    const shape = new Shape();
-    const r = 0.13;
-    shape.moveTo(r * Math.cos(0), r * Math.sin(0));
-    shape.lineTo(r * Math.cos((2 * Math.PI) / 3), r * Math.sin((2 * Math.PI) / 3));
-    shape.lineTo(r * Math.cos((4 * Math.PI) / 3), r * Math.sin((4 * Math.PI) / 3));
-    shape.closePath();
-    const hole = new Path();
-    const rh = 0.085;
-    hole.moveTo(rh * Math.cos(0), rh * Math.sin(0));
-    hole.lineTo(rh * Math.cos((4 * Math.PI) / 3), rh * Math.sin((4 * Math.PI) / 3));
-    hole.lineTo(rh * Math.cos((2 * Math.PI) / 3), rh * Math.sin((2 * Math.PI) / 3));
-    hole.closePath();
-    shape.holes.push(hole);
-    return new ExtrudeGeometry(shape, { depth: 0.1, bevelEnabled: false });
-  }, []);
+const PEG_RADIUS = 0.04;
+const RING_MAJOR_RADIUS = PEG_RADIUS * 2.1;  /* ~2.0–2.2× peg radius for wider ring */
+const RING_TUBE_RADIUS = PEG_RADIUS * 0.4;    /* ~0.4× peg radius for bolder thickness */
+const RING_Y_OFFSET = 0.002;
+const RING_COLOR_DEFAULT = '#1DA5FF';
+const RING_COLOR_TRANSFERRED = '#22c55e';
 
+function PegRing({ position, transferred }: { position: [number, number, number]; transferred: boolean }) {
+  const ringY = TABLE_Y + RING_Y_OFFSET;
+  const color = transferred ? RING_COLOR_TRANSFERRED : RING_COLOR_DEFAULT;
   return (
-    <mesh position={position} rotation={[-Math.PI / 2, 0, 0]} geometry={geometry}>
-      <meshStandardMaterial color="#1DA5FF" />
+    <mesh
+      position={[position[0], ringY, position[2]]}
+      rotation={[Math.PI / 2, 0, 0]}
+    >
+      <torusGeometry args={[RING_MAJOR_RADIUS, RING_TUBE_RADIUS, 16, 32]} />
+      <meshStandardMaterial color={color} metalness={0.3} roughness={0.5} />
     </mesh>
   );
 }
 
-function PegTransferScene() {
-  const [trianglePositions, setTrianglePositions] = useState<[number, number, number][]>(() =>
-    LEFT_PEG_POSITIONS.map((p) => [...p] as [number, number, number])
-  );
+/** Ring 0..3 origin left, 4..7 origin right (matches getInitialRingPositions order). */
+function getOriginSide(ringIndex: number): 'left' | 'right' {
+  return ringIndex < 4 ? 'left' : 'right';
+}
+
+/** Side of a peg position: x < 0 = left, x >= 0 = right. */
+function getSideOfPosition(position: [number, number, number]): 'left' | 'right' {
+  return position[0] < 0 ? 'left' : 'right';
+}
+
+const INITIAL_RING_CURRENT_SIDES: ('left' | 'right')[] = [
+  'left',
+  'left',
+  'left',
+  'left',
+  'right',
+  'right',
+  'right',
+  'right',
+];
+
+const TIMER_INITIAL_SECONDS = 60;
+
+function formatTimer(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+/** All rings are "green" (transferred) when each ring's committed side !== its origin side. */
+function allRingsTransferred(ringCurrentSides: ('left' | 'right')[]): boolean {
+  return ringCurrentSides.length === 8 && ringCurrentSides.every((side, i) => getOriginSide(i) !== side);
+}
+
+function PegTransferScene({
+  onAllRingsTransferred,
+  onFirstRingPickup,
+  onRingSidesChange,
+}: {
+  onAllRingsTransferred?: () => void;
+  onFirstRingPickup?: () => void;
+  onRingSidesChange?: (sides: ('left' | 'right')[]) => void;
+}) {
+  const [ringPositions, setRingPositions] = useState<[number, number, number][]>(getInitialRingPositions);
+  const [ringCurrentSides, setRingCurrentSides] = useState<('left' | 'right')[]>(() => [...INITIAL_RING_CURRENT_SIDES]);
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
   const [instrumentPosition, setInstrumentPosition] = useState<[number, number, number]>([0, TABLE_Y, 0]);
+  const hasFiredFirstPickupRef = useRef(false);
   const { camera, size, gl } = useThree();
+
+  useEffect(() => {
+    if (allRingsTransferred(ringCurrentSides)) onAllRingsTransferred?.();
+  }, [ringCurrentSides, onAllRingsTransferred]);
+
+  useEffect(() => {
+    onRingSidesChange?.(ringCurrentSides);
+  }, [ringCurrentSides, onRingSidesChange]);
 
   useEffect(() => {
     const canvas = gl.domElement;
@@ -141,7 +287,7 @@ function PegTransferScene() {
     (e: { pointer: { x: number; y: number } }) => {
       if (draggingIndex === null) return;
       const point = pointerToTablePoint(e.pointer, camera);
-      setTrianglePositions((prev) => {
+      setRingPositions((prev) => {
         const next = prev.map((p) => [...p] as [number, number, number]);
         next[draggingIndex!] = [point.x, TABLE_Y, point.z];
         return next;
@@ -152,27 +298,26 @@ function PegTransferScene() {
 
   const onPointerUp = useCallback(() => {
     if (draggingIndex === null) return;
-    const pos = trianglePositions[draggingIndex];
-    let bestDist = SNAP_RADIUS;
-    let snapTo: [number, number, number] | null = null;
-    for (const peg of RIGHT_PEG_POSITIONS) {
-      const dx = pos[0] - peg[0];
-      const dz = pos[2] - peg[2];
-      const d = Math.sqrt(dx * dx + dz * dz);
-      if (d < bestDist) {
-        bestDist = d;
-        snapTo = [peg[0], peg[1], peg[2]];
-      }
-    }
-    if (snapTo) {
-      setTrianglePositions((prev) => {
+    const ringId = draggingIndex;
+    const pos = ringPositions[ringId];
+    const result = findNearestSnapTarget(pos);
+    const snapSuccess = result !== null;
+    const destinationSide = snapSuccess ? getSideOfPosition(result.snapTo) : null;
+
+    if (snapSuccess) {
+      setRingPositions((prev) => {
         const next = prev.map((p) => [...p] as [number, number, number]);
-        next[draggingIndex] = snapTo!;
+        next[ringId] = result!.snapTo;
+        return next;
+      });
+      setRingCurrentSides((prev) => {
+        const next = [...prev];
+        next[ringId] = destinationSide!;
         return next;
       });
     }
     setDraggingIndex(null);
-  }, [draggingIndex, trianglePositions]);
+  }, [draggingIndex, ringPositions]);
 
   useEffect(() => {
     if (draggingIndex === null) return;
@@ -182,27 +327,28 @@ function PegTransferScene() {
       const ndcX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       const ndcY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
       const point = pointerToTablePoint({ x: ndcX, y: ndcY }, camera);
-      setTrianglePositions((prev) => {
+      setRingPositions((prev) => {
         const next = prev.map((p) => [...p] as [number, number, number]);
         next[draggingIndex!] = [point.x, TABLE_Y, point.z];
         return next;
       });
     };
     const onUp = () => {
-      setTrianglePositions((prev) => {
-        const pos = prev[draggingIndex!];
-        let bestDist = SNAP_RADIUS;
-        let snapTo: [number, number, number] | null = null;
-        for (const peg of RIGHT_PEG_POSITIONS) {
-          const d = Math.sqrt((pos[0] - peg[0]) ** 2 + (pos[2] - peg[2]) ** 2);
-          if (d < bestDist) {
-            bestDist = d;
-            snapTo = [peg[0], peg[1], peg[2]];
-          }
-        }
-        if (snapTo) {
+      const ringId = draggingIndex!;
+      setRingPositions((prev) => {
+        const pos = prev[ringId];
+        const result = findNearestSnapTarget(pos);
+        const snapSuccess = result !== null;
+        const destinationSide = snapSuccess ? getSideOfPosition(result.snapTo) : null;
+
+        if (snapSuccess) {
+          setRingCurrentSides((sides) => {
+            const next = [...sides];
+            next[ringId] = destinationSide!;
+            return next;
+          });
           const next = prev.map((p) => [...p] as [number, number, number]);
-          next[draggingIndex!] = snapTo;
+          next[ringId] = result.snapTo;
           return next;
         }
         return prev;
@@ -258,34 +404,37 @@ function PegTransferScene() {
         <meshStandardMaterial color="#a0a8b0" metalness={0.25} roughness={0.6} />
       </mesh>
 
-      {[-1.25, -0.85].map((x, row) =>
-        [0.4, 0, -0.4].map((z, col) => (
-          <mesh key={`peg-left-${row}-${col}`} position={[x, 0.29, z]}>
-            <cylinderGeometry args={[0.04, 0.04, 0.2, 16]} />
-            <meshStandardMaterial color="#8b7355" />
-          </mesh>
-        ))
-      )}
-      {trianglePositions.map((pos, i) => (
+      {LEFT_PEG_POSITIONS.map((pos, i) => (
+        <mesh key={`peg-left-${i}`} position={[pos[0], 0.29, pos[2]]}>
+          <cylinderGeometry args={[PEG_RADIUS, PEG_RADIUS, 0.2, 16]} />
+          <meshStandardMaterial color="#8b7355" />
+        </mesh>
+      ))}
+      {ringPositions.map((pos, i) => (
         <group
-          key={`triangle-${i}`}
+          key={`ring-${i}`}
           onPointerDown={(e) => {
             e.stopPropagation();
+            if (!hasFiredFirstPickupRef.current) {
+              hasFiredFirstPickupRef.current = true;
+              onFirstRingPickup?.();
+            }
             setDraggingIndex(i);
           }}
         >
-          <TriangleRing position={pos} />
+          <PegRing
+            position={pos}
+            transferred={getOriginSide(i) !== ringCurrentSides[i]}
+          />
         </group>
       ))}
 
-      {[1.25, 0.85].map((x, row) =>
-        [0.4, 0, -0.4].map((z, col) => (
-          <mesh key={`peg-right-${row}-${col}`} position={[x, 0.29, z]}>
-            <cylinderGeometry args={[0.04, 0.04, 0.2, 16]} />
-            <meshStandardMaterial color="#8b7355" />
-          </mesh>
-        ))
-      )}
+      {RIGHT_PEG_POSITIONS.map((pos, i) => (
+        <mesh key={`peg-right-${i}`} position={[pos[0], 0.29, pos[2]]}>
+          <cylinderGeometry args={[PEG_RADIUS, PEG_RADIUS, 0.2, 16]} />
+          <meshStandardMaterial color="#8b7355" />
+        </mesh>
+      ))}
 
       <Instrument tipPosition={instrumentPosition} />
 
@@ -309,8 +458,92 @@ function PegTransferScene() {
   );
 }
 
+const COMPLETION_NAV_DELAY_MS = 450;
+const TOTAL_RINGS = 8;
+const MODULE3_PASS_THRESHOLD = 80;
+
+/** Compute green (transferred) count from snap-committed ring sides. */
+function getGreenCount(ringCurrentSides: ('left' | 'right')[]): number {
+  if (ringCurrentSides.length !== TOTAL_RINGS) return 0;
+  return ringCurrentSides.filter((side, i) => getOriginSide(i) !== side).length;
+}
+
+/**
+ * Score when timer ends: percent of rings transferred (green).
+ * greenCount / totalRings * 100, with blueCount = total - green.
+ * Edge cases: all green → 100%, none green → 0%.
+ */
+function computeScorePercent(greenCount: number): number {
+  if (greenCount >= TOTAL_RINGS) return 100;
+  if (greenCount <= 0) return 0;
+  return Math.min(100, Math.max(0, Math.round((100 * greenCount) / TOTAL_RINGS)));
+}
+
 const PegTransfer = () => {
   const navigate = useNavigate();
+  const hasNavigatedRef = useRef(false);
+  const latestRingCurrentSidesRef = useRef<('left' | 'right')[]>([...INITIAL_RING_CURRENT_SIDES]);
+  const [timeRemaining, setTimeRemaining] = useState(TIMER_INITIAL_SECONDS);
+  const [timerStarted, setTimerStarted] = useState(false);
+  const [completionTriggered, setCompletionTriggered] = useState(false);
+  const timeRemainingRef = useRef(timeRemaining);
+  timeRemainingRef.current = timeRemaining;
+
+  const onFirstRingPickup = useCallback(() => {
+    setTimerStarted(true);
+  }, []);
+
+  const onRingSidesChange = useCallback((sides: ('left' | 'right')[]) => {
+    latestRingCurrentSidesRef.current = sides;
+  }, []);
+
+  const onAllRingsTransferred = useCallback(() => {
+    if (hasNavigatedRef.current) return;
+    hasNavigatedRef.current = true;
+    setCompletionTriggered(true);
+    const scorePercent = 100;
+    const path = scorePercent >= MODULE3_PASS_THRESHOLD ? '/module/3/completed' : '/module/3/incomplete';
+    setTimeout(() => {
+      const elapsed = TIMER_INITIAL_SECONDS - timeRemainingRef.current;
+      navigate(path, {
+        state: { ringsTransferred: TOTAL_RINGS, elapsedSeconds: elapsed, score: scorePercent },
+      });
+    }, COMPLETION_NAV_DELAY_MS);
+  }, [navigate]);
+
+  useEffect(() => {
+    if (!timerStarted || timeRemaining <= 0 || completionTriggered) return;
+    const id = setInterval(() => {
+      setTimeRemaining((prev) => {
+        if (prev <= 1) {
+          clearInterval(id);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [timerStarted, timeRemaining, completionTriggered]);
+
+  useEffect(() => {
+    if (timeRemaining !== 0 || !timerStarted || completionTriggered) return;
+    if (hasNavigatedRef.current) return;
+    hasNavigatedRef.current = true;
+    setCompletionTriggered(true);
+    const sides = latestRingCurrentSidesRef.current;
+    const greenCount = getGreenCount(sides);
+    const scorePercent = computeScorePercent(greenCount);
+    const path = scorePercent >= MODULE3_PASS_THRESHOLD ? '/module/3/completed' : '/module/3/incomplete';
+    setTimeout(() => {
+      navigate(path, {
+        state: {
+          ringsTransferred: greenCount,
+          elapsedSeconds: TIMER_INITIAL_SECONDS,
+          score: scorePercent,
+        },
+      });
+    }, COMPLETION_NAV_DELAY_MS);
+  }, [timeRemaining, timerStarted, completionTriggered, navigate]);
 
   return (
     <div className="flex flex-col overflow-hidden" style={{ height: '100vh', backgroundColor: '#26313E', padding: '8px 8px 24px 8px', boxSizing: 'border-box' }}>
@@ -333,17 +566,32 @@ const PegTransfer = () => {
         <div style={{ width: '100px' }} />
       </header>
       <div
-        className="flex-1 rounded-lg overflow-hidden min-h-0"
+        className="flex-1 rounded-lg overflow-hidden min-h-0 relative"
         style={{
           width: '100%',
           backgroundColor: '#1E2733',
         }}
       >
+        <div
+          className="absolute top-3 left-3 z-10 rounded-lg px-3 py-1.5 font-mono text-lg font-semibold"
+          style={{
+            backgroundColor: '#1E2733',
+            color: '#fff',
+            border: '1px solid #374151',
+            pointerEvents: 'none',
+          }}
+        >
+          {formatTimer(timeRemaining)}
+        </div>
         <Canvas
           camera={{ position: [0, 2, 2], fov: 50, near: CAMERA_NEAR, far: 100 }}
           style={{ width: '100%', height: '100%', display: 'block' }}
         >
-          <PegTransferScene />
+          <PegTransferScene
+          onAllRingsTransferred={onAllRingsTransferred}
+          onFirstRingPickup={onFirstRingPickup}
+          onRingSidesChange={onRingSidesChange}
+        />
         </Canvas>
       </div>
     </div>
