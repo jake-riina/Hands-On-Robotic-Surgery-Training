@@ -1,11 +1,49 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useBLE } from '../contexts/BLEContext';
 import { supabase } from '../lib/supabaseClient';
+
+const EXPLORE_MODULES = [
+  {
+    id: 1,
+    title: 'Module 1: Pressure',
+    description: 'Learn consistent, controlled pressure on the Da Vinci console.',
+    cover: '/Mod1Cover.png',
+    route: '/module/1/instructions',
+  },
+  {
+    id: 2,
+    title: 'Module 2: Camera Control',
+    description: 'Master camera positioning for an optimal surgical view.',
+    cover: '/CamControl.png',
+    route: '/module/2/instructions',
+  },
+  {
+    id: 3,
+    title: 'Module 3: Peg Transfer',
+    description: 'Build precision and dexterity with peg transfer between targets.',
+    cover: '/Peg.png',
+    route: '/module/3/peg-transfer',
+  },
+];
+
+// My Skills: different # of attempts per module (nonlinear upward), title, blurb
+const MY_SKILLS_MODULES = [
+  { title: 'Module 1: Pressure', scores: [56, 66, 78, 87, 94], highScoreBlurb: '94% high score on your latest attempt.' },           // 5 attempts
+  { title: 'Module 2: Camera Control', scores: [52, 68, 80, 89], highScoreBlurb: '89% high score on your latest attempt.' },          // 4 attempts
+  { title: 'Module 3: Peg Transfer', scores: [48, 58, 70, 78, 86, 92], highScoreBlurb: '92% high score on your latest attempt.' },   // 6 attempts
+];
+
+const scoreToY = (score: number) => Math.round(158 - score * 1.38);
+const X_MIN = 44;
+const X_MAX = 252;
+const getGraphX = (n: number) => n <= 1 ? [148] : Array.from({ length: n }, (_, i) => Math.round(X_MIN + (X_MAX - X_MIN) * i / (n - 1)));
 
 const DashboardGlovesConnected = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [exploreModuleIndex, setExploreModuleIndex] = useState(0);
+  const [mySkillsModuleIndex, setMySkillsModuleIndex] = useState(0);
 
   // Check user role and redirect if admin
   useEffect(() => {
@@ -318,7 +356,7 @@ const DashboardGlovesConnected = () => {
             {/* Empty spacer column for gap */}
             <div></div>
 
-            {/* Box 2: Explore Modules Card */}
+            {/* Box 2: Explore Modules Card - carousel for each of the 3 modules */}
             <div 
               className="rounded-lg p-4 flex flex-col" 
               style={{ 
@@ -333,12 +371,22 @@ const DashboardGlovesConnected = () => {
                   Explore Modules
                 </h3>
                 <div className="flex gap-2">
-                  <button className="text-gray-400 hover:text-gray-300">
+                  <button
+                    type="button"
+                    onClick={() => setExploreModuleIndex((i) => (i - 1 + EXPLORE_MODULES.length) % EXPLORE_MODULES.length)}
+                    className="text-gray-400 hover:text-gray-300"
+                    aria-label="Previous module"
+                  >
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
                   </button>
-                  <button className="text-gray-400 hover:text-gray-300">
+                  <button
+                    type="button"
+                    onClick={() => setExploreModuleIndex((i) => (i + 1) % EXPLORE_MODULES.length)}
+                    className="text-gray-400 hover:text-gray-300"
+                    aria-label="Next module"
+                  >
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
@@ -346,59 +394,62 @@ const DashboardGlovesConnected = () => {
                 </div>
               </div>
               <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
-                <div 
-                  className="w-full rounded-lg mb-3 overflow-hidden bg-white flex-shrink-0" 
-                  style={{ 
-                    height: '160px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '12px',
-                    position: 'relative'
-                  }}
-                >
-                  <img 
-                    src="/Mod1Cover.png" 
-                    alt="Module 1: Pressure" 
-                    style={{ 
-                      maxWidth: 'calc(100% - 12px)', 
-                      maxHeight: 'calc(100% - 12px)', 
-                      width: 'auto', 
-                      height: 'auto',
-                      objectFit: 'contain',
-                      display: 'block',
-                      margin: '0',
-                      position: 'absolute',
-                      left: '46%',
-                      top: '50%',
-                      transform: 'translate(-50%, -50%)',
-                      borderRadius: '8px'
-                    }}
-                    onError={(e) => {
-                      console.error('Image failed to load. Trying fallback...');
-                      e.currentTarget.src = "/Screenshot 2025-12-01 at 5.46.00 PM.png";
-                    }}
-                    onLoad={() => console.log('Image loaded successfully')}
-                  />
-                </div>
-                <h4 className="text-base font-semibold flex-shrink-0" style={{ color: 'white', marginBottom: '4px' }}>
-                  Module 1: Pressure
-                </h4>
-                <p className="text-sm mb-4 leading-relaxed flex-shrink-0" style={{ color: '#9CA3AF' }}>
-                  This module teaches trainees how to apply a consistent, controlled amount of pressure to the Da Vinci console.
-                </p>
-                <div className="mt-auto flex-shrink-0">
-                  <button 
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium"
-                    style={{ backgroundColor: '#1DA5FF', color: 'white' }}
-                    onClick={() => navigate('/module/1/instructions')}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M6 12l4-4-4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    <span className="text-sm">Go to Module</span>
-                  </button>
-                </div>
+                {(() => {
+                  const module = EXPLORE_MODULES[exploreModuleIndex];
+                  return (
+                    <>
+                      <div className="flex-1 flex items-center min-h-0" style={{ minHeight: 0 }}>
+                        <div 
+                          className="w-full rounded-lg overflow-hidden bg-white flex-shrink-0" 
+                          style={{ 
+                            height: '212px',
+                            width: '100%',
+                            position: 'relative',
+                            paddingLeft: '16px',
+                            paddingRight: '16px',
+                            paddingTop: '12px',
+                            paddingBottom: '12px',
+                            boxSizing: 'border-box'
+                          }}
+                        >
+                          <img 
+                            src={module.cover} 
+                            alt={module.title} 
+                            style={{ 
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                              objectPosition: 'center center',
+                              display: 'block',
+                              borderRadius: '8px'
+                            }}
+                            onError={(e) => {
+                              e.currentTarget.src = '/Mod1Cover.png';
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <h4 className="text-base font-semibold flex-shrink-0" style={{ color: 'white', marginBottom: '4px' }}>
+                        {module.title}
+                      </h4>
+                      <p className="text-sm mb-4 leading-relaxed flex-shrink-0" style={{ color: '#9CA3AF' }}>
+                        {module.description}
+                      </p>
+                      <div className="mt-auto flex-shrink-0">
+                        <button 
+                          className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium"
+                          style={{ backgroundColor: '#1DA5FF', color: 'white' }}
+                          onClick={() => navigate(module.route)}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M6 12l4-4-4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                          <span className="text-sm">Go to Module</span>
+                        </button>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
 
@@ -420,12 +471,22 @@ const DashboardGlovesConnected = () => {
                   My Skills
                 </h3>
                 <div className="flex gap-2">
-                  <button className="text-white hover:text-gray-300">
+                  <button
+                    type="button"
+                    onClick={() => setMySkillsModuleIndex((i) => (i - 1 + MY_SKILLS_MODULES.length) % MY_SKILLS_MODULES.length)}
+                    className="text-white hover:text-gray-300"
+                    aria-label="Previous module"
+                  >
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
                   </button>
-                  <button className="text-white hover:text-gray-300">
+                  <button
+                    type="button"
+                    onClick={() => setMySkillsModuleIndex((i) => (i + 1) % MY_SKILLS_MODULES.length)}
+                    className="text-white hover:text-gray-300"
+                    aria-label="Next module"
+                  >
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
@@ -433,53 +494,64 @@ const DashboardGlovesConnected = () => {
                 </div>
               </div>
               <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
-                <div 
-                  className="w-full rounded-lg mb-3 flex items-center justify-center flex-shrink-0" 
-                  style={{ height: '160px', marginTop: '24px' }}
-                >
-                  <div className="relative w-32 h-32">
-                    <svg width="128" height="128" viewBox="0 0 128 128">
-                      <g transform="rotate(-90 64 64)">
-                        <circle
-                          cx="64"
-                          cy="64"
-                          r="56"
-                          stroke="#1E2733"
-                          strokeWidth="12"
-                          fill="none"
-                        />
-                        <circle
-                          cx="64"
-                          cy="64"
-                          r="56"
-                          stroke="#1DA5FF"
-                          strokeWidth="12"
-                          fill="none"
-                          strokeDasharray={`${2 * Math.PI * 56 * 0.77} ${2 * Math.PI * 56}`}
-                          strokeLinecap="round"
-                        />
-                      </g>
-                      <text
-                        x="64"
-                        y="64"
-                        textAnchor="middle"
-                        dominantBaseline="middle"
-                        style={{ 
-                          fontSize: '32px', 
-                          fontWeight: 'bold', 
-                          fill: 'white'
-                        }}
+                {(() => {
+                  const skill = MY_SKILLS_MODULES[mySkillsModuleIndex];
+                  const graphX = getGraphX(skill.scores.length);
+                  const points = skill.scores.map((s, i) => `${graphX[i]},${scoreToY(s)}`).join(' ');
+                  return (
+                    <>
+                      <div className="flex-1 flex items-center min-h-0" style={{ minHeight: 0 }}>
+                        <div 
+                          className="w-full rounded-lg flex items-center justify-center flex-shrink-0" 
+                          style={{ height: '212px' }}
+                        >
+                          <svg width="100%" height="170" viewBox="0 0 260 190" preserveAspectRatio="xMidYMid meet" style={{ maxWidth: '280px', transform: 'translateX(-24px)' }}>
+                            <text x="14" y="95" textAnchor="middle" transform="rotate(-90 14 95)" style={{ fontSize: '10px', fill: '#9CA3AF' }}>Score</text>
+                            <line x1="44" y1="20" x2="44" y2="158" stroke="#374151" strokeWidth="1" />
+                            <text x="38" y="24" textAnchor="end" style={{ fontSize: '9px', fill: '#9CA3AF' }}>100</text>
+                            <text x="38" y="54" textAnchor="end" style={{ fontSize: '9px', fill: '#9CA3AF' }}>75</text>
+                            <text x="38" y="89" textAnchor="end" style={{ fontSize: '9px', fill: '#9CA3AF' }}>50</text>
+                            <text x="38" y="126" textAnchor="end" style={{ fontSize: '9px', fill: '#9CA3AF' }}>25</text>
+                            <text x="38" y="158" textAnchor="end" style={{ fontSize: '9px', fill: '#9CA3AF' }}>0</text>
+                            <line x1="44" y1="158" x2="252" y2="158" stroke="#374151" strokeWidth="1" />
+                            {graphX.map((x, i) => (
+                              <text key={i} x={x} y="170" textAnchor="middle" style={{ fontSize: '9px', fill: '#9CA3AF' }}>{i + 1}</text>
+                            ))}
+                            <text x="148" y="186" textAnchor="middle" style={{ fontSize: '10px', fill: '#9CA3AF' }}>Attempt #</text>
+                            <polyline points={points} fill="none" stroke="#1DA5FF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                            {skill.scores.map((s, i) => (
+                              <circle key={i} cx={graphX[i]} cy={scoreToY(s)} r="4" fill="#1DA5FF" />
+                            ))}
+                          </svg>
+                        </div>
+                      </div>
+                      <h4 
+                        className="text-base font-semibold flex-shrink-0" 
+                        style={{ color: 'white', marginBottom: '4px', transform: 'translateY(-22px)' }}
                       >
-                        77%
-                      </text>
+                        {skill.title}
+                      </h4>
+                      <p 
+                        className="text-sm mb-4 leading-relaxed flex-shrink-0" 
+                        style={{ color: '#9CA3AF', transform: 'translateY(-22px)' }}
+                      >
+                        {skill.highScoreBlurb}
+                      </p>
+                    </>
+                  );
+                })()}
+                <div className="mt-auto flex-shrink-0">
+                  <button 
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium"
+                    style={{ backgroundColor: '#1DA5FF', color: 'white' }}
+                    onClick={() => navigate('/analytics')}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M6 12l4-4-4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
-                  </div>
+                    <span className="text-sm">Go to Analytics</span>
+                  </button>
                 </div>
-                <h4 className="text-base font-semibold flex-shrink-0 text-center" style={{ color: 'white', marginBottom: '4px', marginTop: '48px' }}>
-                  Module 1: Pressure Control
-                  <br />
-                  (High Score)
-                </h4>
               </div>
             </div>
           </div>
