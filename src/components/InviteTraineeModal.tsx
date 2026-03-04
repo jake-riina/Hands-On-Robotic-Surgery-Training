@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { inviteTrainee } from '../lib/invitationService';
 import { supabase } from '../lib/supabaseClient';
 
@@ -18,7 +19,9 @@ const InviteTraineeModal: React.FC<InviteTraineeModalProps> = ({
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    return null;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,47 +76,37 @@ const InviteTraineeModal: React.FC<InviteTraineeModalProps> = ({
     onClose();
   };
 
-  return (
+  const modalContent = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+      className="fixed inset-0 flex items-center justify-center"
+      style={{ 
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        zIndex: 9999,
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0
+      }}
       onClick={handleClose}
     >
       <div
-        className="bg-white rounded-lg p-6 shadow-xl"
-        style={{ width: '90%', maxWidth: '500px' }}
+        style={{ 
+          width: '90%', 
+          maxWidth: '500px',
+          backgroundColor: '#ffffff',
+          borderRadius: '12px',
+          padding: '24px',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+        }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold text-gray-900">Inviting a Trainee</h2>
-          <button
-            onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-            disabled={isLoading}
-          >
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M18 6L6 18M6 6l12 12"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-        </div>
 
         {success ? (
-          <div className="text-center py-4">
-            <div className="text-green-600 mb-2">
+          <div style={{ textAlign: 'center', paddingTop: '16px', paddingBottom: '16px' }}>
+            <div style={{ color: '#059669', marginBottom: '8px' }}>
               <svg
-                className="mx-auto h-12 w-12"
+                style={{ margin: '0 auto', height: '48px', width: '48px' }}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -126,61 +119,129 @@ const InviteTraineeModal: React.FC<InviteTraineeModalProps> = ({
                 />
               </svg>
             </div>
-            <p className="text-lg font-medium text-gray-900">
+            <p style={{ fontSize: '18px', fontWeight: '500', color: '#111827' }}>
               Invitation sent successfully!
             </p>
-            <p className="text-sm text-gray-600 mt-2">
+            <p style={{ fontSize: '14px', color: '#4B5563', marginTop: '8px' }}>
               An email has been sent to {email}
             </p>
           </div>
         ) : (
           <form onSubmit={handleSubmit}>
-            <div className="mb-4">
+            <h2 
+              style={{ 
+                fontSize: '24px', 
+                fontWeight: 'bold', 
+                color: '#111827',
+                textAlign: 'center',
+                marginBottom: '8px'
+              }}
+            >
+              Invite a Trainee
+            </h2>
+            <p 
+              style={{ 
+                fontSize: '14px', 
+                color: '#374151',
+                textAlign: 'center',
+                marginBottom: '24px'
+              }}
+            >
+              Trainee will receive an email with a registration link that will expire after 24 hours
+            </p>
+
+            <div style={{ marginBottom: '16px', paddingLeft: '16px', paddingRight: '16px' }}>
               <label
                 htmlFor="email"
-                className="block text-sm font-medium text-gray-700 mb-2"
+                style={{ 
+                  display: 'block',
+                  fontSize: '14px', 
+                  fontWeight: '500',
+                  color: '#374151',
+                  marginBottom: '8px'
+                }}
               >
-                Trainee Email
+                Email
               </label>
               <input
                 type="email"
                 id="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  outline: 'none',
+                  boxSizing: 'border-box'
+                }}
                 placeholder="Enter trainee email address"
                 required
                 disabled={isLoading}
               />
-              <p className="text-xs text-gray-500 mt-1">
-                The trainee will receive an email with a registration link that expires in 24 hours.
-              </p>
             </div>
 
             {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-600">{error}</p>
+              <div style={{ 
+                marginBottom: '16px', 
+                padding: '12px', 
+                backgroundColor: '#FEF2F2', 
+                border: '1px solid #FECACA', 
+                borderRadius: '8px',
+                paddingLeft: '16px',
+                paddingRight: '16px'
+              }}>
+                <p style={{ fontSize: '14px', color: '#DC2626' }}>{error}</p>
               </div>
             )}
 
-            <div className="flex gap-3 justify-end">
-              <button
-                type="button"
-                onClick={handleClose}
-                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                disabled={isLoading}
-              >
-                Cancel
-              </button>
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'column',
+              gap: '12px', 
+              alignItems: 'center',
+              paddingLeft: '16px',
+              paddingRight: '16px'
+            }}>
               <button
                 type="submit"
                 disabled={isLoading || !email}
-                className="px-4 py-2 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
+                  padding: '8px 16px',
                   backgroundColor: isLoading ? '#9CA3AF' : '#2563eb',
+                  color: '#ffffff',
+                  borderRadius: '8px',
+                  border: 'none',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: isLoading || !email ? 'not-allowed' : 'pointer',
+                  opacity: isLoading || !email ? 0.5 : 1,
+                  width: 'auto',
+                  minWidth: '120px'
                 }}
               >
                 {isLoading ? 'Sending...' : 'Send Invitation'}
+              </button>
+              <button
+                type="button"
+                onClick={handleClose}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#E5E7EB',
+                  color: '#374151',
+                  borderRadius: '8px',
+                  border: 'none',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  width: 'auto',
+                  minWidth: '120px'
+                }}
+                disabled={isLoading}
+              >
+                Cancel
               </button>
             </div>
           </form>
@@ -188,6 +249,9 @@ const InviteTraineeModal: React.FC<InviteTraineeModalProps> = ({
       </div>
     </div>
   );
+
+  // Render modal using React Portal to ensure it's at document body level
+  return createPortal(modalContent, document.body);
 };
 
 export default InviteTraineeModal;
