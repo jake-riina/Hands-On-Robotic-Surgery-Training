@@ -1,0 +1,29 @@
+/* Matches Analytics page chevron nav button styles (icon-only, no text) */
+.navButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 40px;
+  padding: 0 4px;
+  border: none;
+  background: transparent;
+  color: white;
+  cursor: pointer;
+  border-radius: 0;
+}
+
+.navButton:hover {
+  opacity: 0.9;
+}
+
+.iconWrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.iconWrap:hover {
+  opacity: 0.9;
+}

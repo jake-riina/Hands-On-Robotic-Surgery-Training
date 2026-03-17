@@ -2,6 +2,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '../lib/supabaseClient';
 import ProfileDropdown from '../components/ProfileDropdown';
+import analyticsNavStyles from './Module2Analytics.module.css';
 
 const Module1Instructions = () => {
   const navigate = useNavigate();
@@ -94,10 +95,10 @@ const Module1Instructions = () => {
     </svg>
   );
 
-  // Arrow left icon
+  /* Same left chevron as Analytics pages (Module2Analytics "‹ Module 1") */
   const ArrowLeftIcon = () => (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M12.5 15L7.5 10L12.5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
 
@@ -229,13 +230,18 @@ const Module1Instructions = () => {
         {/* Main Content Area */}
         <main className="flex-1" style={{ padding: '32px 48px' }}>
           <div className="max-w-6xl mx-auto">
-            {/* Back Button */}
+            {/* Back Button — same chevron style as Analytics (‹ Module 1 / Module 3 ›) */}
             <button
+              type="button"
               onClick={() => navigate('/modules')}
-              className="flex items-center gap-2 text-white mb-4 hover:opacity-80 transition-opacity"
+              className={analyticsNavStyles.navButton}
+              aria-label="Back to Modules"
+              style={{ marginBottom: '1rem' }}
             >
-              <ArrowLeftIcon />
-              <span className="text-lg">Modules</span>
+              <span className={analyticsNavStyles.moduleNavWithArrow}>
+                <ArrowLeftIcon />
+                <span style={{ fontSize: '0.9375rem' }}>Modules</span>
+              </span>
             </button>
 
             {/* Module Title */}

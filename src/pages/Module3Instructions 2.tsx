@@ -1,5 +1,4 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import analyticsNavStyles from './Module2Analytics.module.css';
 
 /** Green used for transferred rings on the Peg Transfer page. */
 const PEG_TRANSFER_GREEN = '#22c55e';
@@ -60,10 +59,9 @@ const Module3Instructions = () => {
     </svg>
   );
 
-  /* Same left chevron as Analytics pages (Module2Analytics "‹ Module 1") */
   const ArrowLeftIcon = () => (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12.5 15L7.5 10L12.5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
 
@@ -121,18 +119,12 @@ const Module3Instructions = () => {
 
         <main className="flex-1" style={{ padding: '32px 48px' }}>
           <div className="max-w-6xl mx-auto">
-            {/* Back Button — same chevron style as Analytics (‹ Module 1 / Module 3 ›) */}
             <button
-              type="button"
               onClick={() => navigate('/modules')}
-              className={analyticsNavStyles.navButton}
-              aria-label="Back to Modules"
-              style={{ marginBottom: '1rem' }}
+              className="flex items-center gap-2 text-white mb-4 hover:opacity-80 transition-opacity"
             >
-              <span className={analyticsNavStyles.moduleNavWithArrow}>
-                <ArrowLeftIcon />
-                <span style={{ fontSize: '0.9375rem' }}>Modules</span>
-              </span>
+              <ArrowLeftIcon />
+              <span className="text-lg">Modules</span>
             </button>
 
             <h1 className="text-4xl font-bold mb-4 text-center" style={{ color: 'white' }}>
