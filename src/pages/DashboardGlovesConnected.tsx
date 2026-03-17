@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useBLE } from '../contexts/BLEContext';
 import { supabase } from '../lib/supabaseClient';
 import ProfileDropdown from '../components/ProfileDropdown';
+import ChevronNavButtons from '../components/ChevronNavButtons';
 
 const EXPLORE_MODULES = [
   {
@@ -228,7 +229,7 @@ const DashboardGlovesConnected = () => {
             <div className="flex flex-col" style={{ height: '400px', gap: '24px', width: '320px' }}>
               {/* Box 1: Jake's Hands On Gloves Card */}
               <div 
-                className="rounded-lg p-4 relative" 
+                className="rounded-lg relative" 
                 style={{ 
                   backgroundColor: '#1E2733',
                   boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3)',
@@ -251,73 +252,69 @@ const DashboardGlovesConnected = () => {
                     />
                   </div>
                 )}
-                <div className="flex items-start justify-between mb-4">
-                  <h3 className="text-lg font-semibold" style={{ color: 'white' }}>
-                    Jake's HandsOn Gloves
-                  </h3>
-                  <button className="text-gray-400 hover:text-gray-300">
-                    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-                      <path d="M15.66 11.7l-.73-.42a3.5 3.5 0 000-1.56l.73-.42a.5.5 0 00.18-.68l-.68-1.18a.5.5 0 00-.69-.18l-.73.42a3.5 3.5 0 00-1.18-.68V6.5a.5.5 0 00-.5-.5H8.5a.5.5 0 00-.5.5v.84a3.5 3.5 0 00-1.18.68l-.73-.42a.5.5 0 00-.69.18l-.68 1.18a.5.5 0 00.18.68l.73.42a3.5 3.5 0 000 1.56l-.73.42a.5.5 0 00-.18.68l.68 1.18a.5.5 0 00.69.18l.73-.42a3.5 3.5 0 001.18.68v.84a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-.84a3.5 3.5 0 001.18-.68l.73.42a.5.5 0 00.69-.18l.68-1.18a.5.5 0 00-.18-.68z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-                    </svg>
-                  </button>
-                </div>
+                <div className="p-4" style={{ height: '100%', boxSizing: 'border-box' }}>
+                  <div className="flex items-start justify-between mb-4">
+                    <h3 className="text-lg font-semibold" style={{ color: 'white' }}>
+                      Jake's HandsOn Gloves
+                    </h3>
+                  </div>
                   {/* Connection status row */}
-  <div className="mb-2">
-    <div className="flex items-center gap-2">
-      <div
-        className="rounded-full flex-shrink-0"
-        style={{ 
-          width: '8px', 
-          height: '8px',
-          backgroundColor: isConnected ? '#10B981' : '#EF4444' // green vs red
-        }}
-      ></div>
-      <span className="text-sm" style={{ color: '#9CA3AF' }}>
-        {isConnected ? 'Connected' : 'Not connected'}
-      </span>
-    </div>
-  </div>
+                  <div className="mb-2">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="rounded-full flex-shrink-0"
+                        style={{ 
+                          width: '8px', 
+                          height: '8px',
+                          backgroundColor: isConnected ? '#10B981' : '#EF4444' // green vs red
+                        }}
+                      ></div>
+                      <span className="text-sm" style={{ color: '#9CA3AF' }}>
+                        {isConnected ? 'Connected' : 'Not connected'}
+                      </span>
+                    </div>
+                  </div>
 
-  {/* Connect / Disconnect button */}
-  {isConnected ? (
-    <button
-      type="button"
-      onClick={handleDisconnectGloves}
-      disabled={isConnecting}
-      className="mt-2 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-60"
-      style={{
-        backgroundColor: '#EF4444',
-        color: 'white',
-      }}
-    >
-      Disconnect
-    </button>
-  ) : (
-    <button
-      type="button"
-      onClick={handleConnectGloves}
-      disabled={isConnecting}
-      className="mt-2 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-60"
-      style={{
-        backgroundColor: '#1DA5FF',
-        color: 'white',
-      }}
-    >
-      {isConnecting ? 'Connecting...' : 'Connect'}
-    </button>
-  )}
+                  {/* Connect / Disconnect button */}
+                  {isConnected ? (
+                    <button
+                      type="button"
+                      onClick={handleDisconnectGloves}
+                      disabled={isConnecting}
+                      className="mt-2 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-60"
+                      style={{
+                        backgroundColor: '#EF4444',
+                        color: 'white',
+                      }}
+                    >
+                      Disconnect
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleConnectGloves}
+                      disabled={isConnecting}
+                      className="mt-2 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer hover:opacity-90 border-0 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:opacity-60"
+                      style={{
+                        backgroundColor: '#1DA5FF',
+                        color: 'white',
+                      }}
+                    >
+                      {isConnecting ? 'Connecting...' : 'Connect'}
+                    </button>
+                  )}
 
-  {/* Status message */}
-  <p className="mt-2 text-xs" style={{ color: '#9CA3AF' }}>
-    {connectionStatus}
-  </p>
-</div>
+                  {/* Status message */}
+                  <p className="mt-2 text-xs" style={{ color: '#9CA3AF' }}>
+                    {connectionStatus}
+                  </p>
+                </div>
+              </div>
 
 
               {/* Box 4: Daily Challenge Card */}
               <div 
-                className="rounded-lg p-4 flex flex-col" 
+                className="rounded-lg flex flex-col" 
                 style={{ 
                   backgroundColor: '#1E2733',
                   boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3)',
@@ -325,24 +322,26 @@ const DashboardGlovesConnected = () => {
                   width: '100%'
                 }}
               >
-                <h3 className="text-lg font-semibold mb-4" style={{ color: 'white' }}>
-                  Daily Challenge
-                </h3>
-                <div className="flex items-start justify-between flex-1">
-                  <div className="flex-1 pr-4">
-                    <p className="text-sm mb-4 leading-relaxed" style={{ color: '#9CA3AF' }}>
-                      Mimic finger sequences on-screen to build speed, accuracy, and awareness.
-                    </p>
-                    <button 
-                      className="px-4 py-2 rounded-lg font-medium"
-                      style={{ backgroundColor: '#1DA5FF', color: 'white' }}
-                    >
-                      Start
-                    </button>
-                  </div>
-                  <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0" style={{ backgroundColor: '#374151' }}>
-                    {/* Placeholder for hand image */}
-                    <div className="w-full h-full bg-gradient-to-br from-gray-600 to-gray-800"></div>
+                <div className="p-4 flex flex-col flex-1" style={{ minHeight: 0, boxSizing: 'border-box' }}>
+                  <h3 className="text-lg font-semibold mb-4" style={{ color: 'white' }}>
+                    Daily Challenge
+                  </h3>
+                  <div className="flex items-start justify-between flex-1">
+                    <div className="flex-1 pr-4">
+                      <p className="text-sm mb-4 leading-relaxed" style={{ color: '#9CA3AF' }}>
+                        Mimic finger sequences on-screen to build speed, accuracy, and awareness.
+                      </p>
+                      <button 
+                        className="px-4 py-2 rounded-lg font-medium text-sm cursor-pointer hover:opacity-90 border-0"
+                        style={{ backgroundColor: '#1DA5FF', color: 'white' }}
+                      >
+                        Start
+                      </button>
+                    </div>
+                    <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0" style={{ backgroundColor: '#374151' }}>
+                      {/* Placeholder for hand image */}
+                      <div className="w-full h-full bg-gradient-to-br from-gray-600 to-gray-800"></div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -353,7 +352,7 @@ const DashboardGlovesConnected = () => {
 
             {/* Box 2: Explore Modules Card - carousel for each of the 3 modules */}
             <div 
-              className="rounded-lg p-4 flex flex-col" 
+              className="rounded-lg flex flex-col" 
               style={{ 
                 backgroundColor: '#1E2733', 
                 height: '400px',
@@ -361,34 +360,19 @@ const DashboardGlovesConnected = () => {
                 boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3)'
               }}
             >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold" style={{ color: 'white' }}>
-                  Explore Modules
-                </h3>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setExploreModuleIndex((i) => (i - 1 + EXPLORE_MODULES.length) % EXPLORE_MODULES.length)}
-                    className="text-gray-400 hover:text-gray-300"
-                    aria-label="Previous module"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setExploreModuleIndex((i) => (i + 1) % EXPLORE_MODULES.length)}
-                    className="text-gray-400 hover:text-gray-300"
-                    aria-label="Next module"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </button>
+              <div className="p-4 flex flex-col flex-1" style={{ minHeight: 0, boxSizing: 'border-box' }}>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold" style={{ color: 'white' }}>
+                    Explore Modules
+                  </h3>
+                  <ChevronNavButtons
+                    onPrev={() => setExploreModuleIndex((i) => (i - 1 + EXPLORE_MODULES.length) % EXPLORE_MODULES.length)}
+                    onNext={() => setExploreModuleIndex((i) => (i + 1) % EXPLORE_MODULES.length)}
+                    ariaLabelPrev="Previous module"
+                    ariaLabelNext="Next module"
+                  />
                 </div>
-              </div>
-              <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
+                <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
                 {(() => {
                   const module = EXPLORE_MODULES[exploreModuleIndex];
                   return (
@@ -432,7 +416,7 @@ const DashboardGlovesConnected = () => {
                       </p>
                       <div className="mt-auto flex-shrink-0">
                         <button 
-                          className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium"
+                          className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm cursor-pointer hover:opacity-90 border-0"
                           style={{ backgroundColor: '#1DA5FF', color: 'white' }}
                           onClick={() => navigate(module.route)}
                         >
@@ -445,6 +429,7 @@ const DashboardGlovesConnected = () => {
                     </>
                   );
                 })()}
+                </div>
               </div>
             </div>
 
@@ -453,7 +438,7 @@ const DashboardGlovesConnected = () => {
             
             {/* Box 3: My Skills Card */}
             <div 
-              className="rounded-lg p-4 flex flex-col" 
+              className="rounded-lg flex flex-col" 
               style={{ 
                 backgroundColor: '#1E2733', 
                 height: '400px',
@@ -461,34 +446,19 @@ const DashboardGlovesConnected = () => {
                 boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3)'
               }}
             >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold" style={{ color: 'white' }}>
-                  My Skills
-                </h3>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setMySkillsModuleIndex((i) => (i - 1 + MY_SKILLS_MODULES.length) % MY_SKILLS_MODULES.length)}
-                    className="text-white hover:text-gray-300"
-                    aria-label="Previous module"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMySkillsModuleIndex((i) => (i + 1) % MY_SKILLS_MODULES.length)}
-                    className="text-white hover:text-gray-300"
-                    aria-label="Next module"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </button>
+              <div className="p-4 flex flex-col flex-1" style={{ minHeight: 0, boxSizing: 'border-box' }}>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold" style={{ color: 'white' }}>
+                    My Skills
+                  </h3>
+                  <ChevronNavButtons
+                    onPrev={() => setMySkillsModuleIndex((i) => (i - 1 + MY_SKILLS_MODULES.length) % MY_SKILLS_MODULES.length)}
+                    onNext={() => setMySkillsModuleIndex((i) => (i + 1) % MY_SKILLS_MODULES.length)}
+                    ariaLabelPrev="Previous module"
+                    ariaLabelNext="Next module"
+                  />
                 </div>
-              </div>
-              <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
+                <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
                 {(() => {
                   const skill = MY_SKILLS_MODULES[mySkillsModuleIndex];
                   const graphX = getGraphX(skill.scores.length);
@@ -537,7 +507,7 @@ const DashboardGlovesConnected = () => {
                 })()}
                 <div className="mt-auto flex-shrink-0">
                   <button 
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium"
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm cursor-pointer hover:opacity-90 border-0"
                     style={{ backgroundColor: '#1DA5FF', color: 'white' }}
                     onClick={() => navigate('/analytics')}
                   >
@@ -547,6 +517,7 @@ const DashboardGlovesConnected = () => {
                     <span className="text-sm">Go to Analytics</span>
                   </button>
                 </div>
+              </div>
               </div>
             </div>
           </div>
@@ -604,7 +575,7 @@ const DashboardGlovesConnected = () => {
                   </div>
                 </div>
                 <button 
-                  className="px-6 py-2 rounded-lg font-medium"
+                  className="px-6 py-2 rounded-lg font-medium text-sm cursor-pointer hover:opacity-90 border-0"
                   style={{ backgroundColor: '#1DA5FF', color: 'white' }}
                   onClick={() => navigate('/module/1/instructions')}
                 >

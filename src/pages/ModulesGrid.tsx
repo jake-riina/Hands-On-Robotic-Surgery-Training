@@ -142,7 +142,7 @@ const ModulesGrid = () => {
             >
               {modules.map((module) => {
                 const isUnlockedByUser = unlockedModuleIds.has(module.id);
-                const isLocked = module.locked && !isUnlockedByUser;
+                const isLocked = module.id !== 2 && module.id !== 3 && module.locked && !isUnlockedByUser;
                 const content = (
                   <div
                     className="rounded-lg p-6 flex flex-col h-full transition-all"
@@ -205,6 +205,100 @@ const ModulesGrid = () => {
                               }}
                             >
                               {module.progress}%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : module.id === 2 ? (
+                      <div className="relative mb-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium" style={{ color: '#1DA5FF' }}>Module {module.id}</span>
+                        </div>
+                        <div className="absolute" style={{ right: '24px', top: '-10px', width: '48px' }}>
+                          <span className="text-sm font-medium whitespace-nowrap block" style={{ color: '#9CA3AF', position: 'relative', left: '50%', transform: 'translateX(-50%)', width: 'max-content' }}>Top Score</span>
+                        </div>
+                        <div className="absolute flex flex-col items-center" style={{ right: '24px', top: '14px', width: '48px' }}>
+                          <div style={{ position: 'relative', width: '48px', height: '48px', flexShrink: 0 }}>
+                            <svg viewBox="0 0 36 36" className="block w-full h-full" style={{ transform: 'rotate(0deg)', display: 'block' }}>
+                              <path
+                                fill="none"
+                                stroke="#374151"
+                                strokeWidth="2.5"
+                                d="M18 2.5 a 15.5 15.5 0 0 1 0 31 a 15.5 15.5 0 0 1 0 -31"
+                              />
+                              <path
+                                fill="none"
+                                stroke="#1DA5FF"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeDasharray={`${80 * 97.4 / 100} 97.4`}
+                                d="M18 2.5 a 15.5 15.5 0 0 1 0 31 a 15.5 15.5 0 0 1 0 -31"
+                              />
+                            </svg>
+                            <span
+                              style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#1DA5FF',
+                                fontSize: '11px',
+                                fontWeight: 500,
+                                pointerEvents: 'none',
+                              }}
+                            >
+                              80%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : module.id === 3 ? (
+                      <div className="relative mb-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium" style={{ color: '#1DA5FF' }}>Module {module.id}</span>
+                        </div>
+                        <div className="absolute" style={{ right: '24px', top: '-10px', width: '48px' }}>
+                          <span className="text-sm font-medium whitespace-nowrap block" style={{ color: '#9CA3AF', position: 'relative', left: '50%', transform: 'translateX(-50%)', width: 'max-content' }}>Top Score</span>
+                        </div>
+                        <div className="absolute flex flex-col items-center" style={{ right: '24px', top: '14px', width: '48px' }}>
+                          <div style={{ position: 'relative', width: '48px', height: '48px', flexShrink: 0 }}>
+                            <svg viewBox="0 0 36 36" className="block w-full h-full" style={{ transform: 'rotate(0deg)', display: 'block' }}>
+                              <path
+                                fill="none"
+                                stroke="#374151"
+                                strokeWidth="2.5"
+                                d="M18 2.5 a 15.5 15.5 0 0 1 0 31 a 15.5 15.5 0 0 1 0 -31"
+                              />
+                              <path
+                                fill="none"
+                                stroke="#1DA5FF"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeDasharray={`${90 * 97.4 / 100} 97.4`}
+                                d="M18 2.5 a 15.5 15.5 0 0 1 0 31 a 15.5 15.5 0 0 1 0 -31"
+                              />
+                            </svg>
+                            <span
+                              style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#1DA5FF',
+                                fontSize: '11px',
+                                fontWeight: 500,
+                                pointerEvents: 'none',
+                              }}
+                            >
+                              90%
                             </span>
                           </div>
                         </div>

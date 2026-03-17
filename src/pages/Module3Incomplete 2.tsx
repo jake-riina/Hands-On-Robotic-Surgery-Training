@@ -1,10 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import analyticsNavStyles from './Module2Analytics.module.css';
+import styles from './CompletedModule.module.css';
 
-/** Green used for transferred rings on the Peg Transfer page. */
-const PEG_TRANSFER_GREEN = '#22c55e';
-
-const Module3Instructions = () => {
+const Module3Incomplete = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -54,34 +51,22 @@ const Module3Instructions = () => {
     }
   };
 
-  const StarIcon = () => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="#FFD700" stroke="#FFD700" strokeWidth="1.5"/>
-    </svg>
-  );
+  const state = (location.state as { elapsedSeconds?: number; ringsTransferred?: number; score?: number } | null) ?? {};
+  const elapsedSeconds = state.elapsedSeconds ?? 57;
+  const ringsTransferred = state.ringsTransferred ?? 7;
+  const totalRings = 8;
+  const score = state.score ?? 30;
 
-  /* Same left chevron as Analytics pages (Module2Analytics "‹ Module 1") */
-  const ArrowLeftIcon = () => (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  );
-
-  const handleBeginTraining = () => {
-    navigate('/module/3/peg-transfer');
-  };
+  const handleRepeatModule = () => navigate('/module/3/peg-transfer');
+  const handleHome = () => navigate('/dashboard');
+  const handleNextModule = () => navigate('/modules');
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#26313E' }}>
       <header className="flex items-center justify-between px-6 py-2" style={{ backgroundColor: '#1E2733' }}>
         <div className="flex items-center gap-4">
           <div className="flex items-center justify-center overflow-hidden" style={{ width: '72px', height: '72px' }}>
-            <img
-              src="/Logo.png"
-              alt="Logo"
-              className="object-contain"
-              style={{ width: '72px', height: '72px', maxWidth: '72px', maxHeight: '72px', objectFit: 'contain' }}
-            />
+            <img src="/Logo.png" alt="Logo" className="object-contain" style={{ width: '72px', height: '72px', maxWidth: '72px', maxHeight: '72px', objectFit: 'contain' }} />
           </div>
         </div>
         <div className="w-9 h-9 rounded-full bg-gray-500 overflow-hidden flex items-center justify-center">
@@ -107,8 +92,8 @@ const Module3Instructions = () => {
                   <button
                     key={item.path}
                     onClick={() => navigate(item.path)}
-                    style={{ backgroundColor: '#1E2733', border: 'none', paddingTop: '1.5rem', paddingBottom: '1.5rem', color: 'white' }}
-                    className="w-full flex items-center gap-3 px-6 mx-2 rounded-lg transition-colors border-none text-white"
+                    style={{ backgroundColor: '#1E2733', border: 'none', paddingTop: '1.5rem', paddingBottom: '1.5rem', color: isActive ? '#1DA5FF' : 'white' }}
+                    className="w-full flex items-center gap-3 px-6 mx-2 rounded-lg transition-colors border-none"
                   >
                     <span className="flex-shrink-0" style={{ color: isActive ? '#1DA5FF' : 'white' }}>{getIcon(item.icon)}</span>
                     <span className="font-medium" style={{ color: isActive ? '#1DA5FF' : 'white' }}>{item.label}</span>
@@ -119,71 +104,68 @@ const Module3Instructions = () => {
           </nav>
         </aside>
 
-        <main className="flex-1" style={{ padding: '32px 48px' }}>
+        <main className={`flex-1 ${styles.mainContentWrapper}`}>
           <div className="max-w-6xl mx-auto">
-            {/* Back Button — same chevron style as Analytics (‹ Module 1 / Module 3 ›) */}
-            <button
-              type="button"
-              onClick={() => navigate('/modules')}
-              className={analyticsNavStyles.navButton}
-              aria-label="Back to Modules"
-              style={{ marginBottom: '1rem' }}
-            >
-              <span className={analyticsNavStyles.moduleNavWithArrow}>
-                <ArrowLeftIcon />
-                <span style={{ fontSize: '0.9375rem' }}>Modules</span>
-              </span>
-            </button>
-
-            <h1 className="text-4xl font-bold mb-4 text-center" style={{ color: 'white' }}>
-              Module 3: Peg Transfer
-            </h1>
-
-            <p className="text-lg leading-relaxed mx-auto text-center" style={{ color: 'white', marginBottom: '60px', maxWidth: '900px' }}>
-              Peg transfer develops the core motor skills required for safe and efficient robotic surgery. This exercise challenges you to coordinate both instruments while maintaining precise control over grip force, movement speed, and spatial awareness. The ability to smoothly lift, reposition, and release objects reflects real surgical tasks such as tissue handling, suturing, and instrument exchange.
-            </p>
-
-            <div className="flex justify-center items-center" style={{ marginTop: '60px', marginBottom: '60px' }}>
-              <div className="relative rounded-lg overflow-hidden shadow-lg" style={{ width: '100%', maxWidth: '600px', backgroundColor: '#26313E' }}>
-                <img
-                  src="/PegTransfer.png"
-                  alt="Peg Transfer"
-                  className="w-full h-auto object-contain"
-                  onError={(e) => {
-                    console.error('Image failed to load:', e.currentTarget.src);
-                  }}
-                />
-              </div>
+            <div className={`text-center ${styles.pageHeader}`}>
+              <h1 className="text-5xl font-bold mb-4" style={{ color: 'white' }}>Module Incomplete</h1>
+              <h2 className="text-3xl font-semibold" style={{ color: 'white' }}>Continue practicing to improve accuracy.</h2>
             </div>
 
-            <div className="mx-auto text-center" style={{ marginBottom: '48px', maxWidth: '900px' }}>
-              <p className="text-lg leading-relaxed" style={{ color: 'white', marginBottom: '16px' }}>
-                Use the mock controller to move the rings to pegs on the opposite side. Rings will turn{' '}
-                <strong style={{ color: PEG_TRANSFER_GREEN }}>green</strong> when you have successfully completed a transfer.
-              </p>
-            </div>
-
-            <div className="flex items-center justify-between" style={{ marginTop: '120px' }}>
-              <div className="flex items-center" style={{ gap: '32px' }}>
-                <div className="flex items-center gap-2">
-                  <StarIcon />
-                  <span className="text-lg" style={{ color: 'white' }}>Optimal Pressure</span>
+            <div className={styles.completionLayout}>
+              <section className={styles.leftPanel}>
+                <div className={`w-full ${styles.leftPanelCard}`}>
+                  <p className={styles.percentageLine} style={{ marginTop: 0 }}>
+                    <span className={styles.percentageValue}>{elapsedSeconds}</span> seconds spent transferring rings
+                  </p>
+                  <p className={styles.percentageLine}>
+                    <span className={styles.percentageValue}>{ringsTransferred} out of {totalRings}</span> rings transferred
+                  </p>
+                  <p className={styles.percentageLine} style={{ color: '#E5E7EB', fontWeight: 500 }}>
+                    Strong performance in peg transfer depends on <strong style={{ color: 'white' }}>controlled motion</strong> rather than speed alone. Excessive force can cause instability or dropped objects, while hesitant movements reduce efficiency and fluidity. Consistent, deliberate transfers strengthen depth perception, bimanual coordination, and fine motor accuracy.
+                  </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <StarIcon />
-                  <span className="text-lg" style={{ color: 'white' }}>Steady Movement</span>
-                </div>
-              </div>
+              </section>
 
-              <div className="flex gap-4">
-                <button
-                  onClick={handleBeginTraining}
-                  className="px-8 py-4 rounded-lg font-semibold text-white text-lg transition-colors hover:opacity-90"
-                  style={{ backgroundColor: '#1DA5FF' }}
-                >
-                  Begin Training
-                </button>
-              </div>
+              <section className={styles.rightPanel}>
+                <div className={styles.existingCompletionContent}>
+                  <div className={`flex flex-col items-center ${styles.rightContentRing}`}>
+                    <p className="text-lg mb-2" style={{ color: '#9CA3AF' }}>Overall Score</p>
+                    <div className="relative" style={{ width: '200px', height: '200px' }}>
+                      <svg width="200" height="200" viewBox="0 0 200 200" className="transform -rotate-90">
+                        <circle cx="100" cy="100" r="85" fill="none" stroke="#374151" strokeWidth="14" />
+                        <circle
+                          cx="100"
+                          cy="100"
+                          r="85"
+                          fill="none"
+                          stroke="#1DA5FF"
+                          strokeWidth="14"
+                          strokeLinecap="round"
+                          strokeDasharray={2 * Math.PI * 85}
+                          strokeDashoffset={2 * Math.PI * 85 * (1 - Math.min(100, Math.max(0, score)) / 100)}
+                          className="transition-all duration-700 ease-out"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center" style={{ top: 0, left: 0, right: 0, bottom: 0 }}>
+                        <span className="text-4xl font-bold" style={{ color: 'white' }}>{score}%</span>
+                        <span className="text-base mt-1" style={{ color: '#9CA3AF' }}>Try Again!</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className={`flex justify-center gap-4 flex-wrap ${styles.rightContentButtons}`}>
+                    <button onClick={handleRepeatModule} className="px-6 py-3 rounded-lg font-medium transition-colors hover:opacity-90 text-white" style={{ backgroundColor: '#1DA5FF' }}>
+                      Repeat Module
+                    </button>
+                    <button onClick={handleHome} className="px-6 py-3 rounded-lg font-medium transition-colors hover:opacity-90 text-white" style={{ backgroundColor: '#1DA5FF' }}>
+                      Home
+                    </button>
+                    <button onClick={handleNextModule} className="px-6 py-3 rounded-lg font-medium transition-colors hover:opacity-90 text-white" style={{ backgroundColor: '#1DA5FF' }}>
+                      Next Module
+                    </button>
+                  </div>
+                </div>
+              </section>
             </div>
           </div>
         </main>
@@ -192,4 +174,4 @@ const Module3Instructions = () => {
   );
 };
 
-export default Module3Instructions;
+export default Module3Incomplete;
