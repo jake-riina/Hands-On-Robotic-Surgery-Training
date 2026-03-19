@@ -26,6 +26,7 @@ import Module3Analytics from '../pages/Module3Analytics';
 import AdminDashboard from '../pages/AdminDashboard';
 import AdminAnalytics from '../pages/AdminAnalytics';
 import TraineeRegistration from '../pages/TraineeRegistration';
+import HapticsDebug from '../pages/HapticsDebug';
 
 export const router = createBrowserRouter([
   {
@@ -139,6 +140,10 @@ export const router = createBrowserRouter([
   {
     path: '/module/3/incomplete',
     element: <Module3Incomplete />,
+  },
+  {
+    path: '/haptics-debug',
+    element: <HapticsDebug />,
   },
 ]);
 
