@@ -164,10 +164,6 @@ const Module2Instructions = () => {
     }
   };
 
-  const handleViewCompletedModule = () => {
-    navigate('/module/2/completed');
-  };
-
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#26313E' }}>
       {/* Header Container - Top Bar */}
@@ -290,19 +286,11 @@ const Module2Instructions = () => {
 
               {/* Action Buttons */}
               <div className="flex gap-4">
-                {/* Placeholder button to view completed module */}
-                <button
-                  onClick={handleViewCompletedModule}
-                  className="px-6 py-4 rounded-lg font-semibold text-white text-lg transition-colors hover:opacity-90 border-2"
-                  style={{ backgroundColor: 'transparent', borderColor: '#1DA5FF', color: '#1DA5FF' }}
-                >
-                  View Score
-                </button>
                 {/* Begin Training Button */}
                 <button
                   onClick={handleBeginTraining}
-                  className="px-8 py-4 rounded-lg font-semibold text-white text-lg transition-colors hover:opacity-90"
-                  style={{ backgroundColor: '#1DA5FF' }}
+                  className="px-12 py-4 rounded-xl font-semibold text-white text-2xl transition-colors hover:opacity-90"
+                  style={{ backgroundColor: '#1DA5FF', color: '#ffffff' }}
                 >
                   Begin Training
                 </button>

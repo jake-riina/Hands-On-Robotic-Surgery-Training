@@ -126,11 +126,8 @@ function pointerToTablePoint(pointer: { x: number; y: number }, camera: Camera):
   return intersectTarget.clone();
 }
 
-/** Dark shaft like reference; tip stays silver */
-const INSTRUMENT_SHAFT_COLOR = '#3d4045';
-const INSTRUMENT_TIP_COLOR = '#b8c0c8';
-/** Fixed instrument length; it slides in from the left as the mouse moves */
-const INSTRUMENT_LENGTH = 0.9;
+/** Match Module 2 controller finish: slightly lighter dark gray, subtle matte-metal */
+const INSTRUMENT_ARM_MATERIAL = { color: '#4a4a4a', metalness: 0.28, roughness: 0.6 };
 const CAMERA_NEAR = 0.52;
 const Y_UP = new Vector3(0, 1, 0);
 const tempTip = new Vector3();
@@ -140,13 +137,17 @@ const leftPoint = new Vector3();
 
 function Instrument({ tipPosition }: { tipPosition: [number, number, number] }) {
   const groupRef = useRef<Group>(null);
-  const shaftRef = useRef<Mesh>(null);
   const jawBaseRef = useRef<Mesh>(null);
   const jawsRef = useRef<Group>(null);
   const { camera } = useThree();
+  const ELBOW_X = 0.102;
+  const ELBOW_Y = 0.11;
+  const BASE_VIS_LEN = 0.2;
+  const FOREARM_LEN = Math.hypot(ELBOW_X, ELBOW_Y);
+  const FOREARM_ROT_Z = Math.atan2(-ELBOW_Y, -ELBOW_X) + Math.PI / 2;
 
   useFrame(() => {
-    if (!groupRef.current || !shaftRef.current || !jawBaseRef.current || !jawsRef.current) return;
+    if (!groupRef.current || !jawBaseRef.current || !jawsRef.current) return;
     tempTip.set(tipPosition[0], tipPosition[1], tipPosition[2]);
     leftRaycaster.setFromCamera(leftEdgeNDC, camera);
     const leftDir = leftRaycaster.ray.direction;
@@ -160,31 +161,40 @@ function Instrument({ tipPosition }: { tipPosition: [number, number, number] }) 
     groupRef.current.position.copy(tempTip);
     groupRef.current.quaternion.setFromUnitVectors(Y_UP, toHandle);
 
-    shaftRef.current.scale.set(1, INSTRUMENT_LENGTH, 1);
-    shaftRef.current.position.y = INSTRUMENT_LENGTH / 2;
-
     jawBaseRef.current.position.y = 0;
     jawsRef.current.position.y = 0;
   });
 
   return (
     <group ref={groupRef}>
-      <mesh ref={shaftRef} position={[0, 0, 0]}>
-        <cylinderGeometry args={[0.018, 0.024, 1, 16]} />
-        <meshStandardMaterial color={INSTRUMENT_SHAFT_COLOR} metalness={0.35} roughness={0.65} />
+      {/* Decorative bent arm body: static mesh hierarchy, gameplay logic untouched. */}
+      <mesh position={[ELBOW_X, ELBOW_Y + BASE_VIS_LEN / 2, 0]}>
+        <cylinderGeometry args={[0.019, 0.023, BASE_VIS_LEN, 16]} />
+        <meshStandardMaterial {...INSTRUMENT_ARM_MATERIAL} />
       </mesh>
+
+      {/* Elbow joint and outer/forearm segment to match Module 2 bent-arm silhouette. */}
+      <mesh position={[ELBOW_X, ELBOW_Y, 0]}>
+        <sphereGeometry args={[0.022, 20, 16]} />
+        <meshStandardMaterial {...INSTRUMENT_ARM_MATERIAL} />
+      </mesh>
+      <mesh position={[ELBOW_X / 2, ELBOW_Y / 2, 0]} rotation={[0, 0, FOREARM_ROT_Z]}>
+        <cylinderGeometry args={[0.0145, 0.0155, FOREARM_LEN, 20]} />
+        <meshStandardMaterial {...INSTRUMENT_ARM_MATERIAL} />
+      </mesh>
+
       <mesh ref={jawBaseRef} position={[0, 0, 0]}>
-        <cylinderGeometry args={[0.028, 0.018, 0.05, 12]} />
-        <meshStandardMaterial color={INSTRUMENT_TIP_COLOR} metalness={0.6} roughness={0.35} />
+        <cylinderGeometry args={[0.011, 0.010, 0.034, 12]} />
+        <meshStandardMaterial {...INSTRUMENT_ARM_MATERIAL} />
       </mesh>
       <group ref={jawsRef} position={[0, 0, 0]}>
-        <mesh position={[-0.028, 0, 0]}>
-          <boxGeometry args={[0.028, 0.14, 0.028]} />
-          <meshStandardMaterial color={INSTRUMENT_TIP_COLOR} metalness={0.6} roughness={0.35} />
+        <mesh position={[-0.011, 0.016, 0]} rotation={[0, 0, 0.22]}>
+          <boxGeometry args={[0.012, 0.058, 0.012]} />
+          <meshStandardMaterial {...INSTRUMENT_ARM_MATERIAL} />
         </mesh>
-        <mesh position={[0.028, 0, 0]}>
-          <boxGeometry args={[0.028, 0.14, 0.028]} />
-          <meshStandardMaterial color={INSTRUMENT_TIP_COLOR} metalness={0.6} roughness={0.35} />
+        <mesh position={[0.011, 0.016, 0]} rotation={[0, 0, -0.22]}>
+          <boxGeometry args={[0.012, 0.058, 0.012]} />
+          <meshStandardMaterial {...INSTRUMENT_ARM_MATERIAL} />
         </mesh>
       </group>
     </group>

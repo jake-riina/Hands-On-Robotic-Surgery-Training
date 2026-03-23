@@ -5,11 +5,8 @@ const CompleteModule2 = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const state = (location.state as { orbsCollected?: number; totalOrbs?: number; timeTakenSeconds?: number } | null) ?? {};
-  const orbsCollected = Math.min(5, state.orbsCollected ?? 5);
-  const totalOrbs = Math.max(1, state.totalOrbs ?? 5);
+  const state = (location.state as { timeTakenSeconds?: number } | null) ?? {};
   const timeTakenSeconds = Math.max(0, state.timeTakenSeconds ?? 0);
-  const percentage = 100;
 
   const timeDisplay = `${Math.floor(timeTakenSeconds / 60)}:${(timeTakenSeconds % 60).toString().padStart(2, '0')}`;
 

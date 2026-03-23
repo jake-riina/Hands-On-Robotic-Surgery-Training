@@ -674,7 +674,7 @@ useEffect(() => {
         <main className="flex-1 p-8" style={{ color: 'white', marginLeft: '2rem', paddingTop: '24px' }}>
           <div className="max-w-6xl mx-auto">
             {/* Exercise Title */}
-            <h2 className="text-6xl font-bold mb-4" style={{ color: 'white' }}>
+            <h2 className="text-6xl font-bold mb-4 text-center" style={{ color: 'white' }}>
               Exercise 1: Find the Right Pressure
             </h2>
             {/* Instructions Section - Above everything */}

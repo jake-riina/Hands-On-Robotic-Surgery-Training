@@ -5,6 +5,7 @@ import { TextureLoader } from 'three';
 import * as THREE from 'three';
 import organsImage from '../contexts/Organs.png';
 import whiteboardImage from '../contexts/Whteboard.png';
+import { CameraSpaceViewportControllers } from '../components/SurgicalViewportControllers';
 
 function createSyringesTexture() {
   const size = 256;
@@ -359,6 +360,8 @@ function CameraControlScene({
       <directionalLight position={[0, 8, 0]} intensity={1.5} />
       <directionalLight position={[0, 6, 3]} intensity={0.8} />
       <directionalLight position={[3, 5, 2]} intensity={0.3} />
+      {/* Foreground instruments: camera-fixed viewport framing (same placement intent as prior SVG overlay) */}
+      <CameraSpaceViewportControllers />
 
       {/* Floor */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.5, 0]}>
@@ -2111,85 +2114,6 @@ const CameraControl = () => {
               />
             </Suspense>
           </Canvas>
-        </div>
-        {/* Robotic arms overlay: symmetric, from off-screen, tips short of crosshair, no overlap */}
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            pointerEvents: 'none',
-            zIndex: 2,
-            overflow: 'hidden',
-          }}
-        >
-          {/* Left: stick extends off-screen to x=-280 so it emerges from well outside the view. */}
-          <svg
-            viewBox="-60 0 360 400"
-            preserveAspectRatio="xMaxYMax meet"
-            style={{
-              position: 'absolute',
-              left: '-8%',
-              bottom: '-5%',
-              width: '48%',
-              height: '75%',
-              transform: 'perspective(900px) rotateY(-12deg) rotateX(2deg)',
-              transformOrigin: 'left bottom',
-            }}
-          >
-            <defs>
-              <linearGradient id="arm2DarkL" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#1a1a1a" />
-                <stop offset="100%" stopColor="#0f0f0f" />
-              </linearGradient>
-              <linearGradient id="arm2ProngL" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#e5e7eb" />
-                <stop offset="40%" stopColor="#fafafa" />
-                <stop offset="100%" stopColor="#a1a1aa" />
-              </linearGradient>
-            </defs>
-            <path
-              d="M -280 277 L 100 173 L 100 187 L -280 293 Z"
-              fill="url(#arm2DarkL)"
-              stroke="#171717"
-              strokeWidth="0.4"
-            />
-            <path d="M 98 172 L 128 155 L 132 162 L 102 178 Z" fill="url(#arm2ProngL)" stroke="#e5e7eb" strokeWidth="0.4" />
-            <path d="M 98 188 L 128 205 L 132 198 L 102 182 Z" fill="url(#arm2ProngL)" stroke="#e5e7eb" strokeWidth="0.4" />
-          </svg>
-          {/* Right: stick extends off-screen to x=560 so it extends well outside the view. */}
-          <svg
-            viewBox="0 0 360 400"
-            preserveAspectRatio="xMinYMax meet"
-            style={{
-              position: 'absolute',
-              right: '-8%',
-              bottom: '-5%',
-              width: '48%',
-              height: '75%',
-              transform: 'perspective(900px) rotateY(12deg) rotateX(2deg)',
-              transformOrigin: 'right bottom',
-            }}
-          >
-            <defs>
-              <linearGradient id="arm2DarkR" x1="100%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="#1a1a1a" />
-                <stop offset="100%" stopColor="#0f0f0f" />
-              </linearGradient>
-              <linearGradient id="arm2ProngR" x1="100%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="#e5e7eb" />
-                <stop offset="40%" stopColor="#fafafa" />
-                <stop offset="100%" stopColor="#a1a1aa" />
-              </linearGradient>
-            </defs>
-            <path
-              d="M 560 277 L 200 173 L 200 187 L 560 293 Z"
-              fill="url(#arm2DarkR)"
-              stroke="#171717"
-              strokeWidth="0.4"
-            />
-            <path d="M 198 172 L 168 155 L 164 162 L 194 178 Z" fill="url(#arm2ProngR)" stroke="#e5e7eb" strokeWidth="0.4" />
-            <path d="M 198 188 L 168 205 L 164 198 L 194 182 Z" fill="url(#arm2ProngR)" stroke="#e5e7eb" strokeWidth="0.4" />
-          </svg>
         </div>
         {/* Orb hint arrow: points toward orb when off-screen; position as % so it matches canvas coordinates */}
         {showRedOrb && orbHintState.hint != null && orbHintState.canvasW > 0 && orbHintState.canvasH > 0 && (() => {

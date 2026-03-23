@@ -178,8 +178,8 @@ const Module3Instructions = () => {
               <div className="flex gap-4">
                 <button
                   onClick={handleBeginTraining}
-                  className="px-8 py-4 rounded-lg font-semibold text-white text-lg transition-colors hover:opacity-90"
-                  style={{ backgroundColor: '#1DA5FF' }}
+                  className="px-12 py-4 rounded-xl font-semibold text-white text-2xl transition-colors hover:opacity-90"
+                  style={{ backgroundColor: '#1DA5FF', color: '#ffffff' }}
                 >
                   Begin Training
                 </button>

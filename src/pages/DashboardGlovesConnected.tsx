@@ -25,7 +25,7 @@ const EXPLORE_MODULES = [
     title: 'Module 3: Peg Transfer',
     description: 'Build precision and dexterity with peg transfer between targets.',
     cover: '/Peg.png',
-    route: '/module/3/peg-transfer',
+    route: '/module/3/instructions',
   },
 ];
 
@@ -35,6 +35,7 @@ const MY_SKILLS_MODULES = [
   { title: 'Module 2: Camera Control', scores: [52, 68, 80, 89], highScoreBlurb: '89% high score on your latest attempt.' },          // 4 attempts
   { title: 'Module 3: Peg Transfer', scores: [48, 58, 70, 78, 86, 92], highScoreBlurb: '92% high score on your latest attempt.' },   // 6 attempts
 ];
+const MY_SKILLS_ANALYTICS_ROUTES = ['/analytics', '/analytics/module2', '/analytics/module3'];
 
 const scoreToY = (score: number) => Math.round(158 - score * 1.38);
 const X_MIN = 44;
@@ -509,7 +510,7 @@ const DashboardGlovesConnected = () => {
                   <button 
                     className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm cursor-pointer hover:opacity-90 border-0"
                     style={{ backgroundColor: '#1DA5FF', color: 'white' }}
-                    onClick={() => navigate('/analytics')}
+                    onClick={() => navigate(MY_SKILLS_ANALYTICS_ROUTES[mySkillsModuleIndex] ?? '/analytics')}
                   >
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M6 12l4-4-4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
