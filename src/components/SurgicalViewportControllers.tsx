@@ -279,6 +279,7 @@ const PEG_SCREEN_SHAFT_DIST_MAX = 2.8;
 /**
  * Peg Transfer: same port + shaft math as `ScreenFixedPortedNeedleDriver`, ref-driven; world RCM tip is
  * transformed into camera space each frame so the tool stays on screen when the fulcrum camera moves.
+ * `useFrame` priority -1: R3F runs lower first — pair with `PegCameraMount` at -2 and sim at 0 in PegTransfer.
  */
 export function PegScreenFixedPortedNeedleDriver({
   tipWorldRef,
@@ -379,7 +380,7 @@ export function PegScreenFixedPortedNeedleDriver({
       probe.tip.copy(tipScratch);
       probe.biteMid.lerpVectors(probe.leftJaw, probe.rightJaw, 0.5);
     }
-  }, 0);
+  }, -1);
 
   return (
     <group ref={camRootRef}>

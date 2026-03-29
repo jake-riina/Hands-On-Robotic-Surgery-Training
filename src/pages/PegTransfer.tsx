@@ -153,8 +153,8 @@ function PegCameraMount({
     fovRef.current += (fovTargetRef.current - fovRef.current) * a;
     persp.fov = fovRef.current;
     persp.updateProjectionMatrix();
-    // priority must stay <= 0: R3F turns off automatic gl.render when any useFrame has priority > 0.
-  }, 0);
+    // priority <= 0 only (>0 disables automatic rendering). -2 runs before instrument (-1) and sim (0).
+  }, -2);
   return null;
 }
 
@@ -649,7 +649,7 @@ function PegTransferScene({
     []
   );
 
-  // priority -1: run after camera (0) and PegScreenFixedPortedNeedleDriver (0) so toolWorldFrameRef is fresh
+  // priority 0: runs after camera (-2) and PegScreenFixedPortedNeedleDriver (-1); subscribers sort ascending
   useFrame((_, dt) => {
     const raw = latestRawRef.current;
     const clampedDt = Math.min(0.05, dt);
@@ -885,7 +885,7 @@ function PegTransferScene({
       previewPegRef.current = null;
       ghostActiveRef.current = false;
     }
-  }, -1);
+  });
 
   return (
     <>
