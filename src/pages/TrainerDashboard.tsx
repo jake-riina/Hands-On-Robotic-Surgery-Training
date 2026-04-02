@@ -1,15 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import ProfileDropdown from '../components/ProfileDropdown';
-import styles from './AdminAnalytics.module.css';
-import trainerDashboardStyles from './TrainerDashboard.module.css';
+import styles from './TrainerDashboard.module.css';
+import adminDashboardStyles from './AdminDashboard.module.css';
 
-const AdminAnalytics: React.FC = () => {
+const PLACEHOLDER_TRAINEES = [
+  'John Doe',
+  'Jane Doe',
+  'John Smith',
+  'Jane Smith',
+  'Alex Johnson',
+];
+
+const MODULE_AVERAGE_PERCENT = 75;
+
+const TrainerDashboard: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [_firstName, setFirstName] = useState<string>('');
-
   useEffect(() => {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -33,7 +41,6 @@ const AdminAnalytics: React.FC = () => {
         return;
       }
 
-      setFirstName(profile.first_name || '');
     };
 
     checkUser();
@@ -98,50 +105,22 @@ const AdminAnalytics: React.FC = () => {
   };
 
   const ArrowLeftIcon = () => (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
   const ArrowRightIcon = () => (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
 
-  const chartData = [
-    { time: 1, score: 24 },
-    { time: 2, score: 38 },
-    { time: 3, score: 45 },
-    { time: 4, score: 58 },
-    { time: 5, score: 72 },
-    { time: 6, score: 81 },
-  ];
-  const chartWidth = 420;
-  const chartHeight = 240;
-  const padding = { top: 20, right: 20, bottom: 28, left: 36 };
-  const innerWidth = chartWidth - padding.left - padding.right;
-  const innerHeight = chartHeight - padding.top - padding.bottom;
-  const scoreMin = 0;
-  const scoreMax = 100;
-  const timeMin = 0;
-  const timeMax = 7;
-  const xScale = (t: number) => padding.left + (t - timeMin) / (timeMax - timeMin) * innerWidth;
-  const yScale = (s: number) => padding.top + innerHeight - (s - scoreMin) / (scoreMax - scoreMin) * innerHeight;
-  const points = chartData.map((d) => `${xScale(d.time)},${yScale(d.score)}`).join(' ');
-  const axisStroke = 'rgba(255,255,255,0.5)';
-  const x1 = padding.left;
-  const y1 = padding.top + innerHeight;
-  const x2 = padding.left + innerWidth;
-  const y2 = padding.top;
-  const timeLabelX = padding.left - 16;
-  const timeLabelY = padding.top + innerHeight / 2;
-  const scoreLabelX = padding.left + innerWidth / 2;
-  const scoreLabelY = chartHeight - 8;
-
-  const averageScorePercent = 78;
+  const r = 76;
+  const dash = 2 * Math.PI * r;
+  const offset = dash * (1 - MODULE_AVERAGE_PERCENT / 100);
 
   return (
-    <div className={trainerDashboardStyles.page}>
+    <div className={styles.page}>
       <header className="flex items-center justify-between px-6 py-2" style={{ backgroundColor: '#1E2733' }}>
         <div className="flex items-center gap-4">
           <div className="flex items-center justify-center overflow-hidden" style={{ width: '72px', height: '72px' }}>
@@ -149,13 +128,7 @@ const AdminAnalytics: React.FC = () => {
               src="/Logo.png"
               alt="Logo"
               className="object-contain"
-              style={{
-                width: '72px',
-                height: '72px',
-                maxWidth: '72px',
-                maxHeight: '72px',
-                objectFit: 'contain',
-              }}
+              style={{ width: '72px', height: '72px', maxWidth: '72px', maxHeight: '72px', objectFit: 'contain' }}
             />
           </div>
         </div>
@@ -176,6 +149,7 @@ const AdminAnalytics: React.FC = () => {
                 return (
                   <button
                     key={item.path}
+                    type="button"
                     onClick={() => navigate(item.path)}
                     style={{
                       backgroundColor: '#1E2733',
@@ -195,73 +169,75 @@ const AdminAnalytics: React.FC = () => {
           </nav>
         </aside>
 
-        <main className="flex-1" style={{ padding: '32px 48px' }}>
-          <div className="max-w-6xl mx-auto">
-            <div className={styles.pageHeaderRow}>
-              <span className={styles.backArrowDisabled} aria-hidden>
-                <ArrowLeftIcon />
-              </span>
-              <h1 className={styles.pageTitle}>Module 1 Analytics</h1>
-              <span className={styles.backArrowDisabled} aria-hidden>
-                <ArrowRightIcon />
-              </span>
-            </div>
+        <main className={styles.main}>
+          <h2 className="text-2xl font-semibold" style={{ color: '#ffffff', margin: '0 0 28px 0' }}>
+            Hello, Trainer
+          </h2>
 
-            <div className={styles.analyticsContentArea}>
-              <div className={styles.analyticsLayout}>
-                <div className={styles.leftColumnWrapper}>
-                  <div className={styles.card}>
-                    <h2 className={styles.cardTitle}>Average Score</h2>
-                    <div className="relative flex items-center justify-center" style={{ width: '120px', height: '120px', margin: '0 auto' }}>
-                      <svg width="120" height="120" viewBox="0 0 100 100" className="transform -rotate-90" style={{ display: 'block' }}>
-                        <circle cx="50" cy="50" r="42" fill="none" stroke="#374151" strokeWidth="8" />
-                        <circle
-                          cx="50"
-                          cy="50"
-                          r="42"
-                          fill="none"
-                          stroke="#1DA5FF"
-                          strokeWidth="8"
-                          strokeLinecap="round"
-                          strokeDasharray={2 * Math.PI * 42}
-                          strokeDashoffset={2 * Math.PI * 42 * (1 - averageScorePercent / 100)}
-                        />
-                      </svg>
-                      <span
-                        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 font-bold text-[1.625rem]"
-                        style={{ color: 'white' }}
-                      >
-                        {averageScorePercent}%
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className={`${styles.card} ${styles.topCard}`}>
-                    <h2 className={styles.cardTitle}>Top</h2>
-                    <div className={styles.topCardBody}>
-                      <p className={styles.cardValue}>18%</p>
-                      <p className={styles.cardSubtext}>of Departments</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className={styles.rightCard}>
-                  <h2 className={styles.cardTitle} style={{ marginBottom: '16px', width: '100%' }}>Overall Progress</h2>
-                  <div className={styles.chartWrapper}>
-                    <svg width="100%" height="100%" viewBox={`0 0 ${chartWidth} ${chartHeight}`} className={styles.progressChart} preserveAspectRatio="xMidYMid meet">
-                      <line x1={x1} y1={y1} x2={x1} y2={y2} stroke={axisStroke} strokeWidth="1" />
-                      <line x1={x1} y1={y1} x2={x2} y2={y1} stroke={axisStroke} strokeWidth="1" />
-                      <polyline fill="none" stroke="#1DA5FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={points} />
-                      {chartData.map((d, i) => (
-                        <circle key={i} cx={xScale(d.time)} cy={yScale(d.score)} r="5" fill="#ef4444" stroke="#1e2733" strokeWidth="1" />
-                      ))}
-                      <text x={timeLabelX} y={timeLabelY} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="12" transform={`rotate(-90, ${timeLabelX}, ${timeLabelY})`}>Period</text>
-                      <text x={scoreLabelX} y={scoreLabelY} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="12">Progress %</text>
-                    </svg>
-                  </div>
+          <div className={styles.grid}>
+            <section className={styles.card} aria-label="Module 1 progress">
+              <div className={styles.moduleCardHeader}>
+                <h2 className={adminDashboardStyles.chartCardTitle} style={{ margin: 0, textAlign: 'left' }}>
+                  Module 1
+                </h2>
+                <div className={styles.arrowGroup}>
+                  <button type="button" className={styles.arrowBtn} aria-label="Previous module">
+                    <ArrowLeftIcon />
+                  </button>
+                  <button type="button" className={styles.arrowBtn} aria-label="Next module">
+                    <ArrowRightIcon />
+                  </button>
                 </div>
               </div>
-            </div>
+
+              <div className={styles.chartBlock}>
+                <div className={styles.donutWrap}>
+                  <svg className={styles.donutSvg} width="180" height="180" viewBox="0 0 180 180">
+                    <circle cx="90" cy="90" r={r} fill="none" stroke="#374151" strokeWidth="14" />
+                    <circle
+                      cx="90"
+                      cy="90"
+                      r={r}
+                      fill="none"
+                      stroke="#1DA5FF"
+                      strokeWidth="14"
+                      strokeLinecap="round"
+                      strokeDasharray={dash}
+                      strokeDashoffset={offset}
+                    />
+                  </svg>
+                  <span className={styles.donutLabel}>{MODULE_AVERAGE_PERCENT}%</span>
+                </div>
+                <p className={styles.averageLabel}>Average Score</p>
+              </div>
+
+              <button type="button" className={styles.primaryBtn}>
+                View Trainee Progress
+              </button>
+            </section>
+
+            <section className={styles.card} aria-label="My trainees">
+              <h2 className={adminDashboardStyles.chartCardTitle} style={{ textAlign: 'left' }}>
+                My Trainees
+              </h2>
+              <div className={styles.traineeList}>
+                {PLACEHOLDER_TRAINEES.map((name) => (
+                  <div key={name} className={styles.traineeRow}>
+                    <div className={styles.avatarWrap} aria-hidden>
+                      <svg className={styles.avatarSvg} viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="22" cy="22" r="21" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5"/>
+                        <circle cx="22" cy="17" r="5" stroke="white" strokeWidth="1.5"/>
+                        <path d="M9 37c0-7 6-12 13-12s13 5 13 12" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                      </svg>
+                    </div>
+                    <p className={styles.traineeName}>{name}</p>
+                    <button type="button" className={styles.rowBtn}>
+                      View Progress
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
           </div>
         </main>
       </div>
@@ -269,4 +245,4 @@ const AdminAnalytics: React.FC = () => {
   );
 };
 
-export default AdminAnalytics;
+export default TrainerDashboard;

@@ -52,7 +52,7 @@ const AdminAnalytics: React.FC = () => {
     },
     { 
       path: '/admin/trainees', 
-      label: 'Trainees', 
+      label: 'Trainer Dashboard', 
       icon: 'trainees'
     },
     { 

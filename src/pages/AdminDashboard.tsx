@@ -3,7 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import InviteTraineeModal from '../components/InviteTraineeModal';
 import ProfileDropdown from '../components/ProfileDropdown';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
+import AdminAnalyticsOverview from '../components/AdminAnalyticsOverview';
+import dashboardStyles from './AdminDashboard.module.css';
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -53,7 +54,7 @@ const AdminDashboard: React.FC = () => {
     },
     { 
       path: '/admin/trainees', 
-      label: 'Trainees', 
+      label: 'Trainer Dashboard', 
       icon: 'trainees'
     },
     { 
@@ -120,19 +121,6 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  // Data for charts
-  const traineesData = [
-    { name: 'Cardiothoracic', value: 10, color: '#ffffff' },
-    { name: 'ENT', value: 6, color: '#374151' },
-    { name: 'Urology', value: 2, color: '#1DA5FF' },
-  ];
-
-  const moduleCompletionData = [
-    { name: 'Cardiothoracic', completions: 5, color: '#ffffff' },
-    { name: 'ENT', completions: 6, color: '#374151' },
-    { name: 'Urology', completions: 12, color: '#1DA5FF' },
-  ];
-
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#26313E' }}>
       {/* Header Container - Top Bar */}
@@ -193,144 +181,22 @@ const AdminDashboard: React.FC = () => {
         </aside>
 
         {/* Main Content Area */}
-        <main className="flex-1" style={{ padding: '32px 48px' }}>
-          {/* Greeting */}
-          <h2 className="text-2xl font-semibold mb-6" style={{ color: '#ffffff' }}>
-            Hello, {firstName || 'Admin'}
-          </h2>
-          
-          <div className="grid" style={{ gridTemplateColumns: '1fr 1fr 1fr', gap: '24px' }}>
-            {/* Container 1: Number of Trainees by Department */}
-            <div
-              className="rounded-lg p-6 flex flex-col"
-              style={{
-                backgroundColor: '#1E2733',
-                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3)',
-              }}
+        <main className="flex-1" style={{ padding: '36px 52px' }}>
+          <div className="flex items-start justify-between" style={{ marginBottom: '28px' }}>
+            {/* Greeting */}
+            <h2 className="text-2xl font-semibold" style={{ color: '#ffffff' }}>
+              Hello, {firstName || 'Admin'}
+            </h2>
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(true)}
+              className={dashboardStyles.addTraineeButton}
             >
-              <h3 className="text-lg font-semibold mb-4 text-center" style={{ color: '#ffffff' }}>Number of Trainees by Department</h3>
-              
-              {/* Pie Chart */}
-              <div className="flex justify-center mb-6" style={{ height: '200px' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={traineesData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {traineesData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Summary Table */}
-              <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {traineesData.map((entry, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <div 
-                      style={{ 
-                        width: '16px', 
-                        height: '16px', 
-                        borderRadius: '50%',
-                        backgroundColor: entry.color,
-                        display: 'inline-block',
-                        flexShrink: 0
-                      }}
-                    ></div>
-                    <span className="text-sm" style={{ color: '#ffffff' }}>
-                      {entry.name} - {entry.value} {entry.value === 1 ? 'trainee' : 'trainees'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Container 2: Invite a Trainee */}
-            <div
-              className="rounded-lg p-6 flex flex-col items-center"
-              style={{
-                backgroundColor: '#1E2733',
-                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3)',
-              }}
-            >
-              <h3 className="text-lg font-semibold mb-4 text-center" style={{ color: '#ffffff' }}>Invite a Trainee</h3>
-              <div className="flex justify-center items-center mb-6" style={{ height: '200px' }}>
-                <button
-                  onClick={() => setIsModalOpen(true)}
-                  className="px-6 py-3 text-white font-medium rounded-lg transition-colors"
-                  style={{ backgroundColor: '#1DA5FF' }}
-                >
-                  Add a trainee
-                </button>
-              </div>
-            </div>
-
-            {/* Container 3: Module Completion by Department */}
-            <div
-              className="rounded-lg p-6 flex flex-col"
-              style={{
-                backgroundColor: '#1E2733',
-                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3)',
-              }}
-            >
-              <h3 className="text-lg font-semibold mb-4 text-center" style={{ color: '#ffffff' }}>Highest Module by Department</h3>
-              
-              {/* Horizontal Bar Chart */}
-              <div className="mb-6" style={{ height: '200px' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={moduleCompletionData}
-                    layout="vertical"
-                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                    <XAxis type="number" domain={[0, 12]} stroke="#ffffff" tick={{ fill: '#ffffff', fontSize: 10 }} />
-                    <YAxis 
-                      type="category" 
-                      dataKey="name" 
-                      stroke="#ffffff" 
-                      tick={{ fill: '#ffffff', fontSize: 12 }}
-                      width={100}
-                    />
-                    <Bar dataKey="completions" radius={[0, 4, 4, 0]}>
-                      {moduleCompletionData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Summary Table */}
-              <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {moduleCompletionData.map((entry, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <div 
-                      style={{ 
-                        width: '16px', 
-                        height: '16px', 
-                        borderRadius: '50%',
-                        backgroundColor: entry.color,
-                        display: 'inline-block',
-                        flexShrink: 0
-                      }}
-                    ></div>
-                    <span className="text-sm" style={{ color: '#ffffff' }}>
-                      {entry.name} - Module {entry.completions}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
+              Add New Trainee
+            </button>
           </div>
+
+          <AdminAnalyticsOverview />
         </main>
       </div>
 

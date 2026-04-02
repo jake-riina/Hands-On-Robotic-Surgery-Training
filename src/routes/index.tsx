@@ -25,6 +25,7 @@ import Module2Analytics from '../pages/Module2Analytics';
 import Module3Analytics from '../pages/Module3Analytics';
 import AdminDashboard from '../pages/AdminDashboard';
 import AdminAnalytics from '../pages/AdminAnalytics';
+import TrainerDashboard from '../pages/TrainerDashboard';
 import TraineeRegistration from '../pages/TraineeRegistration';
 import HapticsDebug from '../pages/HapticsDebug';
 
@@ -48,6 +49,10 @@ export const router = createBrowserRouter([
   {
     path: '/admin/dashboard',
     element: <AdminDashboard />,
+  },
+  {
+    path: '/admin/trainees',
+    element: <TrainerDashboard />,
   },
   {
     path: '/admin/analytics',
