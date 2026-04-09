@@ -27,6 +27,7 @@ import AdminDashboard from '../pages/AdminDashboard';
 import AdminAnalytics from '../pages/AdminAnalytics';
 import TrainerDashboard from '../pages/TrainerDashboard';
 import TraineeRegistration from '../pages/TraineeRegistration';
+import TrainerRegistration from '../pages/TrainerRegistration';
 import HapticsDebug from '../pages/HapticsDebug';
 
 export const router = createBrowserRouter([
@@ -61,6 +62,10 @@ export const router = createBrowserRouter([
   {
     path: '/register/:token',
     element: <TraineeRegistration />,
+  },
+  {
+    path: '/register/trainer/:token',
+    element: <TrainerRegistration />,
   },
   {
     path: '/dashboard/logout',

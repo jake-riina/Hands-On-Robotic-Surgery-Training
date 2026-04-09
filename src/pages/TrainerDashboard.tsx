@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import ProfileDropdown from '../components/ProfileDropdown';
@@ -18,6 +18,7 @@ const MODULE_AVERAGE_PERCENT = 75;
 const TrainerDashboard: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [currentRole, setCurrentRole] = useState<string>('');
   useEffect(() => {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -32,7 +33,7 @@ const TrainerDashboard: React.FC = () => {
         .eq('user_id', user.id)
         .single();
 
-      if (!profile || profile.role !== 'admin') {
+      if (!profile || (profile.role !== 'admin' && profile.role !== 'trainer')) {
         if (profile?.role === 'trainee') {
           navigate('/dashboard');
         } else {
@@ -40,6 +41,7 @@ const TrainerDashboard: React.FC = () => {
         }
         return;
       }
+      setCurrentRole(profile.role || '');
 
     };
 
@@ -140,6 +142,8 @@ const TrainerDashboard: React.FC = () => {
           <nav className="py-6">
             <div className="space-y-2 pt-[30px]">
               {navItems.map((item) => {
+                const isAdminDashboardDisabledForTrainer =
+                  currentRole === 'trainer' && item.path === '/admin/dashboard';
                 const isActive =
                   (item.path === '/admin/dashboard' && location.pathname.startsWith('/admin/dashboard') && !location.pathname.startsWith('/admin/trainees') && !location.pathname.startsWith('/admin/analytics')) ||
                   (item.path === '/admin/trainees' && location.pathname.startsWith('/admin/trainees')) ||
@@ -150,18 +154,24 @@ const TrainerDashboard: React.FC = () => {
                   <button
                     key={item.path}
                     type="button"
-                    onClick={() => navigate(item.path)}
+                    onClick={() => {
+                      if (!isAdminDashboardDisabledForTrainer) {
+                        navigate(item.path);
+                      }
+                    }}
+                    disabled={isAdminDashboardDisabledForTrainer}
                     style={{
                       backgroundColor: '#1E2733',
                       border: 'none',
                       paddingTop: '1.5rem',
                       paddingBottom: '1.5rem',
-                      color: 'white',
+                      color: isAdminDashboardDisabledForTrainer ? '#9CA3AF' : 'white',
+                      cursor: isAdminDashboardDisabledForTrainer ? 'not-allowed' : 'pointer',
                     }}
                     className="w-full flex items-center gap-3 px-6 mx-2 rounded-lg transition-colors border-none text-white"
                   >
-                    <span className="flex-shrink-0" style={{ color: isActive ? '#1DA5FF' : 'white' }}>{getIcon(item.icon)}</span>
-                    <span className="font-medium" style={{ color: isActive ? '#1DA5FF' : 'white' }}>{item.label}</span>
+                    <span className="flex-shrink-0" style={{ color: isAdminDashboardDisabledForTrainer ? '#9CA3AF' : (isActive ? '#1DA5FF' : 'white') }}>{getIcon(item.icon)}</span>
+                    <span className="font-medium" style={{ color: isAdminDashboardDisabledForTrainer ? '#9CA3AF' : (isActive ? '#1DA5FF' : 'white') }}>{item.label}</span>
                   </button>
                 );
               })}

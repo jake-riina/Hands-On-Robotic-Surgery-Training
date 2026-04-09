@@ -9,8 +9,10 @@ import dashboardStyles from './AdminDashboard.module.css';
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isTraineeModalOpen, setIsTraineeModalOpen] = useState(false);
+  const [isTrainerModalOpen, setIsTrainerModalOpen] = useState(false);
   const [firstName, setFirstName] = useState<string>('');
+  const [currentRole, setCurrentRole] = useState<string>('');
 
   useEffect(() => {
     // Check if user is authenticated and is admin
@@ -28,7 +30,7 @@ const AdminDashboard: React.FC = () => {
         .eq('user_id', user.id)
         .single();
 
-      if (!profile || profile.role !== 'admin') {
+      if (!profile || (profile.role !== 'admin' && profile.role !== 'trainer')) {
         // Redirect to appropriate dashboard based on role
         if (profile?.role === 'trainee') {
           navigate('/dashboard');
@@ -38,8 +40,14 @@ const AdminDashboard: React.FC = () => {
         return;
       }
 
+      if (profile.role === 'trainer') {
+        navigate('/admin/trainees');
+        return;
+      }
+
       // Set first name for greeting
       setFirstName(profile.first_name || '');
+      setCurrentRole(profile.role || '');
     };
 
     checkUser();
@@ -152,6 +160,8 @@ const AdminDashboard: React.FC = () => {
           <nav className="py-6">
             <div className="space-y-2 pt-[30px]">
               {navItems.map((item) => {
+                const isAdminDashboardDisabledForTrainer =
+                  currentRole === 'trainer' && item.path === '/admin/dashboard';
                 const isActive = 
                   (item.path === '/admin/dashboard' && location.pathname.startsWith('/admin/dashboard') && !location.pathname.startsWith('/admin/trainees') && !location.pathname.startsWith('/admin/analytics')) ||
                   (item.path === '/admin/trainees' && location.pathname.startsWith('/admin/trainees')) ||
@@ -161,18 +171,24 @@ const AdminDashboard: React.FC = () => {
                 return (
                   <button
                     key={item.path}
-                    onClick={() => navigate(item.path)}
+                    onClick={() => {
+                      if (!isAdminDashboardDisabledForTrainer) {
+                        navigate(item.path);
+                      }
+                    }}
+                    disabled={isAdminDashboardDisabledForTrainer}
                     style={{ 
                       backgroundColor: '#1E2733',
                       border: 'none',
                       paddingTop: '1.5rem',
                       paddingBottom: '1.5rem',
-                      color: 'white'
+                      color: isAdminDashboardDisabledForTrainer ? '#9CA3AF' : 'white',
+                      cursor: isAdminDashboardDisabledForTrainer ? 'not-allowed' : 'pointer'
                     }}
                     className={`w-full flex items-center gap-3 px-6 mx-2 rounded-lg transition-colors border-none text-white`}
                   >
-                    <span className="flex-shrink-0" style={{ color: isActive ? '#1DA5FF' : 'white' }}>{getIcon(item.icon)}</span>
-                    <span className="font-medium" style={{ color: isActive ? '#1DA5FF' : 'white' }}>{item.label}</span>
+                    <span className="flex-shrink-0" style={{ color: isAdminDashboardDisabledForTrainer ? '#9CA3AF' : (isActive ? '#1DA5FF' : 'white') }}>{getIcon(item.icon)}</span>
+                    <span className="font-medium" style={{ color: isAdminDashboardDisabledForTrainer ? '#9CA3AF' : (isActive ? '#1DA5FF' : 'white') }}>{item.label}</span>
                   </button>
                 );
               })}
@@ -185,15 +201,24 @@ const AdminDashboard: React.FC = () => {
           <div className="flex items-start justify-between" style={{ marginBottom: '28px' }}>
             {/* Greeting */}
             <h2 className="text-2xl font-semibold" style={{ color: '#ffffff' }}>
-              Hello, {firstName || 'Admin'}
+              Hello, {firstName || (currentRole === 'trainer' ? 'Trainer' : 'Admin')}
             </h2>
-            <button
-              type="button"
-              onClick={() => setIsModalOpen(true)}
-              className={dashboardStyles.addTraineeButton}
-            >
-              Add New Trainee
-            </button>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                type="button"
+                onClick={() => setIsTraineeModalOpen(true)}
+                className={dashboardStyles.addTraineeButton}
+              >
+                Add New Trainee
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsTrainerModalOpen(true)}
+                className={dashboardStyles.addTraineeButton}
+              >
+                Add a Trainer
+              </button>
+            </div>
           </div>
 
           <AdminAnalyticsOverview />
@@ -202,8 +227,19 @@ const AdminDashboard: React.FC = () => {
 
       {/* Invite Trainee Modal */}
       <InviteTraineeModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        isOpen={isTraineeModalOpen}
+        onClose={() => setIsTraineeModalOpen(false)}
+        inviteRole="trainee"
+        onSuccess={() => {
+          // Refresh or update UI if needed
+        }}
+      />
+
+      {/* Invite Trainer Modal */}
+      <InviteTraineeModal
+        isOpen={isTrainerModalOpen}
+        onClose={() => setIsTrainerModalOpen(false)}
+        inviteRole="trainer"
         onSuccess={() => {
           // Refresh or update UI if needed
         }}

@@ -63,6 +63,8 @@ const LoginTraineeV1: React.FC = () => {
         
         if (profile?.role === 'admin') {
           navigate('/admin/dashboard');
+        } else if (profile?.role === 'trainer') {
+          navigate('/admin/trainees');
         } else {
           navigate('/dashboard');
         }
@@ -120,6 +122,8 @@ const LoginTraineeV1: React.FC = () => {
           
           if (profile?.role === 'admin') {
             navigate('/admin/dashboard');
+          } else if (profile?.role === 'trainer') {
+            navigate('/admin/trainees');
           } else {
             navigate('/dashboard');
           }

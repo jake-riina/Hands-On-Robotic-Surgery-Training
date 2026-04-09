@@ -5,7 +5,7 @@ import { getCurrentUserRole } from '../lib/userService';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRole?: 'admin' | 'trainee';
+  requiredRole?: 'admin' | 'trainer' | 'trainee';
   redirectTo?: string;
 }
 
@@ -74,6 +74,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     // Redirect to appropriate dashboard
     if (userRole === 'admin') {
       return <Navigate to="/admin/dashboard" replace />;
+    } else if (userRole === 'trainer') {
+      return <Navigate to="/admin/trainees" replace />;
     } else if (userRole === 'trainee') {
       return <Navigate to="/dashboard" replace />;
     }
@@ -83,6 +85,9 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   // Auto-redirect based on role if accessing root dashboard
   if (location.pathname === '/dashboard' && userRole === 'admin') {
     return <Navigate to="/admin/dashboard" replace />;
+  }
+  if (location.pathname === '/dashboard' && userRole === 'trainer') {
+    return <Navigate to="/admin/trainees" replace />;
   }
 
   if (location.pathname === '/admin/dashboard' && userRole === 'trainee') {

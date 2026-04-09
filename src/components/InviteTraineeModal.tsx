@@ -1,18 +1,20 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { inviteTrainee } from '../lib/invitationService';
+import { inviteTrainee, inviteTrainer, type InvitationRole } from '../lib/invitationService';
 import { supabase } from '../lib/supabaseClient';
 
 interface InviteTraineeModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  inviteRole?: InvitationRole;
 }
 
 const InviteTraineeModal: React.FC<InviteTraineeModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
+  inviteRole = 'trainee',
 }) => {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -33,7 +35,7 @@ const InviteTraineeModal: React.FC<InviteTraineeModalProps> = ({
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        setError('You must be logged in to invite trainees');
+        setError(`You must be logged in to invite ${inviteRole === 'trainer' ? 'trainers' : 'trainees'}`);
         return;
       }
 
@@ -45,8 +47,10 @@ const InviteTraineeModal: React.FC<InviteTraineeModalProps> = ({
         return;
       }
 
-      // Invite trainee
-      const result = await inviteTrainee(email, user.id);
+      // Invite user based on selected role
+      const result = inviteRole === 'trainer'
+        ? await inviteTrainer(email, user.id)
+        : await inviteTrainee(email, user.id);
       
       if (result.success) {
         setSuccess(true);
@@ -137,7 +141,7 @@ const InviteTraineeModal: React.FC<InviteTraineeModalProps> = ({
                 marginBottom: '8px'
               }}
             >
-              Invite a Trainee
+              {inviteRole === 'trainer' ? 'Invite a Trainer' : 'Invite a Trainee'}
             </h2>
             <p 
               style={{ 
@@ -147,7 +151,9 @@ const InviteTraineeModal: React.FC<InviteTraineeModalProps> = ({
                 marginBottom: '24px'
               }}
             >
-              Trainee will receive an email with a registration link that will expire after 24 hours
+              {inviteRole === 'trainer'
+                ? 'Trainer will receive an email with a registration link that will expire after 24 hours'
+                : 'Trainee will receive an email with a registration link that will expire after 24 hours'}
             </p>
 
             <div style={{ marginBottom: '16px', paddingLeft: '16px', paddingRight: '16px' }}>
@@ -177,7 +183,7 @@ const InviteTraineeModal: React.FC<InviteTraineeModalProps> = ({
                   outline: 'none',
                   boxSizing: 'border-box'
                 }}
-                placeholder="Enter trainee email address"
+                placeholder={`Enter ${inviteRole === 'trainer' ? 'trainer' : 'trainee'} email address`}
                 required
                 disabled={isLoading}
               />

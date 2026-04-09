@@ -1,6 +1,8 @@
 import { supabase } from './supabaseClient';
 import { v4 as uuidv4 } from 'uuid';
 
+export type InvitationRole = 'trainee' | 'trainer';
+
 export interface InvitationResult {
   success: boolean;
   error?: string;
@@ -14,6 +16,25 @@ export interface InvitationResult {
 export async function inviteTrainee(
   email: string,
   invitedBy: string
+): Promise<InvitationResult> {
+  return inviteByRole(email, invitedBy, 'trainee');
+}
+
+/**
+ * Invites a trainer by email
+ * Generates a unique token, stores it in the database, and sends an email
+ */
+export async function inviteTrainer(
+  email: string,
+  invitedBy: string
+): Promise<InvitationResult> {
+  return inviteByRole(email, invitedBy, 'trainer');
+}
+
+async function inviteByRole(
+  email: string,
+  invitedBy: string,
+  role: InvitationRole
 ): Promise<InvitationResult> {
   try {
     // Generate unique token
@@ -53,7 +74,9 @@ export async function inviteTrainee(
     // Note: Email sending requires admin privileges and should be done via Edge Function
     // See SUPABASE_EMAIL_SETUP.md for configuration instructions
     const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
-    const registrationLink = `${appUrl}/register/${token}`;
+    const registrationLink = role === 'trainer'
+      ? `${appUrl}/register/trainer/${token}`
+      : `${appUrl}/register/${token}`;
 
     // Attempt to call Edge Function if it exists
     // If Edge Function is not set up, the invitation is still created in the database
@@ -65,6 +88,7 @@ export async function inviteTrainee(
           token,
           registrationLink,
           appUrl,
+          role,
         },
       });
 

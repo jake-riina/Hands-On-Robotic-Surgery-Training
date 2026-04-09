@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient';
 
-export type UserRole = 'trainee' | 'admin';
+export type UserRole = 'trainee' | 'trainer' | 'admin';
 
 export interface UserProfile {
   user_id: string;
@@ -9,6 +9,7 @@ export interface UserProfile {
   first_name?: string;
   last_name?: string;
   experience_level?: string;
+  department?: 'ENT' | 'Cardiothoracic' | 'Urology' | string;
 }
 
 /**
@@ -56,4 +57,12 @@ export async function isCurrentUserAdmin(): Promise<boolean> {
 export async function isCurrentUserTrainee(): Promise<boolean> {
   const role = await getCurrentUserRole();
   return role === 'trainee';
+}
+
+/**
+ * Checks if the current user is a trainer
+ */
+export async function isCurrentUserTrainer(): Promise<boolean> {
+  const role = await getCurrentUserRole();
+  return role === 'trainer';
 }
