@@ -1,4 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom';
+import { module1PressureBarGradient } from '../lib/module1PressureGauge';
 import styles from './CompletedModule.module.css';
 import ProfileDropdown from '../components/ProfileDropdown';
 
@@ -209,8 +210,7 @@ const IncompleteModule1 = () => {
                   <div
                     className="w-full h-[48px] rounded-[14px] shadow-lg"
                     style={{
-                      background:
-                        'linear-gradient(90deg, #ef4444 10%, #f97316 28%, #22c55e 50%, #f97316 72%, #ef4444 90%)',
+                      background: module1PressureBarGradient(),
                       border: '1.5px solid #e2e8f0',
                       boxShadow: '0 4px 24px 2px rgba(0,0,0,0.04)',
                     }}
