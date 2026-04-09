@@ -5,7 +5,12 @@ import { TextureLoader } from 'three';
 import * as THREE from 'three';
 import organsImage from '../contexts/Organs.png';
 import whiteboardImage from '../contexts/Whteboard.png';
-import { CameraSpaceViewportControllers } from '../components/SurgicalViewportControllers';
+import {
+  CameraSpaceViewportControllers,
+  type ViewportInstrumentPosePair,
+} from '../components/SurgicalViewportControllers';
+import { makeFulcrumBehindCamera, setPerspectiveCameraFromFulcrum } from '../utils/fulcrumCamera';
+import { BRIDGE_WS_URL, type TouchStateMessage } from '../types/geomagicBridge';
 
 function createSyringesTexture() {
   const size = 256;
@@ -91,8 +96,17 @@ function createGloveTexture() {
   return tex;
 }
 
-/** Camera mounted on top of table: position never changes, only rotation (look around). Zoom = FOV. */
-const CAMERA_POSITION = new THREE.Vector3(0, 0.5, 0);
+/** Same initial pose as the old fixed camera; fulcrum sits behind along the initial view (trocar / RCM). */
+const CC_CAM_INITIAL_POS = new THREE.Vector3(0, 0.5, 0);
+const CC_CAM_ARM_LENGTH = 0.92;
+const CC_CAM_INIT_PITCH = -0.28;
+const CC_CAM_INIT_YAW = 0;
+const CAMERA_FULCRUM = makeFulcrumBehindCamera(
+  CC_CAM_INITIAL_POS,
+  CC_CAM_INIT_PITCH,
+  CC_CAM_INIT_YAW,
+  CC_CAM_ARM_LENGTH
+);
 
 function CameraMount({
   rotRef,
@@ -102,15 +116,10 @@ function CameraMount({
   fovRef: React.MutableRefObject<number>;
 }) {
   useFrame(({ camera }) => {
-    camera.position.copy(CAMERA_POSITION);
-    camera.rotation.order = 'YXZ';
-    camera.rotation.y = rotRef.current.y;
-    camera.rotation.x = rotRef.current.x;
-    camera.rotation.z = 0;
-    if (camera instanceof THREE.PerspectiveCamera) {
-      camera.fov = fovRef.current;
-      camera.updateProjectionMatrix();
-    }
+    const persp = camera as THREE.PerspectiveCamera;
+    setPerspectiveCameraFromFulcrum(persp, CAMERA_FULCRUM, CC_CAM_ARM_LENGTH, rotRef.current.x, rotRef.current.y);
+    persp.fov = fovRef.current;
+    persp.updateProjectionMatrix();
   });
   return null;
 }
@@ -122,7 +131,7 @@ const POSITION_TOLERANCE_PX = 16;
 /** Orb must be within this much smaller than crosshair (too small = too much space, don't fill). Tighter = more precise zoom. */
 const SIZE_MIN_BELOW_PX = 5;
 /** Orb must not be bigger than crosshair (too zoomed in = don't fill). */
-const SIZE_MAX_ABOVE_PX = 1;
+const SIZE_MAX_ABOVE_PX = 5;
 
 function ProjectOrb({
   orbPosition,
@@ -209,6 +218,25 @@ const ORB_SPAWN_POSITIONS: [number, number, number][] = [
   [0.55, 0.33, -2.06],
 ];
 
+/**
+ * Transform candidates into a "front cavity" using Z only (no x/y changes):
+ * - always negative Z (never behind the user at spawn time)
+ * - compress into a far-wall-ish band so targets are closer together.
+ *
+ * Target band: z' in [-2.4, -1.3]
+ * Derived from:
+ *   z' = -(Z_OFFSET + abs(z) * Z_SCALE)
+ *   abs(z)=0.5  -> ~-1.3
+ *   abs(z)=4.05 -> ~-2.4
+ */
+const TASK_Z_OFFSET = 1.145;
+const TASK_Z_SCALE = 0.310;
+function toFrontCavityZOnly([x, y, z]: [number, number, number]): [number, number, number] {
+  return [x, y, -(TASK_Z_OFFSET + Math.abs(z) * TASK_Z_SCALE)];
+}
+
+const ORB_SPAWN_POSITIONS_FRONT = ORB_SPAWN_POSITIONS.map(toFrontCavityZOnly);
+
 /** Invisible bubble: orbs cannot spawn inside this sphere (center = above table, radius in world units) */
 const EXCLUSION_CENTER: [number, number, number] = [0, 0.35, 0];
 const EXCLUSION_RADIUS = 1.0;
@@ -230,7 +258,7 @@ function isFarEnoughFromCamera(pos: [number, number, number]): boolean {
 }
 
 /** Spawn positions: outside exclusion bubble and far enough from camera so max zoom out never shows orb bigger than crosshair */
-const ORB_SPAWN_POSITIONS_VALID = ORB_SPAWN_POSITIONS.filter(
+const ORB_SPAWN_POSITIONS_VALID = ORB_SPAWN_POSITIONS_FRONT.filter(
   (p) => isOutsideExclusionBubble(p) && isFarEnoughFromCamera(p)
 );
 
@@ -317,6 +345,7 @@ interface CameraControlSceneProps {
   showRedOrb?: boolean;
   sceneRotRef?: React.MutableRefObject<{ x: number; y: number }>;
   fovRef?: React.MutableRefObject<number>;
+  instrumentPoseRef: React.MutableRefObject<ViewportInstrumentPosePair>;
   orbPosition?: [number, number, number];
   onOrbProjection?: (data: { progress: number }) => void;
   onCapture?: () => void;
@@ -327,6 +356,7 @@ function CameraControlScene({
   showRedOrb = false,
   sceneRotRef,
   fovRef,
+  instrumentPoseRef,
   orbPosition = [1.4, 0.3, 4.05],
   onOrbProjection = () => {},
   onCapture = () => {},
@@ -361,7 +391,7 @@ function CameraControlScene({
       <directionalLight position={[0, 6, 3]} intensity={0.8} />
       <directionalLight position={[3, 5, 2]} intensity={0.3} />
       {/* Foreground instruments: camera-fixed viewport framing (same placement intent as prior SVG overlay) */}
-      <CameraSpaceViewportControllers />
+      <CameraSpaceViewportControllers poseRef={instrumentPoseRef} />
 
       {/* Floor */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.5, 0]}>
@@ -1869,20 +1899,54 @@ function CameraControlScene({
   );
 }
 
-const ROT_SENSITIVITY = 0.004;
-const ZOOM_SENSITIVITY = 0.4;
 const FOV_MIN = 12;
 const FOV_MAX = 50;
 const ROT_X_MAX = Math.PI / 2 - 0.15;
+const CAMERA_YAW_SENSITIVITY = 0.013;
+const CAMERA_PITCH_SENSITIVITY = 0.013;
+const CAMERA_ZOOM_SENSITIVITY = 0.08;
+const CAMERA_DEADZONE_MM = 0.4;
 
-/** Camera fixed on table: rotate only (no movement). Zoom = FOV (narrower = zoom in). */
+type ArmSide = 'left' | 'right';
+
+/** Camera pivots about a fixed fulcrum (trocar); arm length fixed; zoom = FOV. */
+
+const MM_TO_VIEW_X = 0.004;
+const MM_TO_VIEW_Y = 0.004;
+const MM_TO_VIEW_Z = 0.0034;
+const INSTRUMENT_GIMBAL_GAIN = 1.1;
+const MAX_VIEW_OFFSET_M = 0.07;
+const MAX_WRIST_ROT_RAD = 0.5;
+
+function createDefaultInstrumentPosePair(): ViewportInstrumentPosePair {
+  const zero = (): ViewportInstrumentPosePair['left'] => ({
+    offset: [0, 0, 0],
+    pitch: 0,
+    yaw: 0,
+    roll: 0,
+  });
+  return { left: zero(), right: zero() };
+}
+
+function clampInstrumentOffsetComponent(value: number, maxAbs: number): number {
+  return Math.max(-maxAbs, Math.min(maxAbs, value));
+}
+
+/** Left viewport arm uses right device Z for depth mapping (third axis). */
+function zSourceForViewportArm(arm: ArmSide, raw: TouchStateMessage, latest: Record<ArmSide, TouchStateMessage | null>): number {
+  if (arm === 'left') {
+    const rz = latest.right?.position?.z;
+    if (rz !== undefined) return rz;
+  }
+  return raw.position!.z;
+}
 
 function pickNewOrbPosition(current: [number, number, number]): [number, number, number] {
   const others = ORB_SPAWN_POSITIONS_VALID.filter(
     (p) => p[0] !== current[0] || p[1] !== current[1] || p[2] !== current[2]
   );
   const pool = others.length > 0 ? others : ORB_SPAWN_POSITIONS_VALID;
-  return pool[Math.floor(Math.random() * pool.length)] ?? ORB_SPAWN_POSITIONS[0];
+  return pool[Math.floor(Math.random() * pool.length)] ?? ORB_SPAWN_POSITIONS_FRONT[0];
 }
 
 const CameraControl = () => {
@@ -1895,7 +1959,7 @@ const CameraControl = () => {
   const sceneRotRef = useRef({ x: -0.28, y: 0 });
   const fovRef = useRef(FOV_MAX);
   const [orbPosition, setOrbPosition] = useState<[number, number, number]>(
-    ORB_SPAWN_POSITIONS_VALID[0] ?? ORB_SPAWN_POSITIONS[0]
+    ORB_SPAWN_POSITIONS_VALID[0] ?? ORB_SPAWN_POSITIONS_FRONT[0]
   );
   const [orbsCollected, setOrbsCollected] = useState(0);
   const [captureProgress, setCaptureProgress] = useState(0);
@@ -1906,15 +1970,31 @@ const CameraControl = () => {
     targetX?: number;
     targetY?: number;
   } | null>(null);
-  const dragRef = useRef({ lastX: 0, lastY: 0 });
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const shellRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
+  const [cameraModeActive, setCameraModeActive] = useState(false);
   const [orbHintState, setOrbHintState] = useState<{
     hint: { x: number; y: number; angle: number } | null;
     canvasW: number;
     canvasH: number;
   }>({ hint: null, canvasW: 1, canvasH: 1 });
+  const latestRawRef = useRef<Record<ArmSide, TouchStateMessage | null>>({ left: null, right: null });
+  const previousPosRef = useRef<Record<ArmSide, [number, number, number] | null>>({ left: null, right: null });
+  const previousCameraModeRef = useRef(false);
+  const instrumentPoseRef = useRef<ViewportInstrumentPosePair>(createDefaultInstrumentPosePair());
+  const neutralMmInstrumentRef = useRef<Record<ArmSide, [number, number, number] | null>>({
+    left: null,
+    right: null,
+  });
+  const neutralGimbalInstrumentRef = useRef<Record<ArmSide, [number, number, number] | null>>({
+    left: null,
+    right: null,
+  });
+  const clutchInstrumentLatchRef = useRef<Record<ArmSide, ViewportInstrumentPosePair['left'] | null>>({
+    left: null,
+    right: null,
+  });
+  const previousInstrumentButton2Ref = useRef<Record<ArmSide, boolean>>({ left: false, right: false });
 
   const onOrbHint = useCallback(
     (hint: { x: number; y: number; angle: number } | null, canvasW?: number, canvasH?: number) => {
@@ -1978,34 +2058,202 @@ const CameraControl = () => {
   }, [flyingOrb?.targetIndex, flyingOrb?.targetX]);
 
   useEffect(() => {
-    const el = canvasContainerRef.current;
-    if (!el) return;
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      fovRef.current = Math.max(FOV_MIN, Math.min(FOV_MAX, fovRef.current - e.deltaY * ZOOM_SENSITIVITY));
+    const ws = new WebSocket(BRIDGE_WS_URL);
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data) as TouchStateMessage;
+        if (msg.type !== 'state' || !msg.deviceId || !msg.position || !msg.buttons) return;
+        const side: ArmSide | null =
+          msg.deviceId === 'touch-1' ? 'left' : msg.deviceId === 'touch-2' ? 'right' : null;
+        if (!side) return;
+        latestRawRef.current[side] = msg;
+      } catch {
+        // ignore malformed bridge frames
+      }
     };
-    el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
+    return () => ws.close();
   }, []);
 
-  const handlePointerDown = (e: React.PointerEvent) => {
-    if ((e.target as HTMLElement).closest('button, a')) return;
-    setIsDragging(true);
-    dragRef.current = { lastX: e.clientX, lastY: e.clientY };
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-  };
-  const handlePointerMove = (e: React.PointerEvent) => {
-    if (!isDragging) return;
-    const dx = e.clientX - dragRef.current.lastX;
-    const dy = e.clientY - dragRef.current.lastY;
-    dragRef.current = { lastX: e.clientX, lastY: e.clientY };
-    sceneRotRef.current.y += dx * ROT_SENSITIVITY;
-    sceneRotRef.current.x = Math.max(-ROT_X_MAX, Math.min(ROT_X_MAX, sceneRotRef.current.x - dy * ROT_SENSITIVITY));
-  };
-  const handlePointerUp = (e: React.PointerEvent) => {
-    setIsDragging(false);
-    (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
-  };
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const left = latestRawRef.current.left;
+      const right = latestRawRef.current.right;
+
+      (['left', 'right'] as ArmSide[]).forEach((arm) => {
+        const raw = latestRawRef.current[arm];
+        if (!raw?.position || !raw.buttons) return;
+        if (arm === 'left' && latestRawRef.current.right?.position === undefined) {
+          previousInstrumentButton2Ref.current[arm] = raw.buttons.button2;
+          return;
+        }
+
+        const gx = raw.gimbal?.x ?? 0;
+        const gy = raw.gimbal?.y ?? 0;
+        const gz = raw.gimbal?.z ?? 0;
+        const zEff = zSourceForViewportArm(arm, raw, latestRawRef.current);
+
+        if (!neutralMmInstrumentRef.current[arm]) {
+          neutralMmInstrumentRef.current[arm] = [
+            raw.position.x,
+            raw.position.y,
+            arm === 'left' ? zEff : raw.position.z,
+          ];
+          neutralGimbalInstrumentRef.current[arm] = [gx, gy, gz];
+        }
+
+        const b2 = raw.buttons.button2;
+        const prevB2 = previousInstrumentButton2Ref.current[arm];
+
+        if (b2) {
+          if (!prevB2) {
+            const cur = instrumentPoseRef.current[arm];
+            clutchInstrumentLatchRef.current[arm] = {
+              offset: [...cur.offset] as [number, number, number],
+              pitch: cur.pitch,
+              yaw: cur.yaw,
+              roll: cur.roll,
+            };
+          }
+          const latched = clutchInstrumentLatchRef.current[arm];
+          if (latched) {
+            const t = instrumentPoseRef.current[arm];
+            t.offset = [...latched.offset] as [number, number, number];
+            t.pitch = latched.pitch;
+            t.yaw = latched.yaw;
+            t.roll = latched.roll;
+          }
+        } else {
+          if (prevB2) {
+            const o = instrumentPoseRef.current[arm].offset;
+            const p = instrumentPoseRef.current[arm];
+            const rz = latestRawRef.current.right?.position?.z;
+            if (arm === 'left') {
+              neutralMmInstrumentRef.current[arm] = [
+                raw.position.x + o[0] / MM_TO_VIEW_X,
+                raw.position.y - o[1] / MM_TO_VIEW_Y,
+                (rz ?? zEff) - o[2] / MM_TO_VIEW_Z,
+              ];
+            } else {
+              neutralMmInstrumentRef.current[arm] = [
+                raw.position.x - o[0] / MM_TO_VIEW_X,
+                raw.position.y - o[1] / MM_TO_VIEW_Y,
+                raw.position.z - o[2] / MM_TO_VIEW_Z,
+              ];
+            }
+            neutralGimbalInstrumentRef.current[arm] = [
+              gx - p.roll / INSTRUMENT_GIMBAL_GAIN,
+              gy - p.pitch / INSTRUMENT_GIMBAL_GAIN,
+              gz - p.yaw / INSTRUMENT_GIMBAL_GAIN,
+            ];
+            clutchInstrumentLatchRef.current[arm] = null;
+          }
+
+          const n = neutralMmInstrumentRef.current[arm]!;
+          const ng = neutralGimbalInstrumentRef.current[arm]!;
+          const dx = raw.position.x - n[0];
+          const dy = raw.position.y - n[1];
+          const zForDelta = arm === 'left' ? zSourceForViewportArm(arm, raw, latestRawRef.current) : raw.position.z;
+          const dz = zForDelta - n[2];
+
+          let ox: number;
+          let oy: number;
+          let oz: number;
+          if (arm === 'left') {
+            ox = -dx * MM_TO_VIEW_X;
+            oy = dy * MM_TO_VIEW_Y;
+            oz = dz * MM_TO_VIEW_Z;
+          } else {
+            ox = dx * MM_TO_VIEW_X;
+            oy = dy * MM_TO_VIEW_Y;
+            oz = dz * MM_TO_VIEW_Z;
+          }
+
+          const t = instrumentPoseRef.current[arm];
+          t.offset = [
+            clampInstrumentOffsetComponent(ox, MAX_VIEW_OFFSET_M),
+            clampInstrumentOffsetComponent(oy, MAX_VIEW_OFFSET_M),
+            clampInstrumentOffsetComponent(oz, MAX_VIEW_OFFSET_M),
+          ];
+
+          let roll = (gx - ng[0]) * INSTRUMENT_GIMBAL_GAIN;
+          let pitch = (gy - ng[1]) * INSTRUMENT_GIMBAL_GAIN;
+          let yaw = (gz - ng[2]) * INSTRUMENT_GIMBAL_GAIN;
+          roll = Math.max(-MAX_WRIST_ROT_RAD, Math.min(MAX_WRIST_ROT_RAD, roll));
+          pitch = Math.max(-MAX_WRIST_ROT_RAD, Math.min(MAX_WRIST_ROT_RAD, pitch));
+          yaw = Math.max(-MAX_WRIST_ROT_RAD, Math.min(MAX_WRIST_ROT_RAD, yaw));
+          t.roll = roll;
+          t.pitch = pitch;
+          t.yaw = yaw;
+        }
+
+        previousInstrumentButton2Ref.current[arm] = b2;
+      });
+
+      const bothButton1 =
+        (left?.buttons?.button1 ?? false) && (right?.buttons?.button1 ?? false);
+      setCameraModeActive(bothButton1);
+
+      const enteredCameraMode = bothButton1 && !previousCameraModeRef.current;
+      previousCameraModeRef.current = bothButton1;
+
+      (['left', 'right'] as ArmSide[]).forEach((arm) => {
+        const raw = latestRawRef.current[arm];
+        if (!raw?.position) return;
+        if (enteredCameraMode || !bothButton1 || raw.buttons?.button2) {
+          previousPosRef.current[arm] = [raw.position.x, raw.position.y, raw.position.z];
+        }
+      });
+
+      if (!bothButton1) return;
+
+      let contributorCount = 0;
+      let dxSum = 0;
+      let dySum = 0;
+      let dzSum = 0;
+
+      (['left', 'right'] as ArmSide[]).forEach((arm) => {
+        const raw = latestRawRef.current[arm];
+        if (!raw?.position || !raw.buttons) return;
+        if (raw.buttons.button2) return;
+        const prev = previousPosRef.current[arm];
+        if (!prev) return;
+
+        const dx = raw.position.x - prev[0];
+        const dy = raw.position.y - prev[1];
+        const dz = raw.position.z - prev[2];
+        const mag = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (mag < CAMERA_DEADZONE_MM) {
+          previousPosRef.current[arm] = [raw.position.x, raw.position.y, raw.position.z];
+          return;
+        }
+
+        dxSum += dx;
+        dySum += dy;
+        dzSum += dz;
+        contributorCount += 1;
+        previousPosRef.current[arm] = [raw.position.x, raw.position.y, raw.position.z];
+      });
+
+      if (contributorCount === 0) return;
+
+      const avgDx = dxSum / contributorCount;
+      const avgDy = dySum / contributorCount;
+      const avgDz = dzSum / contributorCount;
+
+      // Inverted camera controls on all axes.
+      sceneRotRef.current.y -= avgDx * CAMERA_YAW_SENSITIVITY;
+      sceneRotRef.current.x = Math.max(
+        -ROT_X_MAX,
+        Math.min(ROT_X_MAX, sceneRotRef.current.x + avgDy * CAMERA_PITCH_SENSITIVITY)
+      );
+      fovRef.current = Math.max(
+        FOV_MIN,
+        Math.min(FOV_MAX, fovRef.current + avgDz * CAMERA_ZOOM_SENSITIVITY)
+      );
+    }, 20);
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Start countdown shortly after mount (avoids Strict Mode double-mount reset)
   useEffect(() => {
@@ -2083,21 +2331,17 @@ const CameraControl = () => {
         </button>
         <h1 className="text-lg font-semibold" style={{ color: 'white' }}>Camera Control</h1>
         <p className="text-sm" style={{ color: '#9CA3AF', maxWidth: '240px' }}>
-          Camera fixed on table · Drag to look around · Scroll to zoom
+          Hold button1 on both handles for camera mode
         </p>
       </header>
       <div
         className="flex-1 rounded-lg overflow-hidden min-h-0 relative"
         style={{ width: '100%', backgroundColor: '#1E2733' }}
       >
-        {/* Canvas: camera mounted on table (position fixed); drag to look around, scroll to zoom (FOV) */}
+        {/* Canvas: camera mounted on table (position fixed). Camera input comes from bridge data in camera mode. */}
         <div
           ref={canvasContainerRef}
-          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0, cursor: isDragging ? 'grabbing' : 'grab' }}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerLeave={handlePointerUp}
+          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0, cursor: 'default' }}
           role="application"
           tabIndex={0}
         >
@@ -2107,6 +2351,7 @@ const CameraControl = () => {
                 showRedOrb={showRedOrb}
                 sceneRotRef={sceneRotRef}
                 fovRef={fovRef}
+                instrumentPoseRef={instrumentPoseRef}
                 orbPosition={orbPosition}
                 onOrbProjection={onOrbProjection}
                 onCapture={onCapture}
@@ -2149,6 +2394,28 @@ const CameraControl = () => {
             </div>
           );
         })()}
+        {cameraModeActive && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 14,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              padding: '6px 12px',
+              borderRadius: 8,
+              border: '1px solid #22c55e',
+              background: 'rgba(22, 101, 52, 0.9)',
+              color: '#dcfce7',
+              fontSize: 12,
+              fontWeight: 700,
+              letterSpacing: 0.7,
+              zIndex: 11,
+              pointerEvents: 'none',
+            }}
+          >
+            CAMERA MODE
+          </div>
+        )}
         {/* Crosshair: center of screen, fixed size; circular progress when orb is centered + right zoom */}
         {showRedOrb && (
           <div
