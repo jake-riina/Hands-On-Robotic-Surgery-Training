@@ -1,6 +1,15 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import {
+  MODULE1_EXERCISE_DURATION_SECONDS,
+  MODULE1_GAUGE_PSI_MAX,
+  MODULE1_TARGET_PSI_MAX,
+  MODULE1_TARGET_PSI_MIN,
+  module1PressureBarGradient,
+  module1ScorePercent,
+  psiToBarPercent,
+} from '../lib/module1PressureGauge';
 import { useBLE } from '../contexts/BLEContext';
 import RoboticGripper from '../components/RoboticGripper';
 import ProfileDropdown from '../components/ProfileDropdown';
@@ -143,7 +152,7 @@ const Module1Exercise1Start = () => {
 
  // Exercise state
  const [isExerciseActive, setIsExerciseActive] = useState(false);
- const [timeRemaining, setTimeRemaining] = useState(20);
+ const [timeRemaining, setTimeRemaining] = useState(MODULE1_EXERCISE_DURATION_SECONDS);
  const [exerciseStarted, setExerciseStarted] = useState(false);
  const [score, setScore] = useState<number | null>(null);
  const [overrideBleWarning, setOverrideBleWarning] = useState(false);
@@ -154,6 +163,10 @@ const Module1Exercise1Start = () => {
 
  // Effective pressure: spacebar cheat overrides BLE when held
  const effectivePressure = cheatPressure !== null ? cheatPressure : pressure;
+ const effectivePressureRef = useRef(effectivePressure);
+ useEffect(() => {
+   effectivePressureRef.current = effectivePressure;
+ }, [effectivePressure]);
 
  // Spacebar cheat: hold = pressure ramps up, release = pressure ramps down
  const cheatPressureRef = useRef<number>(0);
@@ -161,7 +174,7 @@ const Module1Exercise1Start = () => {
  const rampDownIdRef = useRef<ReturnType<typeof setInterval> | null>(null);
  const RAMP_DURATION_MS = 2000; // Same speed for both up and down
  const RAMP_INTERVAL_MS = 50;
- const CHEAT_MAX_PSI = 35; // Arrow can go to right red; video caps at 20
+ const CHEAT_MAX_PSI = MODULE1_GAUGE_PSI_MAX;
 
  // Keep ref in sync with cheat pressure (state updates from ramps)
  useEffect(() => {
@@ -246,9 +259,8 @@ const Module1Exercise1Start = () => {
  const exerciseStartedRef = useRef<boolean>(false);
  const sessionIdRef = useRef<string | undefined>(sessionId);
 
- // Target pressure range (15-20 PSI)
- const TARGET_MIN = 15;
- const TARGET_MAX = 20;
+ const TARGET_MIN = MODULE1_TARGET_PSI_MIN;
+ const TARGET_MAX = MODULE1_TARGET_PSI_MAX;
 
  // Mock sensor - simulates pressure fluctuations (fallback if BLE not available)
  // Note: This is kept for potential fallback, but BLE context handles pressure updates
@@ -355,37 +367,37 @@ useEffect(() => {
   }
 }, [effectivePressure, bleIsConnected, overrideBleWarning]);
 
- // Track time spent in target threshold
+ // Track time spent in target threshold (stable interval; read pressure from ref so we do not reset on each sample)
  useEffect(() => {
-   if (isExerciseActive && exerciseStarted) {
-     // Initialize start time on first activation
-     if (startTimeRef.current === null) {
-       startTimeRef.current = Date.now();
-       lastCheckTimeRef.current = Date.now();
-     }
-
-     // Check every 100ms if pressure is in target range
-     thresholdCheckIntervalRef.current = setInterval(() => {
-       const now = Date.now();
-       const lastCheck = lastCheckTimeRef.current || now;
-       const timeDelta = now - lastCheck;
-
-       // Check if current pressure is in target range (15-20 PSI)
-       if (effectivePressure >= TARGET_MIN && effectivePressure <= TARGET_MAX) {
-         timeOnThresholdRef.current += timeDelta;
-       }
-
-       lastCheckTimeRef.current = now;
-     }, 100);
+   if (!isExerciseActive || !exerciseStarted) {
+     return;
    }
 
+   if (startTimeRef.current === null) {
+     startTimeRef.current = Date.now();
+     lastCheckTimeRef.current = Date.now();
+   }
+
+   thresholdCheckIntervalRef.current = window.setInterval(() => {
+     const now = Date.now();
+     const lastCheck = lastCheckTimeRef.current ?? now;
+     const timeDelta = now - lastCheck;
+     const p = effectivePressureRef.current;
+
+     if (p >= TARGET_MIN && p <= TARGET_MAX) {
+       timeOnThresholdRef.current += timeDelta;
+     }
+
+     lastCheckTimeRef.current = now;
+   }, 100);
+
    return () => {
-     if (thresholdCheckIntervalRef.current) {
+     if (thresholdCheckIntervalRef.current !== null) {
        clearInterval(thresholdCheckIntervalRef.current);
        thresholdCheckIntervalRef.current = null;
      }
    };
- }, [isExerciseActive, exerciseStarted, effectivePressure]);
+ }, [isExerciseActive, exerciseStarted]);
 
  // Timer countdown - starts immediately when exercise becomes active
  useEffect(() => {
@@ -415,17 +427,19 @@ useEffect(() => {
    };
  }, [isExerciseActive, timeRemaining]);
 
- // Calculate score when exercise completes
+ // Score = (time in green zone, ms) / (full exercise duration, ms) × 100
  useEffect(() => {
    if (exerciseStarted && timeRemaining === 0 && startTimeRef.current !== null) {
-     const endTime = Date.now();
-     const duration = endTime - startTimeRef.current;
-     const timeOnThreshold = timeOnThresholdRef.current;
-     
-     // Calculate score: (time_on_threshold / duration) * 100
-     const calculatedScore = duration > 0 ? (timeOnThreshold / duration) * 100 : 0;
+     const timeInGreenMs = timeOnThresholdRef.current;
+     const calculatedScore = module1ScorePercent(timeInGreenMs);
      setScore(calculatedScore);
-     console.log('Exercise completed. Score:', calculatedScore.toFixed(1), '%');
+     console.log(
+       'Exercise completed. Time in green (ms):',
+       timeInGreenMs,
+       'Score:',
+       calculatedScore.toFixed(1),
+       '%',
+     );
 
     // Persist latest Module 1 score so it can be shown even when revisiting later
     try {
@@ -471,12 +485,8 @@ useEffect(() => {
 
  // Gauge component
  const PressureGauge = () => {
-   const maxPressure = 35;
-   const trianglePosition = Math.min((effectivePressure / maxPressure) * 100, 100);
-
-   useEffect(() => {
-     console.log('PressureGauge render - Pressure:', effectivePressure, 'PSI, Triangle Position:', trianglePosition.toFixed(1), '%');
-   }, [effectivePressure, trianglePosition]);
+   const trianglePosition = psiToBarPercent(effectivePressure);
+   const barGradient = module1PressureBarGradient();
 
    return (
      <div className="flex flex-col items-center">
@@ -519,14 +529,14 @@ useEffect(() => {
            <div
              className="w-full h-[48px] rounded-[14px] shadow-lg"
              style={{
-               background: "linear-gradient(90deg, #ef4444 10%, #f97316 28%, #22c55e 50%, #f97316 72%, #ef4444 90%)",
+               background: barGradient,
                border: "1.5px solid #e2e8f0",
                boxShadow: "0 4px 24px 2px rgba(0,0,0,0.04)"
              }}
            />
            
            <div 
-             className="absolute top-full transition-all duration-200 ease-out"
+             className="absolute top-full transition-all duration-300 ease-out"
              style={{ 
                left: `${trianglePosition}%`,
                transform: 'translateX(-50%)',
@@ -546,7 +556,7 @@ useEffect(() => {
            </p>
            {exerciseStarted && (
              <p className="text-white text-xs" style={{ opacity: 0.75 }}>
-               Target: 15-20 PSI
+               Target: {TARGET_MIN}–{TARGET_MAX} PSI
              </p>
            )}
          </div>

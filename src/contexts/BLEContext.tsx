@@ -1,5 +1,61 @@
-import { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import type { ReactNode } from 'react';
+import { smoothBlePsi } from '../lib/blePressureSmooth';
+import { fsrToPsi } from '../lib/fsrToPsi';
+
+type BleUuid = number | string;
+
+/** Force-sensor peripheral primary service (128-bit UUID). */
+const BLE_FORCE_SENSOR_SERVICE_UUID = '5202e1a0-d2ac-b548-e166-94962a931eed';
+
+/** Standard Environmental Sensing (pressure / sensor data on many gloves). */
+const BLE_ENVIRONMENTAL_SENSING_SERVICE = 0x181a;
+
+/** Standard Environmental Sensing pressure characteristic when present on the device. */
+const BLE_PRESSURE_CHARACTERISTIC_UUID = 0x2a6e;
+
+/** Services we access after pairing; must be listed when the scan filter is by name only. */
+const BLE_OPTIONAL_SERVICES: BleUuid[] = [
+  BLE_FORCE_SENSOR_SERVICE_UUID,
+  BLE_ENVIRONMENTAL_SENSING_SERVICE,
+];
+
+/** Device chooser: BLE peripherals whose advertised name starts with ESP32 (case variants). */
+const BLE_DEVICE_NAME_FILTERS: Array<{ namePrefix: string }> = [
+  { namePrefix: 'ESP32' },
+  { namePrefix: 'esp32' },
+  { namePrefix: 'Esp32' },
+];
+
+async function resolveForceSensorService(
+  server: BluetoothRemoteGATTServer
+): Promise<BluetoothRemoteGATTService> {
+  for (const uuid of [BLE_FORCE_SENSOR_SERVICE_UUID, BLE_ENVIRONMENTAL_SENSING_SERVICE]) {
+    try {
+      return await server.getPrimaryService(uuid);
+    } catch {
+      /* try next */
+    }
+  }
+  throw new Error(
+    'No supported force/pressure service on this device. Use your glove peripheral or check GATT services.'
+  );
+}
+
+async function pickForceSensorCharacteristic(
+  service: BluetoothRemoteGATTService
+): Promise<BluetoothRemoteGATTCharacteristic> {
+  try {
+    return await service.getCharacteristic(BLE_PRESSURE_CHARACTERISTIC_UUID);
+  } catch {
+    const all = await service.getCharacteristics();
+    const withNotify = all.find((c) => c.properties.notify || c.properties.indicate);
+    if (withNotify) return withNotify;
+    const readable = all.find((c) => c.properties.read);
+    if (readable) return readable;
+    throw new Error('No readable or notify characteristic on force sensor service');
+  }
+}
 
 // Web Bluetooth API types
 declare global {
@@ -13,7 +69,9 @@ interface Bluetooth {
 }
 
 interface RequestDeviceOptions {
-  filters: Array<{ services: number[] }>;
+  filters?: Array<{ services?: BleUuid[]; name?: string; namePrefix?: string }>;
+  optionalServices?: BleUuid[];
+  acceptAllDevices?: boolean;
 }
 
 interface BluetoothDevice extends EventTarget {
@@ -25,13 +83,14 @@ interface BluetoothDevice extends EventTarget {
 
 interface BluetoothRemoteGATTServer {
   connect(): Promise<BluetoothRemoteGATTServer>;
-  getPrimaryService(service: number): Promise<BluetoothRemoteGATTService>;
+  getPrimaryService(service: BleUuid): Promise<BluetoothRemoteGATTService>;
   connected: boolean;
   disconnect(): void;
 }
 
 interface BluetoothRemoteGATTService {
-  getCharacteristic(characteristic: number): Promise<BluetoothRemoteGATTCharacteristic>;
+  getCharacteristic(characteristic: BleUuid): Promise<BluetoothRemoteGATTCharacteristic>;
+  getCharacteristics(): Promise<BluetoothRemoteGATTCharacteristic[]>;
 }
 
 interface BluetoothRemoteGATTCharacteristic extends EventTarget {
@@ -76,32 +135,15 @@ export const BLEProvider = ({ children }: BLEProviderProps) => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<string>('Not connected');
   const [pressure, setPressure] = useState(0);
-  
-  const pollIntervalRef = useRef<number | null>(null);
+
+  const pressureSmoothRef = useRef(0);
+  const ingestRawPsi = useCallback((rawPsi: number) => {
+    const next = smoothBlePsi(pressureSmoothRef.current, rawPsi);
+    pressureSmoothRef.current = next;
+    setPressure(next);
+  }, []);
+
   const eventListenerRef = useRef<((event: Event) => void) | null>(null);
-
-  // Convert ADC reading to PSI using FSR power-law model
-  const fsrToPsi = (
-    adc: number,
-    rFixed: number = 56000,
-    K: number = 2.058e6,
-    n: number = 0.90,
-    areaIn2: number = 0.266
-  ): number => {
-    if (adc <= 0) {
-      return 0.0;
-    }
-    if (adc >= 4095) {
-      adc = 4094.9; // avoid division-by-zero
-    }
-
-    const rFsr = rFixed * (4095 - adc) / adc;
-    const forceG = K * Math.pow(rFsr, -n);
-    const pounds = forceG * 0.00220462;
-    const psi = pounds / areaIn2;
-
-    return psi;
-  };
 
   const connect = async () => {
     if (!navigator.bluetooth) {
@@ -129,9 +171,9 @@ export const BLEProvider = ({ children }: BLEProviderProps) => {
             const data = JSON.parse(jsonString);
             const adcValue = data.raw || 0;
             const pressurePSI = fsrToPsi(adcValue);
-            const clampedPressure = Math.max(0, Math.min(35, pressurePSI));
-            setPressure(clampedPressure);
-            console.log('BLE Reading - ADC:', adcValue, 'PSI:', clampedPressure.toFixed(2));
+            const psi = Math.max(0, pressurePSI);
+            ingestRawPsi(psi);
+            console.log('BLE Reading - ADC:', adcValue, 'PSI:', psi.toFixed(2));
           } catch (parseError) {
             console.error('Error parsing JSON:', parseError);
           }
@@ -158,34 +200,7 @@ export const BLEProvider = ({ children }: BLEProviderProps) => {
       } catch (notifError) {
         console.warn('Could not start notifications (might already be active):', notifError);
       }
-      
-      // Ensure polling is active
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-      }
-      
-      console.log('Starting polling for existing connection...');
-      pollIntervalRef.current = setInterval(async () => {
-        try {
-          if (characteristic && device.gatt?.connected) {
-            const value = await characteristic.readValue();
-            if (value && value.byteLength > 0) {
-              let jsonString = '';
-              for (let i = 0; i < value.byteLength; i++) {
-                jsonString += String.fromCharCode(value.getUint8(i));
-              }
-              const data = JSON.parse(jsonString);
-              const adcValue = data.raw || 0;
-              const pressurePSI = fsrToPsi(adcValue);
-              const clampedPressure = Math.max(0, Math.min(35, pressurePSI));
-              setPressure(clampedPressure);
-            }
-          }
-        } catch (pollError) {
-          // Silently fail
-        }
-      }, 100);
-      
+
       console.log('✅ Existing connection verified and listeners re-established');
       return;
     }
@@ -201,8 +216,8 @@ export const BLEProvider = ({ children }: BLEProviderProps) => {
           const server = await device.gatt?.connect();
           if (server && server.connected) {
             // Re-setup the service and characteristic
-            const service = await server.getPrimaryService(0x181A);
-            const newCharacteristic = await service.getCharacteristic(0x2A6E);
+            const service = await resolveForceSensorService(server);
+            const newCharacteristic = await pickForceSensorCharacteristic(service);
             await newCharacteristic.startNotifications();
             setCharacteristic(newCharacteristic);
             setIsConnected(true);
@@ -222,9 +237,9 @@ export const BLEProvider = ({ children }: BLEProviderProps) => {
                   const data = JSON.parse(jsonString);
                   const adcValue = data.raw || 0;
                   const pressurePSI = fsrToPsi(adcValue);
-                  const clampedPressure = Math.max(0, Math.min(35, pressurePSI));
-                  setPressure(clampedPressure);
-                  console.log('BLE Reading - ADC:', adcValue, 'PSI:', clampedPressure.toFixed(2));
+                  const psi = Math.max(0, pressurePSI);
+                  ingestRawPsi(psi);
+                  console.log('BLE Reading - ADC:', adcValue, 'PSI:', psi.toFixed(2));
                 } catch (parseError) {
                   console.error('Error parsing JSON:', parseError);
                 }
@@ -232,29 +247,7 @@ export const BLEProvider = ({ children }: BLEProviderProps) => {
             };
             newCharacteristic.addEventListener('characteristicvaluechanged', handleValueChange);
             eventListenerRef.current = handleValueChange;
-            
-            // Re-setup polling
-            pollIntervalRef.current = setInterval(async () => {
-              try {
-                if (newCharacteristic && device.gatt?.connected) {
-                  const value = await newCharacteristic.readValue();
-                  if (value && value.byteLength > 0) {
-                    let jsonString = '';
-                    for (let i = 0; i < value.byteLength; i++) {
-                      jsonString += String.fromCharCode(value.getUint8(i));
-                    }
-                    const data = JSON.parse(jsonString);
-                    const adcValue = data.raw || 0;
-                    const pressurePSI = fsrToPsi(adcValue);
-                    const clampedPressure = Math.max(0, Math.min(35, pressurePSI));
-                    setPressure(clampedPressure);
-                  }
-                }
-              } catch (pollError) {
-                // Silently fail
-              }
-            }, 100);
-            
+
             return; // Successfully reconnected
           }
         } catch (reconnectError: any) {
@@ -269,13 +262,10 @@ export const BLEProvider = ({ children }: BLEProviderProps) => {
         await new Promise(resolve => setTimeout(resolve, 300));
       }
 
-      console.log('Requesting BLE device...');
+      console.log('Requesting BLE device (name starts with ESP32)...');
       const newDevice = await navigator.bluetooth.requestDevice({
-        filters: [
-          {
-            services: [0x181A], // Environmental Sensing service
-          },
-        ],
+        filters: BLE_DEVICE_NAME_FILTERS,
+        optionalServices: BLE_OPTIONAL_SERVICES,
       });
 
       console.log('Device selected:', newDevice.name || 'Unknown');
@@ -303,16 +293,16 @@ export const BLEProvider = ({ children }: BLEProviderProps) => {
       }
 
       console.log('Connected to GATT server');
+      pressureSmoothRef.current = 0;
+      setPressure(0);
       setDevice(newDevice);
       setIsConnected(true);
       setConnectionStatus('Connected');
 
-      // Get the Environmental Sensing service
-      const service = await server.getPrimaryService(0x181A);
+      const service = await resolveForceSensorService(server);
       console.log('Service obtained');
 
-      // Get the Pressure characteristic (0x2A6E)
-      const newCharacteristic = await service.getCharacteristic(0x2A6E);
+      const newCharacteristic = await pickForceSensorCharacteristic(service);
       console.log('Characteristic obtained');
       setCharacteristic(newCharacteristic);
 
@@ -336,9 +326,9 @@ export const BLEProvider = ({ children }: BLEProviderProps) => {
             const data = JSON.parse(jsonString);
             const adcValue = data.raw || 0;
             const pressurePSI = fsrToPsi(adcValue);
-            const clampedPressure = Math.max(0, Math.min(35, pressurePSI));
-            setPressure(clampedPressure);
-            console.log('BLE Reading - ADC:', adcValue, 'PSI:', clampedPressure.toFixed(2));
+            const psi = Math.max(0, pressurePSI);
+            ingestRawPsi(psi);
+            console.log('BLE Reading - ADC:', adcValue, 'PSI:', psi.toFixed(2));
           } catch (parseError) {
             console.error('Error parsing JSON:', parseError);
           }
@@ -348,37 +338,13 @@ export const BLEProvider = ({ children }: BLEProviderProps) => {
       newCharacteristic.addEventListener('characteristicvaluechanged', handleValueChange);
       eventListenerRef.current = handleValueChange;
 
-      // Set up polling as fallback
-      pollIntervalRef.current = setInterval(async () => {
-        try {
-          if (newCharacteristic && newDevice.gatt?.connected) {
-            const value = await newCharacteristic.readValue();
-            if (value && value.byteLength > 0) {
-              let jsonString = '';
-              for (let i = 0; i < value.byteLength; i++) {
-                jsonString += String.fromCharCode(value.getUint8(i));
-              }
-              const data = JSON.parse(jsonString);
-              const adcValue = data.raw || 0;
-              const pressurePSI = fsrToPsi(adcValue);
-              const clampedPressure = Math.max(0, Math.min(35, pressurePSI));
-              setPressure(clampedPressure);
-            }
-          }
-        } catch (pollError) {
-          // Silently fail
-        }
-      }, 100);
-
       // Handle disconnection
       newDevice.addEventListener('gattserverdisconnected', () => {
         console.log('BLE device disconnected');
         setIsConnected(false);
         setConnectionStatus('Disconnected');
-        if (pollIntervalRef.current) {
-          clearInterval(pollIntervalRef.current);
-          pollIntervalRef.current = null;
-        }
+        pressureSmoothRef.current = 0;
+        setPressure(0);
       });
 
     } catch (error: any) {
@@ -402,11 +368,6 @@ export const BLEProvider = ({ children }: BLEProviderProps) => {
 
   const disconnect = async () => {
     console.log('Disconnecting BLE device...');
-    
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-      pollIntervalRef.current = null;
-    }
 
     if (characteristic && eventListenerRef.current) {
       try {
@@ -432,6 +393,7 @@ export const BLEProvider = ({ children }: BLEProviderProps) => {
 
     setIsConnected(false);
     setConnectionStatus('Disconnected');
+    pressureSmoothRef.current = 0;
     setPressure(0);
     console.log('BLE device disconnected');
   };
@@ -454,9 +416,9 @@ export const BLEProvider = ({ children }: BLEProviderProps) => {
             const data = JSON.parse(jsonString);
             const adcValue = data.raw || 0;
             const pressurePSI = fsrToPsi(adcValue);
-            const clampedPressure = Math.max(0, Math.min(35, pressurePSI));
-            setPressure(clampedPressure);
-            console.log('📊 BLE Reading - ADC:', adcValue, 'PSI:', clampedPressure.toFixed(2));
+            const psi = Math.max(0, pressurePSI);
+            ingestRawPsi(psi);
+            console.log('📊 BLE Reading - ADC:', adcValue, 'PSI:', psi.toFixed(2));
           } catch (parseError) {
             console.error('Error parsing JSON:', parseError);
           }
@@ -481,39 +443,10 @@ export const BLEProvider = ({ children }: BLEProviderProps) => {
         console.warn('Notifications might already be active:', err);
       });
 
-      // Ensure polling is active
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-      }
-
-      pollIntervalRef.current = setInterval(async () => {
-        try {
-          if (characteristic && device.gatt?.connected) {
-            const value = await characteristic.readValue();
-            if (value && value.byteLength > 0) {
-              let jsonString = '';
-              for (let i = 0; i < value.byteLength; i++) {
-                jsonString += String.fromCharCode(value.getUint8(i));
-              }
-              const data = JSON.parse(jsonString);
-              const adcValue = data.raw || 0;
-              const pressurePSI = fsrToPsi(adcValue);
-              const clampedPressure = Math.max(0, Math.min(35, pressurePSI));
-              setPressure(clampedPressure);
-            }
-          }
-        } catch (pollError) {
-          // Silently fail
-        }
-      }, 100);
-
       console.log('✅ BLE listeners are now active');
 
       // Cleanup
       return () => {
-        if (pollIntervalRef.current) {
-          clearInterval(pollIntervalRef.current);
-        }
         if (eventListenerRef.current) {
           try {
             characteristic.removeEventListener('characteristicvaluechanged', eventListenerRef.current);
@@ -523,14 +456,11 @@ export const BLEProvider = ({ children }: BLEProviderProps) => {
         }
       };
     }
-  }, [device, characteristic]);
+  }, [device, characteristic, ingestRawPsi]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-      }
       if (characteristic && eventListenerRef.current) {
         characteristic.removeEventListener('characteristicvaluechanged', eventListenerRef.current);
       }
