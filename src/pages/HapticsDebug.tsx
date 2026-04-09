@@ -1,22 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-
-type GimbalPayload = {
-  x: number;
-  y: number;
-  z: number;
-  xDeg?: number;
-  yDeg?: number;
-  zDeg?: number;
-};
-
-type TouchStateMessage = {
-  type: string;
-  deviceId: string;
-  timestampMs?: number;
-  position?: { x: number; y: number; z: number };
-  gimbal?: GimbalPayload;
-  buttons?: { button1: boolean; button2: boolean };
-};
+import { useEffect, useState } from 'react';
+import { BRIDGE_WS_URL, type TouchStateMessage } from '../types/geomagicBridge';
 
 function fmt(n: number | undefined, decimals: number): string {
   if (n === undefined || Number.isNaN(n)) return '—';
@@ -131,14 +114,12 @@ function DevicePanel({
 }
 
 export default function HapticsDebug() {
-  const WS_URL = useMemo(() => 'ws://localhost:4000', []);
-
   const [connected, setConnected] = useState(false);
   const [lastByDeviceId, setLastByDeviceId] = useState<Record<string, TouchStateMessage>>({});
   const [messageCount, setMessageCount] = useState(0);
 
   useEffect(() => {
-    const ws = new WebSocket(WS_URL);
+    const ws = new WebSocket(BRIDGE_WS_URL);
 
     ws.onopen = () => {
       setConnected(true);
@@ -165,7 +146,7 @@ export default function HapticsDebug() {
     };
 
     return () => ws.close();
-  }, [WS_URL]);
+  }, []);
 
   const touch1 = lastByDeviceId['touch-1'];
   const touch2 = lastByDeviceId['touch-2'];
