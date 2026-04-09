@@ -4,24 +4,34 @@ import type { ToolArmSide, ToolKinematicsRef, ToolOrientationYXZ } from './toolF
 import { pegTransferReferenceValues } from './pegTransferReferenceValues';
 import { computeTipWorldFromDeviceDelta } from './pegTransferTipSpaceKinematics';
 
-const MM_TO_VIEW_X = 0.004;
-const MM_TO_VIEW_Y = 0.004;
-const MM_TO_VIEW_Z = 0.0025;
-
-/** Tip-space XY: world meters per device mm on seed-camera right (matches legacy ox scale). */
-const TIP_SPACE_SCALE_X = MM_TO_VIEW_X;
-/** Tip-space XY: world meters per device mm on seed-camera up (sign matches legacy oy = -dy·MM_TO_VIEW_Y). */
-const TIP_SPACE_SCALE_Y = -MM_TO_VIEW_Y;
-/** Max world-space XY offset applied per frame (m); limits single-frame tip motion. */
-const TIP_SPACE_MAX_DELTA = 0.02;
-
 const INSTRUMENT_GIMBAL_GAIN = 1.1;
-const MAX_VIEW_OFFSET_M = 0.2;
-const MAX_WRIST_ROT_RAD = 0.5;
 
 const DEFAULT_INSERTION = 1.4;
-const INSERTION_MIN = 0.22;
-const INSERTION_MAX = 2;
+
+/** Device mm → world mapping, cone limits, and insertion bounds for RCM. Peg uses defaults; Camera Control passes a wider preset. */
+export type RcmKinematicsLimits = {
+  mmToViewX: number;
+  mmToViewY: number;
+  mmToViewZ: number;
+  /** Max world-space XY step per frame (m) when `useTipSpaceMapping` is true. */
+  tipSpaceMaxDelta: number;
+  /** Clamps ox / oy / oz cone offsets and clutch reindex targets (m). */
+  maxViewOffsetM: number;
+  maxWristRotRad: number;
+  insertionMin: number;
+  insertionMax: number;
+};
+
+export const PEG_TRANSFER_DEFAULT_RCM_LIMITS: RcmKinematicsLimits = {
+  mmToViewX: 0.004,
+  mmToViewY: 0.004,
+  mmToViewZ: 0.0025,
+  tipSpaceMaxDelta: 0.02,
+  maxViewOffsetM: 0.2,
+  maxWristRotRad: 0.5,
+  insertionMin: 0.22,
+  insertionMax: 2,
+};
 
 const clamp = (n: number, a: number, b: number) => Math.max(a, Math.min(b, n));
 
@@ -183,10 +193,12 @@ export function seedGeometricToolRestPose(
   leftTrocarWorld: THREE.Vector3,
   rightTrocarWorld: THREE.Vector3,
   cameraBasisQuatWorldFixed: THREE.Quaternion,
-  boardCenterWorld: THREE.Vector3
+  boardCenterWorld: THREE.Vector3,
+  motionLimits: RcmKinematicsLimits = PEG_TRANSFER_DEFAULT_RCM_LIMITS
 ): void {
-  const leftInsertion = clamp(insertionBaselineM('left'), INSERTION_MIN, INSERTION_MAX);
-  const rightInsertion = clamp(insertionBaselineM('right'), INSERTION_MIN, INSERTION_MAX);
+  const { insertionMin, insertionMax } = motionLimits;
+  const leftInsertion = clamp(insertionBaselineM('left'), insertionMin, insertionMax);
+  const rightInsertion = clamp(insertionBaselineM('right'), insertionMin, insertionMax);
 
   computeInstrumentShaftDirWorld(_shaftDirWorld, leftTrocarWorld, boardCenterWorld, 0, 0, cameraBasisQuatWorldFixed);
   controller.toolKinematicsRef.left.tipWorld.copy(leftTrocarWorld).addScaledVector(_shaftDirWorld, leftInsertion);
@@ -212,14 +224,16 @@ export function resyncNeutralTipWorldAnchors(
   leftTrocarWorld: THREE.Vector3,
   rightTrocarWorld: THREE.Vector3,
   cameraBasisQuatWorldFixed: THREE.Quaternion,
-  boardCenterWorld: THREE.Vector3
+  boardCenterWorld: THREE.Vector3,
+  motionLimits: RcmKinematicsLimits = PEG_TRANSFER_DEFAULT_RCM_LIMITS
 ): void {
+  const { insertionMin, insertionMax } = motionLimits;
   computeInstrumentShaftDirWorld(_shaftDirWorld, leftTrocarWorld, boardCenterWorld, 0, 0, cameraBasisQuatWorldFixed);
-  const leftIns = clamp(insertionBaselineM('left'), INSERTION_MIN, INSERTION_MAX);
+  const leftIns = clamp(insertionBaselineM('left'), insertionMin, insertionMax);
   controller.neutralTipWorld.left.copy(leftTrocarWorld).addScaledVector(_shaftDirWorld, leftIns);
 
   computeInstrumentShaftDirWorld(_shaftDirWorld, rightTrocarWorld, boardCenterWorld, 0, 0, cameraBasisQuatWorldFixed);
-  const rightIns = clamp(insertionBaselineM('right'), INSERTION_MIN, INSERTION_MAX);
+  const rightIns = clamp(insertionBaselineM('right'), insertionMin, insertionMax);
   controller.neutralTipWorld.right.copy(rightTrocarWorld).addScaledVector(_shaftDirWorld, rightIns);
 }
 
@@ -265,6 +279,7 @@ export function updateRcmKinematics({
   cameraBasisQuatWorldFixed,
   boardCenterWorld,
   useTipSpaceMapping = false,
+  motionLimits = PEG_TRANSFER_DEFAULT_RCM_LIMITS,
 }: {
   controller: RcmKinematicsController;
   leftRaw: TouchStateMessage | null;
@@ -277,7 +292,12 @@ export function updateRcmKinematics({
   boardCenterWorld: THREE.Vector3;
   /** Peg Transfer: tip-space X/Y mapping (wired from scene; inert until branch uses it). */
   useTipSpaceMapping?: boolean;
+  /** Defaults to peg tuning; Camera Control passes a wider preset. */
+  motionLimits?: RcmKinematicsLimits;
 }) {
+  const L = motionLimits;
+  const tipSpaceScaleX = L.mmToViewX;
+  const tipSpaceScaleY = -L.mmToViewY;
   const leftButtons = leftRaw?.buttons;
   const rightButtons = rightRaw?.buttons;
 
@@ -332,25 +352,25 @@ export function updateRcmKinematics({
       let oyTarget: number;
 
       if (instrumentNeutralAimsAtBoard() && buildBoardAimTangents(boardCenterWorld, trocarWorld, cameraBasisQuatWorldFixed, _f0, _rTan, _uTan)) {
-        oxTarget = clamp(dirWorld.dot(_rTan), -MAX_VIEW_OFFSET_M, MAX_VIEW_OFFSET_M);
-        oyTarget = clamp(dirWorld.dot(_uTan), -MAX_VIEW_OFFSET_M, MAX_VIEW_OFFSET_M);
+        oxTarget = clamp(dirWorld.dot(_rTan), -L.maxViewOffsetM, L.maxViewOffsetM);
+        oyTarget = clamp(dirWorld.dot(_uTan), -L.maxViewOffsetM, L.maxViewOffsetM);
       } else {
         const dirView = _vScratch.copy(dirWorld).applyQuaternion(invBasis);
         const safeZ = Math.abs(dirView.z) < 1e-6 ? -1e-6 : dirView.z;
-        oxTarget = clamp(dirView.x / -safeZ, -MAX_VIEW_OFFSET_M, MAX_VIEW_OFFSET_M);
-        oyTarget = clamp(dirView.y / -safeZ, -MAX_VIEW_OFFSET_M, MAX_VIEW_OFFSET_M);
+        oxTarget = clamp(dirView.x / -safeZ, -L.maxViewOffsetM, L.maxViewOffsetM);
+        oyTarget = clamp(dirView.y / -safeZ, -L.maxViewOffsetM, L.maxViewOffsetM);
       }
 
       const ozTarget = clamp(
         insertionTarget - insertionBaselineM(arm),
-        -MAX_VIEW_OFFSET_M,
-        MAX_VIEW_OFFSET_M
+        -L.maxViewOffsetM,
+        L.maxViewOffsetM
       );
 
       // Invert mapping to find deltas that should map raw -> current frozen pose.
-      const dxTarget = oxTarget / MM_TO_VIEW_X;
-      const dyTarget = -oyTarget / MM_TO_VIEW_Y;
-      const dzTarget = -ozTarget / MM_TO_VIEW_Z;
+      const dxTarget = oxTarget / L.mmToViewX;
+      const dyTarget = -oyTarget / L.mmToViewY;
+      const dzTarget = -ozTarget / L.mmToViewZ;
 
       controller.neutralMmRef[arm] = [rawPos.x - dxTarget, rawPos.y - dyTarget, rawPos.z - dzTarget];
 
@@ -412,17 +432,17 @@ export function updateRcmKinematics({
     const dz = rawPos.z - nMm[2];
 
     // CameraControl sign conventions (keep consistent with existing device mapping intent).
-    const ox = dx * MM_TO_VIEW_X;
+    const ox = dx * L.mmToViewX;
     /** Inverted vs device Y so physical stylus down matches expected on-screen tilt. */
-    const oy = -dy * MM_TO_VIEW_Y;
-    const oz = -dz * MM_TO_VIEW_Z;
+    const oy = -dy * L.mmToViewY;
+    const oz = -dz * L.mmToViewZ;
 
-    const oxC = clamp(ox, -MAX_VIEW_OFFSET_M, MAX_VIEW_OFFSET_M);
-    const oyC = clamp(oy, -MAX_VIEW_OFFSET_M, MAX_VIEW_OFFSET_M);
-    const ozC = clamp(oz, -MAX_VIEW_OFFSET_M, MAX_VIEW_OFFSET_M);
+    const oxC = clamp(ox, -L.maxViewOffsetM, L.maxViewOffsetM);
+    const oyC = clamp(oy, -L.maxViewOffsetM, L.maxViewOffsetM);
+    const ozC = clamp(oz, -L.maxViewOffsetM, L.maxViewOffsetM);
 
     // Insertion from depth component (depth maps to "sliding along" the shaft).
-    const insertion = clamp(insertionBaselineM(arm) + ozC, INSERTION_MIN, INSERTION_MAX);
+    const insertion = clamp(insertionBaselineM(arm) + ozC, L.insertionMin, L.insertionMax);
 
     if (useTipSpaceMapping) {
       const dxTask = dx;
@@ -432,12 +452,12 @@ export function updateRcmKinematics({
         dy,
         cameraBasisQuatWorldFixed,
         trocarWorld,
-        TIP_SPACE_SCALE_X,
-        TIP_SPACE_SCALE_Y,
-        INSERTION_MIN,
-        INSERTION_MAX,
+        tipSpaceScaleX,
+        tipSpaceScaleY,
+        L.insertionMin,
+        L.insertionMax,
         {
-          maxDeltaWorld: TIP_SPACE_MAX_DELTA,
+          maxDeltaWorld: L.tipSpaceMaxDelta,
           insertionAlongShaft: insertion,
         }
       );
@@ -469,9 +489,9 @@ export function updateRcmKinematics({
     let pitch = (gy - ngy) * INSTRUMENT_GIMBAL_GAIN;
     let yaw = (gz - ngz) * INSTRUMENT_GIMBAL_GAIN;
 
-    roll = clamp(roll, -MAX_WRIST_ROT_RAD, MAX_WRIST_ROT_RAD);
-    pitch = clamp(pitch, -MAX_WRIST_ROT_RAD, MAX_WRIST_ROT_RAD);
-    yaw = clamp(yaw, -MAX_WRIST_ROT_RAD, MAX_WRIST_ROT_RAD);
+    roll = clamp(roll, -L.maxWristRotRad, L.maxWristRotRad);
+    pitch = clamp(pitch, -L.maxWristRotRad, L.maxWristRotRad);
+    yaw = clamp(yaw, -L.maxWristRotRad, L.maxWristRotRad);
 
     out.orientation.pitch = pitch;
     out.orientation.yaw = yaw;

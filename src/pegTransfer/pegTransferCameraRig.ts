@@ -3,11 +3,14 @@ import * as THREE from 'three';
 import { setPerspectiveCameraFromFulcrum } from '../utils/fulcrumCamera';
 
 export const CAMERA_FOV_DEFAULT = 35;
+/** Degrees; aligned with camera-control module for consistent zoom range. */
+export const CAMERA_FOV_MIN = 12;
+export const CAMERA_FOV_MAX = 50;
 export const CAMERA_DEADZONE_MM = 0.4;
 
 export const CAMERA_YAW_SENSITIVITY = 0.013;
 export const CAMERA_PITCH_SENSITIVITY = 0.013;
-/** Reserved for a future product-safe zoom path; device-Z does not drive FOV in peg transfer for now. */
+/** Averaged device Z delta (mm per tick) → FOV change (degrees); same sign convention as camera control. */
 export const CAMERA_ZOOM_SENSITIVITY = 0.08;
 
 /** Legacy wide pitch cap (radians); peg transfer uses tighter `CAMERA_PITCH_LIMIT_RAD` below. */
@@ -45,6 +48,27 @@ export const CAMERA_PAN_MAX_VERTICAL_M = 0.015;
 /** Half-width dolly (meters). */
 export const CAMERA_PAN_MAX_DOLLY_M = 0.01;
 
+/**
+ * Symmetric bounds for camera mode around the rig seed (rotation half-widths in rad, pan half-maxes in m).
+ * Peg transfer uses {@link PEG_TRANSFER_DEFAULT_CAMERA_MODE_LIMITS}; Camera Control passes a wider preset.
+ */
+export type EndoscopeCameraModeLimits = {
+  yawHalfWidthRad: number;
+  pitchHalfWidthRad: number;
+  panMaxLateralM: number;
+  panMaxVerticalM: number;
+  panMaxDollyM: number;
+};
+
+/** Unchanged peg-transfer exercise tuning. */
+export const PEG_TRANSFER_DEFAULT_CAMERA_MODE_LIMITS: EndoscopeCameraModeLimits = {
+  yawHalfWidthRad: CAMERA_YAW_MAX_RAD,
+  pitchHalfWidthRad: CAMERA_PITCH_LIMIT_RAD,
+  panMaxLateralM: CAMERA_PAN_MAX_LATERAL_M,
+  panMaxVerticalM: CAMERA_PAN_MAX_VERTICAL_M,
+  panMaxDollyM: CAMERA_PAN_MAX_DOLLY_M,
+};
+
 export const CAMERA_TRANS_DAMP_LAMBDA = 9;
 
 /** Yaw/pitch scale when translation-first is on (rotation stays secondary). */
@@ -78,15 +102,31 @@ export function resetCameraModePrevPos(
   if (rightRaw?.position) prevPosRef.right = [rightRaw.position.x, rightRaw.position.y, rightRaw.position.z];
 }
 
-function clampCameraTargetRotation(target: CameraRotRef, seed: CameraRotRef) {
-  target.y = THREE.MathUtils.clamp(target.y, seed.y - CAMERA_YAW_MAX_RAD, seed.y + CAMERA_YAW_MAX_RAD);
-  target.x = THREE.MathUtils.clamp(target.x, seed.x - CAMERA_PITCH_LIMIT_RAD, seed.x + CAMERA_PITCH_LIMIT_RAD);
+function clampCameraTargetRotation(
+  target: CameraRotRef,
+  seed: CameraRotRef,
+  limits: EndoscopeCameraModeLimits
+) {
+  target.y = THREE.MathUtils.clamp(
+    target.y,
+    seed.y - limits.yawHalfWidthRad,
+    seed.y + limits.yawHalfWidthRad
+  );
+  target.x = THREE.MathUtils.clamp(
+    target.x,
+    seed.x - limits.pitchHalfWidthRad,
+    seed.x + limits.pitchHalfWidthRad
+  );
 }
 
-function clampCameraTranslationTarget(target: CameraTranslationRef) {
-  target.x = THREE.MathUtils.clamp(target.x, -CAMERA_PAN_MAX_LATERAL_M, CAMERA_PAN_MAX_LATERAL_M);
-  target.y = THREE.MathUtils.clamp(target.y, -CAMERA_PAN_MAX_VERTICAL_M, CAMERA_PAN_MAX_VERTICAL_M);
-  target.z = THREE.MathUtils.clamp(target.z, -CAMERA_PAN_MAX_DOLLY_M, CAMERA_PAN_MAX_DOLLY_M);
+function clampCameraTranslationTarget(target: CameraTranslationRef, limits: EndoscopeCameraModeLimits) {
+  target.x = THREE.MathUtils.clamp(target.x, -limits.panMaxLateralM, limits.panMaxLateralM);
+  target.y = THREE.MathUtils.clamp(target.y, -limits.panMaxVerticalM, limits.panMaxVerticalM);
+  target.z = THREE.MathUtils.clamp(target.z, -limits.panMaxDollyM, limits.panMaxDollyM);
+}
+
+function clampCameraFov(fovRef: { current: number }) {
+  fovRef.current = THREE.MathUtils.clamp(fovRef.current, CAMERA_FOV_MIN, CAMERA_FOV_MAX);
 }
 
 /**
@@ -113,7 +153,7 @@ export function dampPegTransferCameraTranslation(
 
 /**
  * Integrates device motion into rotation/translation targets when cameraModeActive is true.
- * Does not change FOV. Call damp helpers afterward for the pose applied to the camera.
+ * Averaged stylus Z drives FOV (zoom); XY drive pan/tilt (translation-first) or yaw/pitch.
  *
  * Rule alignment:
  * - cameraModeActive is `left.button1 && right.button1`
@@ -124,10 +164,12 @@ export function updateCameraRigFromDevice({
   cameraRotTargetRef,
   cameraRotSeedRef,
   cameraTransTargetRef,
+  fovRef,
   prevPosRef,
   wasCameraModeActiveRef,
   leftRaw,
   rightRaw,
+  cameraModeLimits = PEG_TRANSFER_DEFAULT_CAMERA_MODE_LIMITS,
 }: {
   cameraModeActive: boolean;
   cameraRotTargetRef: CameraRotRef;
@@ -135,10 +177,14 @@ export function updateCameraRigFromDevice({
   cameraRotSeedRef: CameraRotRef;
   /** Seed-local translation target: +X right, +Y up, +Z along view (Three.js look = −Z). */
   cameraTransTargetRef: CameraTranslationRef;
+  /** Field of view in degrees; updated from averaged device Z in camera mode. */
+  fovRef: { current: number };
   prevPosRef: CameraModePrevPosRef;
   wasCameraModeActiveRef: { current: boolean };
   leftRaw: TouchStateMessage | null;
   rightRaw: TouchStateMessage | null;
+  /** Defaults to peg-transfer bounds; pass a wider preset for Camera Control. */
+  cameraModeLimits?: EndoscopeCameraModeLimits;
 }) {
   const wasActive = wasCameraModeActiveRef.current;
 
@@ -193,11 +239,13 @@ export function updateCameraRigFromDevice({
   const avgDy = dySum / contributorCount;
   const avgDz = dzSum / contributorCount;
 
+  fovRef.current += avgDz * CAMERA_ZOOM_SENSITIVITY;
+  clampCameraFov(fovRef);
+
   if (PEG_TRANSFER_CAMERA_TRANSLATION_FIRST) {
     cameraTransTargetRef.x -= avgDx * CAMERA_PAN_LATERAL_PER_DEVICE_MM;
     cameraTransTargetRef.y += avgDy * CAMERA_PAN_VERTICAL_PER_DEVICE_MM;
-    cameraTransTargetRef.z -= avgDz * CAMERA_DOLLY_PER_DEVICE_MM;
-    clampCameraTranslationTarget(cameraTransTargetRef);
+    clampCameraTranslationTarget(cameraTransTargetRef, cameraModeLimits);
 
     cameraRotTargetRef.y -= avgDx * CAMERA_YAW_SENSITIVITY * CAMERA_ROTATION_SECONDARY_SCALE;
     cameraRotTargetRef.x += avgDy * CAMERA_PITCH_SENSITIVITY * CAMERA_ROTATION_SECONDARY_SCALE;
@@ -205,7 +253,7 @@ export function updateCameraRigFromDevice({
     cameraRotTargetRef.y -= avgDx * CAMERA_YAW_SENSITIVITY;
     cameraRotTargetRef.x += avgDy * CAMERA_PITCH_SENSITIVITY;
   }
-  clampCameraTargetRotation(cameraRotTargetRef, cameraRotSeedRef);
+  clampCameraTargetRotation(cameraRotTargetRef, cameraRotSeedRef, cameraModeLimits);
 }
 
 /**

@@ -14,7 +14,7 @@ import Module2Instructions from '../pages/Module2Instructions';
 import Module3Instructions from '../pages/Module3Instructions';
 import CompletedModule from '../pages/CompletedModule';
 import PegTransfer from '../pages/PegTransfer';
-import CameraControl from '../pages/CameraControl';
+import CameraControl from '../pages/cameraControl/CameraControl';
 import IncompleteModule1 from '../pages/IncompleteModule1';
 import IncompleteModule2 from '../pages/IncompleteModule2';
 import CompleteModule2 from '../pages/CompleteModule2';

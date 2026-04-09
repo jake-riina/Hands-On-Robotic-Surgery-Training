@@ -1,6 +1,17 @@
 import * as THREE from 'three';
 import { pegTransferReferenceValues } from './pegTransferReferenceValues';
 
+/** Resolved fulcra + task focal point for RCM/camera calibration (peg board or OR preset). */
+export type SurgicalWorldRigResolved = {
+  cameraTrocarWorld: THREE.Vector3;
+  leftTrocarWorld: THREE.Vector3;
+  rightTrocarWorld: THREE.Vector3;
+  /** Aim point for instrument neutrals and camera seed (pegboard center or OR workspace). */
+  taskCenterWorld: THREE.Vector3;
+  cameraArmLengthM: number;
+  useTipSpaceMapping: boolean;
+};
+
 function scaleCornerTowardConvergence(
   base: THREE.Vector3,
   convergence: THREE.Vector3,
@@ -83,3 +94,17 @@ export const pegTransferBoardCenterWorld = new THREE.Vector3(
   wr.convergenceWorldM[1],
   wr.convergenceWorldM[2]
 );
+
+/** Peg-transfer exercise: resolved trocars + board center + camera arm length (existing behavior). */
+export function resolvePegTransferWorldRig(): SurgicalWorldRigResolved {
+  const { cameraTrocar, leftTrocar, rightTrocar } = computeResolvedTrocarWorldPositions();
+  const cfg = pegTransferReferenceValues.worldRig;
+  return {
+    cameraTrocarWorld: cameraTrocar,
+    leftTrocarWorld: leftTrocar,
+    rightTrocarWorld: rightTrocar,
+    taskCenterWorld: pegTransferBoardCenterWorld.clone(),
+    cameraArmLengthM: cfg.cameraConstrainedArmLengthM,
+    useTipSpaceMapping: cfg.useTipSpaceMapping,
+  };
+}

@@ -10,11 +10,13 @@ import {
   CAMERA_FOV_DEFAULT,
   dampPegTransferCameraRotation,
   dampPegTransferCameraTranslation,
+  PEG_TRANSFER_DEFAULT_CAMERA_MODE_LIMITS,
   updateCameraRigFromDevice,
 } from './pegTransferCameraRig';
 import {
   applyExplicitDeviceCalibration,
   initRcmKinematicsController,
+  PEG_TRANSFER_DEFAULT_RCM_LIMITS,
   resyncNeutralTipWorldAnchors,
   seedGeometricToolRestPose,
   updateRcmKinematics,
@@ -32,7 +34,7 @@ import { createInitialRingState, createRingHomePoseMap, type RingStateMap } from
 import { PegRings } from './PegRings';
 import { initRingInteractionController, updateRingInteractions } from './ringInteraction';
 import { pegTransferReferenceValues } from './pegTransferReferenceValues';
-import { computeResolvedTrocarWorldPositions, pegTransferBoardCenterWorld } from './pegTransferWorldRig';
+import { pegTransferBoardCenterWorld, resolvePegTransferWorldRig } from './pegTransferWorldRig';
 
 const ENDOSCOPE = pegTransferReferenceValues.lightingDefaults.endoscopePointLight;
 
@@ -259,10 +261,15 @@ export function PegTransferScene({
 
     camera.updateMatrixWorld(true);
 
-    const { cameraTrocar, leftTrocar, rightTrocar } = computeResolvedTrocarWorldPositions();
+    const rig = resolvePegTransferWorldRig();
+    armLengthRef.current = rig.cameraArmLengthM;
 
-    // Seed pitch/yaw so camera axis initially points toward the shared convergence center.
-    const toTarget = pegTransferBoardCenterWorld.clone().sub(cameraTrocar).normalize();
+    cameraTrocarWorldRef.current.copy(rig.cameraTrocarWorld);
+    leftTrocarWorldRef.current.copy(rig.leftTrocarWorld);
+    rightTrocarWorldRef.current.copy(rig.rightTrocarWorld);
+
+    // Seed pitch/yaw so camera axis initially points toward the task / board center.
+    const toTarget = rig.taskCenterWorld.clone().sub(cameraTrocarWorldRef.current).normalize();
     const seedQuat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, -1), toTarget);
     const seedEuler = new THREE.Euler().setFromQuaternion(seedQuat, 'YXZ');
 
@@ -279,11 +286,6 @@ export function PegTransferScene({
     cameraBasisQuatWorldFixedRef.current.copy(camWorldQuat);
 
     fovRef.current = CAMERA_FOV_DEFAULT;
-
-    // Fixed world-space trocar points (triangulated geometry).
-    cameraTrocarWorldRef.current.copy(cameraTrocar);
-    leftTrocarWorldRef.current.copy(leftTrocar);
-    rightTrocarWorldRef.current.copy(rightTrocar);
 
     // Apply once so scene initializes with intended framing before first interactive update.
     applyConstrainedCameraPose({
@@ -303,7 +305,8 @@ export function PegTransferScene({
       leftTrocarWorldRef.current,
       rightTrocarWorldRef.current,
       cameraBasisQuatWorldFixedRef.current,
-      pegTransferBoardCenterWorld
+      pegTransferBoardCenterWorld,
+      PEG_TRANSFER_DEFAULT_RCM_LIMITS
     );
 
     rigCalibratedRef.current = true;
@@ -322,7 +325,8 @@ export function PegTransferScene({
         leftTrocarWorldRef.current,
         rightTrocarWorldRef.current,
         cameraBasisQuatWorldFixedRef.current,
-        pegTransferBoardCenterWorld
+        pegTransferBoardCenterWorld,
+        PEG_TRANSFER_DEFAULT_RCM_LIMITS
       );
       updateRcmKinematics({
         controller,
@@ -333,6 +337,7 @@ export function PegTransferScene({
         cameraBasisQuatWorldFixed: cameraBasisQuatWorldFixedRef.current,
         boardCenterWorld: pegTransferBoardCenterWorld,
         useTipSpaceMapping: pegTransferReferenceValues.worldRig.useTipSpaceMapping,
+        motionLimits: PEG_TRANSFER_DEFAULT_RCM_LIMITS,
       });
       pendingCalibrateRef.current = false;
       onDeviceCalibrationApplied?.();
@@ -372,10 +377,12 @@ export function PegTransferScene({
         cameraRotTargetRef: cameraRotTargetRef.current,
         cameraRotSeedRef: cameraRotSeedRef.current,
         cameraTransTargetRef: cameraTransTargetRef.current,
+        fovRef,
         prevPosRef: prevPosRef.current,
         wasCameraModeActiveRef,
         leftRaw,
         rightRaw,
+        cameraModeLimits: PEG_TRANSFER_DEFAULT_CAMERA_MODE_LIMITS,
       });
       if (!cameraModeActive) {
         cameraRotTargetRef.current.x = cameraRotRef.current.x;
@@ -408,6 +415,7 @@ export function PegTransferScene({
       cameraBasisQuatWorldFixed: cameraBasisQuatWorldFixedRef.current,
       boardCenterWorld: pegTransferBoardCenterWorld,
       useTipSpaceMapping: pegTransferReferenceValues.worldRig.useTipSpaceMapping,
+      motionLimits: PEG_TRANSFER_DEFAULT_RCM_LIMITS,
     });
   });
 

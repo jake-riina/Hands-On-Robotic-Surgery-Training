@@ -3,14 +3,40 @@ import { useNavigate } from 'react-router-dom';
 import { Canvas, useLoader, useFrame, useThree } from '@react-three/fiber';
 import { TextureLoader } from 'three';
 import * as THREE from 'three';
-import organsImage from '../contexts/Organs.png';
-import whiteboardImage from '../contexts/Whteboard.png';
-import {
-  CameraSpaceViewportControllers,
-  type ViewportInstrumentPosePair,
-} from '../components/SurgicalViewportControllers';
-import { makeFulcrumBehindCamera, setPerspectiveCameraFromFulcrum } from '../utils/fulcrumCamera';
-import { BRIDGE_WS_URL, type TouchStateMessage } from '../types/geomagicBridge';
+import organsImage from '../../contexts/Organs.png';
+import whiteboardImage from '../../contexts/Whteboard.png';
+import { useGeomagicLatestRef, type LatestByArmRef } from '../../hooks/useGeomagicLatestRef';
+import { canCalibrateDevices } from '../../pegTransfer/pegTransferDeviceCalibration';
+import { CAMERA_FOV_MAX } from '../../pegTransfer/pegTransferCameraRig';
+import { pegTransferReferenceValues } from '../../pegTransfer/pegTransferReferenceValues';
+import { CameraControlInstruments } from './CameraControlInstruments';
+import { CameraControlRig } from './CameraControlRig';
+
+const ENDOSCOPE = pegTransferReferenceValues.lightingDefaults.endoscopePointLight;
+
+function OrEndoscopeHeadlamp() {
+  const { camera } = useThree();
+  const lightRef = useRef<THREE.PointLight>(null);
+  const tmpForward = useMemo(() => new THREE.Vector3(), []);
+
+  useFrame(() => {
+    const light = lightRef.current;
+    if (!light) return;
+    camera.getWorldDirection(tmpForward);
+    light.position.copy(camera.position).addScaledVector(tmpForward, ENDOSCOPE.forwardOffsetM);
+    light.updateMatrixWorld();
+  });
+
+  return (
+    <pointLight
+      ref={lightRef}
+      intensity={ENDOSCOPE.intensity}
+      distance={ENDOSCOPE.distance}
+      decay={ENDOSCOPE.decay}
+      color={ENDOSCOPE.colorHex}
+    />
+  );
+}
 
 function createSyringesTexture() {
   const size = 256;
@@ -94,34 +120,6 @@ function createGloveTexture() {
   const tex = new THREE.CanvasTexture(canvas);
   tex.needsUpdate = true;
   return tex;
-}
-
-/** Same initial pose as the old fixed camera; fulcrum sits behind along the initial view (trocar / RCM). */
-const CC_CAM_INITIAL_POS = new THREE.Vector3(0, 0.5, 0);
-const CC_CAM_ARM_LENGTH = 0.92;
-const CC_CAM_INIT_PITCH = -0.28;
-const CC_CAM_INIT_YAW = 0;
-const CAMERA_FULCRUM = makeFulcrumBehindCamera(
-  CC_CAM_INITIAL_POS,
-  CC_CAM_INIT_PITCH,
-  CC_CAM_INIT_YAW,
-  CC_CAM_ARM_LENGTH
-);
-
-function CameraMount({
-  rotRef,
-  fovRef,
-}: {
-  rotRef: React.MutableRefObject<{ x: number; y: number }>;
-  fovRef: React.MutableRefObject<number>;
-}) {
-  useFrame(({ camera }) => {
-    const persp = camera as THREE.PerspectiveCamera;
-    setPerspectiveCameraFromFulcrum(persp, CAMERA_FULCRUM, CC_CAM_ARM_LENGTH, rotRef.current.x, rotRef.current.y);
-    persp.fov = fovRef.current;
-    persp.updateProjectionMatrix();
-  });
-  return null;
 }
 
 /** Crosshair / capture: bar only fills when orb is centered AND size matches (not too zoomed in = orb bigger than crosshair, not too zoomed out = orb too small) */
@@ -343,9 +341,13 @@ function OrbHintUpdater({
 
 interface CameraControlSceneProps {
   showRedOrb?: boolean;
-  sceneRotRef?: React.MutableRefObject<{ x: number; y: number }>;
+  geomagicLatestRef: LatestByArmRef;
   fovRef?: React.MutableRefObject<number>;
-  instrumentPoseRef: React.MutableRefObject<ViewportInstrumentPosePair>;
+  simulationEnabled: boolean;
+  pendingCalibrateRef: React.MutableRefObject<boolean>;
+  onDeviceCalibrationApplied?: () => void;
+  toolMotionEpoch: number;
+  onCameraModeActiveChange?: (active: boolean) => void;
   orbPosition?: [number, number, number];
   onOrbProjection?: (data: { progress: number }) => void;
   onCapture?: () => void;
@@ -354,9 +356,13 @@ interface CameraControlSceneProps {
 
 function CameraControlScene({
   showRedOrb = false,
-  sceneRotRef,
+  geomagicLatestRef,
   fovRef,
-  instrumentPoseRef,
+  simulationEnabled,
+  pendingCalibrateRef,
+  onDeviceCalibrationApplied,
+  toolMotionEpoch,
+  onCameraModeActiveChange,
   orbPosition = [1.4, 0.3, 4.05],
   onOrbProjection = () => {},
   onCapture = () => {},
@@ -367,14 +373,24 @@ function CameraControlScene({
   const syringesTexture = useMemo(() => createSyringesTexture(), []);
   const gloveTexture = useMemo(() => createGloveTexture(), []);
 
-  const defaultRotRef = useRef({ x: -0.28, y: 0 });
-  const defaultFovRef = useRef(FOV_MAX);
-  const rotRef = sceneRotRef ?? defaultRotRef;
+  const defaultFovRef = useRef(CAMERA_FOV_MAX);
   const fov = fovRef ?? defaultFovRef;
 
   return (
     <>
-      <CameraMount rotRef={rotRef} fovRef={fov} />
+      <OrEndoscopeHeadlamp />
+      <CameraControlRig
+        geomagicLatestRef={geomagicLatestRef}
+        fovRef={fov}
+        onCameraModeActiveChange={onCameraModeActiveChange}
+      />
+      <CameraControlInstruments
+        geomagicLatestRef={geomagicLatestRef}
+        simulationEnabled={simulationEnabled}
+        pendingCalibrateRef={pendingCalibrateRef}
+        onDeviceCalibrationApplied={onDeviceCalibrationApplied}
+        toolMotionEpoch={toolMotionEpoch}
+      />
       {showRedOrb && (
         <ProjectOrb
           orbPosition={orbPosition}
@@ -390,8 +406,6 @@ function CameraControlScene({
       <directionalLight position={[0, 8, 0]} intensity={1.5} />
       <directionalLight position={[0, 6, 3]} intensity={0.8} />
       <directionalLight position={[3, 5, 2]} intensity={0.3} />
-      {/* Foreground instruments: camera-fixed viewport framing (same placement intent as prior SVG overlay) */}
-      <CameraSpaceViewportControllers poseRef={instrumentPoseRef} />
 
       {/* Floor */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.5, 0]}>
@@ -1899,48 +1913,6 @@ function CameraControlScene({
   );
 }
 
-const FOV_MIN = 12;
-const FOV_MAX = 50;
-const ROT_X_MAX = Math.PI / 2 - 0.15;
-const CAMERA_YAW_SENSITIVITY = 0.013;
-const CAMERA_PITCH_SENSITIVITY = 0.013;
-const CAMERA_ZOOM_SENSITIVITY = 0.08;
-const CAMERA_DEADZONE_MM = 0.4;
-
-type ArmSide = 'left' | 'right';
-
-/** Camera pivots about a fixed fulcrum (trocar); arm length fixed; zoom = FOV. */
-
-const MM_TO_VIEW_X = 0.004;
-const MM_TO_VIEW_Y = 0.004;
-const MM_TO_VIEW_Z = 0.0034;
-const INSTRUMENT_GIMBAL_GAIN = 1.1;
-const MAX_VIEW_OFFSET_M = 0.07;
-const MAX_WRIST_ROT_RAD = 0.5;
-
-function createDefaultInstrumentPosePair(): ViewportInstrumentPosePair {
-  const zero = (): ViewportInstrumentPosePair['left'] => ({
-    offset: [0, 0, 0],
-    pitch: 0,
-    yaw: 0,
-    roll: 0,
-  });
-  return { left: zero(), right: zero() };
-}
-
-function clampInstrumentOffsetComponent(value: number, maxAbs: number): number {
-  return Math.max(-maxAbs, Math.min(maxAbs, value));
-}
-
-/** Left viewport arm uses right device Z for depth mapping (third axis). */
-function zSourceForViewportArm(arm: ArmSide, raw: TouchStateMessage, latest: Record<ArmSide, TouchStateMessage | null>): number {
-  if (arm === 'left') {
-    const rz = latest.right?.position?.z;
-    if (rz !== undefined) return rz;
-  }
-  return raw.position!.z;
-}
-
 function pickNewOrbPosition(current: [number, number, number]): [number, number, number] {
   const others = ORB_SPAWN_POSITIONS_VALID.filter(
     (p) => p[0] !== current[0] || p[1] !== current[1] || p[2] !== current[2]
@@ -1955,9 +1927,7 @@ const CameraControl = () => {
   const [showRedOrb, setShowRedOrb] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(60);
   const [timerActive, setTimerActive] = useState(false);
-  /** Start facing the back wall (wall cabinets): horizontal toward -Z with slight tilt down at cabinet height. Refs avoid re-renders on every drag/scroll. */
-  const sceneRotRef = useRef({ x: -0.28, y: 0 });
-  const fovRef = useRef(FOV_MAX);
+  const fovRef = useRef(CAMERA_FOV_MAX);
   const [orbPosition, setOrbPosition] = useState<[number, number, number]>(
     ORB_SPAWN_POSITIONS_VALID[0] ?? ORB_SPAWN_POSITIONS_FRONT[0]
   );
@@ -1973,28 +1943,27 @@ const CameraControl = () => {
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const shellRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [cameraModeActive, setCameraModeActive] = useState(false);
+  const [devicesCalibrated, setDevicesCalibrated] = useState(false);
+  const [toolMotionEpoch, setToolMotionEpoch] = useState(0);
+  const [inkwellReady, setInkwellReady] = useState(false);
+  const pendingCalibrateRef = useRef(false);
   const [orbHintState, setOrbHintState] = useState<{
     hint: { x: number; y: number; angle: number } | null;
     canvasW: number;
     canvasH: number;
   }>({ hint: null, canvasW: 1, canvasH: 1 });
-  const latestRawRef = useRef<Record<ArmSide, TouchStateMessage | null>>({ left: null, right: null });
-  const previousPosRef = useRef<Record<ArmSide, [number, number, number] | null>>({ left: null, right: null });
-  const previousCameraModeRef = useRef(false);
-  const instrumentPoseRef = useRef<ViewportInstrumentPosePair>(createDefaultInstrumentPosePair());
-  const neutralMmInstrumentRef = useRef<Record<ArmSide, [number, number, number] | null>>({
-    left: null,
-    right: null,
-  });
-  const neutralGimbalInstrumentRef = useRef<Record<ArmSide, [number, number, number] | null>>({
-    left: null,
-    right: null,
-  });
-  const clutchInstrumentLatchRef = useRef<Record<ArmSide, ViewportInstrumentPosePair['left'] | null>>({
-    left: null,
-    right: null,
-  });
-  const previousInstrumentButton2Ref = useRef<Record<ArmSide, boolean>>({ left: false, right: false });
+  const geomagicLatestRef = useGeomagicLatestRef();
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setInkwellReady(canCalibrateDevices(geomagicLatestRef.current));
+    }, 120);
+    return () => window.clearInterval(id);
+  }, [geomagicLatestRef]);
+
+  const onCameraModeActiveChange = useCallback((active: boolean) => {
+    setCameraModeActive(active);
+  }, []);
 
   const onOrbHint = useCallback(
     (hint: { x: number; y: number; angle: number } | null, canvasW?: number, canvasH?: number) => {
@@ -2057,209 +2026,12 @@ const CameraControl = () => {
     return () => cancelAnimationFrame(id);
   }, [flyingOrb?.targetIndex, flyingOrb?.targetX]);
 
+  // Countdown starts after device calibration (same inkwell flow as Peg Transfer).
   useEffect(() => {
-    const ws = new WebSocket(BRIDGE_WS_URL);
-    ws.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(event.data) as TouchStateMessage;
-        if (msg.type !== 'state' || !msg.deviceId || !msg.position || !msg.buttons) return;
-        const side: ArmSide | null =
-          msg.deviceId === 'touch-1' ? 'left' : msg.deviceId === 'touch-2' ? 'right' : null;
-        if (!side) return;
-        latestRawRef.current[side] = msg;
-      } catch {
-        // ignore malformed bridge frames
-      }
-    };
-    return () => ws.close();
-  }, []);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const left = latestRawRef.current.left;
-      const right = latestRawRef.current.right;
-
-      (['left', 'right'] as ArmSide[]).forEach((arm) => {
-        const raw = latestRawRef.current[arm];
-        if (!raw?.position || !raw.buttons) return;
-        if (arm === 'left' && latestRawRef.current.right?.position === undefined) {
-          previousInstrumentButton2Ref.current[arm] = raw.buttons.button2;
-          return;
-        }
-
-        const gx = raw.gimbal?.x ?? 0;
-        const gy = raw.gimbal?.y ?? 0;
-        const gz = raw.gimbal?.z ?? 0;
-        const zEff = zSourceForViewportArm(arm, raw, latestRawRef.current);
-
-        if (!neutralMmInstrumentRef.current[arm]) {
-          neutralMmInstrumentRef.current[arm] = [
-            raw.position.x,
-            raw.position.y,
-            arm === 'left' ? zEff : raw.position.z,
-          ];
-          neutralGimbalInstrumentRef.current[arm] = [gx, gy, gz];
-        }
-
-        const b2 = raw.buttons.button2;
-        const prevB2 = previousInstrumentButton2Ref.current[arm];
-
-        if (b2) {
-          if (!prevB2) {
-            const cur = instrumentPoseRef.current[arm];
-            clutchInstrumentLatchRef.current[arm] = {
-              offset: [...cur.offset] as [number, number, number],
-              pitch: cur.pitch,
-              yaw: cur.yaw,
-              roll: cur.roll,
-            };
-          }
-          const latched = clutchInstrumentLatchRef.current[arm];
-          if (latched) {
-            const t = instrumentPoseRef.current[arm];
-            t.offset = [...latched.offset] as [number, number, number];
-            t.pitch = latched.pitch;
-            t.yaw = latched.yaw;
-            t.roll = latched.roll;
-          }
-        } else {
-          if (prevB2) {
-            const o = instrumentPoseRef.current[arm].offset;
-            const p = instrumentPoseRef.current[arm];
-            const rz = latestRawRef.current.right?.position?.z;
-            if (arm === 'left') {
-              neutralMmInstrumentRef.current[arm] = [
-                raw.position.x + o[0] / MM_TO_VIEW_X,
-                raw.position.y - o[1] / MM_TO_VIEW_Y,
-                (rz ?? zEff) - o[2] / MM_TO_VIEW_Z,
-              ];
-            } else {
-              neutralMmInstrumentRef.current[arm] = [
-                raw.position.x - o[0] / MM_TO_VIEW_X,
-                raw.position.y - o[1] / MM_TO_VIEW_Y,
-                raw.position.z - o[2] / MM_TO_VIEW_Z,
-              ];
-            }
-            neutralGimbalInstrumentRef.current[arm] = [
-              gx - p.roll / INSTRUMENT_GIMBAL_GAIN,
-              gy - p.pitch / INSTRUMENT_GIMBAL_GAIN,
-              gz - p.yaw / INSTRUMENT_GIMBAL_GAIN,
-            ];
-            clutchInstrumentLatchRef.current[arm] = null;
-          }
-
-          const n = neutralMmInstrumentRef.current[arm]!;
-          const ng = neutralGimbalInstrumentRef.current[arm]!;
-          const dx = raw.position.x - n[0];
-          const dy = raw.position.y - n[1];
-          const zForDelta = arm === 'left' ? zSourceForViewportArm(arm, raw, latestRawRef.current) : raw.position.z;
-          const dz = zForDelta - n[2];
-
-          let ox: number;
-          let oy: number;
-          let oz: number;
-          if (arm === 'left') {
-            ox = -dx * MM_TO_VIEW_X;
-            oy = dy * MM_TO_VIEW_Y;
-            oz = dz * MM_TO_VIEW_Z;
-          } else {
-            ox = dx * MM_TO_VIEW_X;
-            oy = dy * MM_TO_VIEW_Y;
-            oz = dz * MM_TO_VIEW_Z;
-          }
-
-          const t = instrumentPoseRef.current[arm];
-          t.offset = [
-            clampInstrumentOffsetComponent(ox, MAX_VIEW_OFFSET_M),
-            clampInstrumentOffsetComponent(oy, MAX_VIEW_OFFSET_M),
-            clampInstrumentOffsetComponent(oz, MAX_VIEW_OFFSET_M),
-          ];
-
-          let roll = (gx - ng[0]) * INSTRUMENT_GIMBAL_GAIN;
-          let pitch = (gy - ng[1]) * INSTRUMENT_GIMBAL_GAIN;
-          let yaw = (gz - ng[2]) * INSTRUMENT_GIMBAL_GAIN;
-          roll = Math.max(-MAX_WRIST_ROT_RAD, Math.min(MAX_WRIST_ROT_RAD, roll));
-          pitch = Math.max(-MAX_WRIST_ROT_RAD, Math.min(MAX_WRIST_ROT_RAD, pitch));
-          yaw = Math.max(-MAX_WRIST_ROT_RAD, Math.min(MAX_WRIST_ROT_RAD, yaw));
-          t.roll = roll;
-          t.pitch = pitch;
-          t.yaw = yaw;
-        }
-
-        previousInstrumentButton2Ref.current[arm] = b2;
-      });
-
-      const bothButton1 =
-        (left?.buttons?.button1 ?? false) && (right?.buttons?.button1 ?? false);
-      setCameraModeActive(bothButton1);
-
-      const enteredCameraMode = bothButton1 && !previousCameraModeRef.current;
-      previousCameraModeRef.current = bothButton1;
-
-      (['left', 'right'] as ArmSide[]).forEach((arm) => {
-        const raw = latestRawRef.current[arm];
-        if (!raw?.position) return;
-        if (enteredCameraMode || !bothButton1 || raw.buttons?.button2) {
-          previousPosRef.current[arm] = [raw.position.x, raw.position.y, raw.position.z];
-        }
-      });
-
-      if (!bothButton1) return;
-
-      let contributorCount = 0;
-      let dxSum = 0;
-      let dySum = 0;
-      let dzSum = 0;
-
-      (['left', 'right'] as ArmSide[]).forEach((arm) => {
-        const raw = latestRawRef.current[arm];
-        if (!raw?.position || !raw.buttons) return;
-        if (raw.buttons.button2) return;
-        const prev = previousPosRef.current[arm];
-        if (!prev) return;
-
-        const dx = raw.position.x - prev[0];
-        const dy = raw.position.y - prev[1];
-        const dz = raw.position.z - prev[2];
-        const mag = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        if (mag < CAMERA_DEADZONE_MM) {
-          previousPosRef.current[arm] = [raw.position.x, raw.position.y, raw.position.z];
-          return;
-        }
-
-        dxSum += dx;
-        dySum += dy;
-        dzSum += dz;
-        contributorCount += 1;
-        previousPosRef.current[arm] = [raw.position.x, raw.position.y, raw.position.z];
-      });
-
-      if (contributorCount === 0) return;
-
-      const avgDx = dxSum / contributorCount;
-      const avgDy = dySum / contributorCount;
-      const avgDz = dzSum / contributorCount;
-
-      // Inverted camera controls on all axes.
-      sceneRotRef.current.y -= avgDx * CAMERA_YAW_SENSITIVITY;
-      sceneRotRef.current.x = Math.max(
-        -ROT_X_MAX,
-        Math.min(ROT_X_MAX, sceneRotRef.current.x + avgDy * CAMERA_PITCH_SENSITIVITY)
-      );
-      fovRef.current = Math.max(
-        FOV_MIN,
-        Math.min(FOV_MAX, fovRef.current + avgDz * CAMERA_ZOOM_SENSITIVITY)
-      );
-    }, 20);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  // Start countdown shortly after mount (avoids Strict Mode double-mount reset)
-  useEffect(() => {
+    if (!devicesCalibrated) return;
     const startId = setTimeout(() => setCountdown(5), 100);
     return () => clearTimeout(startId);
-  }, []);
+  }, [devicesCalibrated]);
 
   useEffect(() => {
     if (countdown === null) return;
@@ -2310,6 +2082,38 @@ const CameraControl = () => {
         boxSizing: 'border-box',
       }}
     >
+      {!devicesCalibrated && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 50,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column',
+            gap: 24,
+            padding: 24,
+            background: 'rgba(10, 12, 18, 0.82)',
+            pointerEvents: 'auto',
+          }}
+        >
+          <p className="text-center text-lg leading-relaxed max-w-xl" style={{ color: '#e2e8f0', margin: 0 }}>
+            Place both styluses in the inkwell, then calibrate to enable instruments and start the exercise.
+          </p>
+          <button
+            type="button"
+            disabled={!inkwellReady}
+            onClick={() => {
+              pendingCalibrateRef.current = true;
+            }}
+            className="rounded-xl font-semibold text-2xl transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45 px-12 py-4"
+            style={{ backgroundColor: '#1DA5FF', color: '#ffffff' }}
+          >
+            Calibrate devices
+          </button>
+        </div>
+      )}
       <header
         className="flex items-center justify-between px-3 py-1.5 flex-shrink-0"
         style={{
@@ -2338,7 +2142,7 @@ const CameraControl = () => {
         className="flex-1 rounded-lg overflow-hidden min-h-0 relative"
         style={{ width: '100%', backgroundColor: '#1E2733' }}
       >
-        {/* Canvas: camera mounted on table (position fixed). Camera input comes from bridge data in camera mode. */}
+        {/* Canvas: endoscope rig + peg-style world instruments (RCM). */}
         <div
           ref={canvasContainerRef}
           style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0, cursor: 'default' }}
@@ -2349,9 +2153,16 @@ const CameraControl = () => {
             <Suspense fallback={null}>
               <CameraControlScene
                 showRedOrb={showRedOrb}
-                sceneRotRef={sceneRotRef}
+                geomagicLatestRef={geomagicLatestRef}
                 fovRef={fovRef}
-                instrumentPoseRef={instrumentPoseRef}
+                simulationEnabled={devicesCalibrated}
+                pendingCalibrateRef={pendingCalibrateRef}
+                toolMotionEpoch={toolMotionEpoch}
+                onCameraModeActiveChange={onCameraModeActiveChange}
+                onDeviceCalibrationApplied={() => {
+                  setDevicesCalibrated(true);
+                  setToolMotionEpoch((e) => e + 1);
+                }}
                 orbPosition={orbPosition}
                 onOrbProjection={onOrbProjection}
                 onCapture={onCapture}
