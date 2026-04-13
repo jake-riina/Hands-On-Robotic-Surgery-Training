@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
+import { module1PressureBarGradient, psiToBarPercent } from '../lib/module1PressureGauge';
 import { supabase } from '../lib/supabaseClient';
 import ProfileDropdown from '../components/ProfileDropdown';
 import analyticsNavStyles from './Module2Analytics.module.css';
@@ -269,17 +270,17 @@ const Module1Instructions = () => {
                   <div
                     className="w-full h-[36px] rounded-[14px] shadow-lg mx-auto"
                     style={{
-                      background: "linear-gradient(90deg, #ef4444 10%, #f97316 28%, #22c55e 50%, #f97316 72%, #ef4444 90%)",
+                      background: module1PressureBarGradient(),
                       border: "1.5px solid #e2e8f0",
                       boxShadow: "0 4px 24px 2px rgba(0,0,0,0.04)"
                     }}
                   />
                   
-                  {/* Triangle arrow positioned in the green zone (around 50%) */}
+                  {/* Triangle at mid-target band (17.5 PSI on 0–35 scale, same as live exercise) */}
                   <div 
                     className="absolute top-full"
                     style={{ 
-                      left: '50%',
+                      left: `${psiToBarPercent(17.5)}%`,
                       transform: 'translateX(-50%)',
                       marginTop: '12px'
                     }}

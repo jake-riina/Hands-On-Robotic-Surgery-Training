@@ -1,6 +1,13 @@
 import AppLayout from '../components/AppLayout';
 import { useEffect, useRef, useState } from 'react';
 import { useBLE } from '../contexts/BLEContext';
+import {
+  MODULE1_EXERCISE_DURATION_SECONDS,
+  MODULE1_GAUGE_PSI_MAX,
+  MODULE1_TARGET_PSI_MAX,
+  MODULE1_TARGET_PSI_MIN,
+  module1ScorePercent,
+} from '../lib/module1PressureGauge';
 
 const ForceSensorGraph = () => {
   const width = 400;
@@ -178,9 +185,8 @@ const ForceSensorGraph = () => {
   );
 };
 
-const TARGET_MIN = 15;
-const TARGET_MAX = 20;
-const TOTAL_DURATION_SECONDS = 20;
+const TARGET_MIN = MODULE1_TARGET_PSI_MIN;
+const TARGET_MAX = MODULE1_TARGET_PSI_MAX;
 const PASSING_SCORE = 80;
 
 const Module1Exercise2Start = () => {
@@ -188,20 +194,24 @@ const Module1Exercise2Start = () => {
 
   const [exerciseStarted, setExerciseStarted] = useState(false);
   const [isExerciseActive, setIsExerciseActive] = useState(false);
-  const [timeRemaining, setTimeRemaining] = useState(TOTAL_DURATION_SECONDS);
+  const [timeRemaining, setTimeRemaining] = useState(MODULE1_EXERCISE_DURATION_SECONDS);
   const [score, setScore] = useState<number | null>(null);
   const [hasPassed, setHasPassed] = useState<boolean | null>(null);
 
   // Spacebar testing / cheat pressure (same pattern as Exercise 1)
   const [cheatPressure, setCheatPressure] = useState<number | null>(null);
   const effectivePressure = cheatPressure !== null ? cheatPressure : pressure;
+  const effectivePressureRef = useRef(effectivePressure);
+  useEffect(() => {
+    effectivePressureRef.current = effectivePressure;
+  }, [effectivePressure]);
 
   const cheatPressureRef = useRef<number>(0);
   const rampUpIdRef = useRef<number | null>(null);
   const rampDownIdRef = useRef<number | null>(null);
   const RAMP_DURATION_MS = 2000;
   const RAMP_INTERVAL_MS = 50;
-  const CHEAT_MAX_PSI = 35;
+  const CHEAT_MAX_PSI = MODULE1_GAUGE_PSI_MAX;
 
   // Keep ref in sync with cheat pressure
   useEffect(() => {
@@ -299,7 +309,7 @@ const Module1Exercise2Start = () => {
     }
   }, [effectivePressure, exerciseStarted]);
 
-  // Track time spent in the target pressure range (15–20 PSI)
+  // Track time spent in the target pressure range (15–20 PSI); ref avoids resetting the interval every BLE sample
   useEffect(() => {
     if (!isExerciseActive || !exerciseStarted) {
       return;
@@ -309,8 +319,9 @@ const Module1Exercise2Start = () => {
       const now = Date.now();
       const last = lastCheckTimeRef.current ?? now;
       const delta = now - last;
+      const p = effectivePressureRef.current;
 
-      if (effectivePressure >= TARGET_MIN && effectivePressure <= TARGET_MAX) {
+      if (p >= TARGET_MIN && p <= TARGET_MAX) {
         timeOnTargetRef.current += delta;
       }
 
@@ -323,7 +334,7 @@ const Module1Exercise2Start = () => {
         thresholdIntervalRef.current = null;
       }
     };
-  }, [isExerciseActive, exerciseStarted, effectivePressure]);
+  }, [isExerciseActive, exerciseStarted]);
 
   // 20-second countdown timer
   useEffect(() => {
@@ -359,23 +370,19 @@ const Module1Exercise2Start = () => {
       return;
     }
 
-    const durationMs = Date.now() - startTimeRef.current;
-    const timeOnTargetMs = timeOnTargetRef.current;
+    const timeInGreenMs = timeOnTargetRef.current;
+    const calculatedScore = module1ScorePercent(timeInGreenMs);
 
-    // Score is percentage of time spent in 15–20 PSI over the whole exercise
-    const rawScore = durationMs > 0 ? (timeOnTargetMs / durationMs) * 100 : 0;
-    const clampedScore = Math.max(0, Math.min(100, rawScore));
-
-    setScore(clampedScore);
-    setHasPassed(clampedScore >= PASSING_SCORE);
+    setScore(calculatedScore);
+    setHasPassed(calculatedScore >= PASSING_SCORE);
 
     console.log(
-      '[Exercise 2] duration(ms):',
-      durationMs,
-      'timeOnTarget(ms):',
-      timeOnTargetMs,
+      '[Exercise 2] time in green (ms):',
+      timeInGreenMs,
+      'total exercise (ms):',
+      MODULE1_EXERCISE_DURATION_SECONDS * 1000,
       'score(%):',
-      clampedScore.toFixed(1),
+      calculatedScore.toFixed(1),
     );
   }, [exerciseStarted, timeRemaining]);
 
@@ -420,7 +427,7 @@ const Module1Exercise2Start = () => {
             </p>
 
             <p className="text-center text-sm mb-2" style={{ color: '#D1D5DB' }}>
-              Target range: {TARGET_MIN}–{TARGET_MAX} PSI over {TOTAL_DURATION_SECONDS} seconds.
+              Target range: {TARGET_MIN}–{TARGET_MAX} PSI over {MODULE1_EXERCISE_DURATION_SECONDS} seconds.
               Passing score: {PASSING_SCORE}%.
             </p>
 
