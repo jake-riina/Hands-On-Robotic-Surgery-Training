@@ -1,11 +1,25 @@
 import { Suspense, useMemo, useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import type { MutableRefObject } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Canvas, useLoader, useFrame, useThree } from '@react-three/fiber';
 import { TextureLoader } from 'three';
 import * as THREE from 'three';
 import organsImage from '../../contexts/Organs.png';
 import whiteboardImage from '../../contexts/Whteboard.png';
-import { useGeomagicLatestRef, type LatestByArmRef } from '../../hooks/useGeomagicLatestRef';
+import {
+  useGeomagicLatestRef,
+  type GeomagicBridgeEvents,
+  type LatestByArmRef,
+} from '../../hooks/useGeomagicLatestRef';
+import {
+  type CameraTelemetrySample,
+  type CameraOrbCaptureMetrics,
+  insertCameraTelemetryBatch,
+  insertCameraOrbRow,
+  markCameraOrbCollected,
+  invokeModule2AbandonSession,
+  invokeModule2CompleteSession,
+} from '../../lib/module2SessionService';
 import { canCalibrateDevices } from '../../pegTransfer/pegTransferDeviceCalibration';
 import { CAMERA_FOV_MAX } from '../../pegTransfer/pegTransferCameraRig';
 import { pegTransferReferenceValues } from '../../pegTransfer/pegTransferReferenceValues';
@@ -36,6 +50,36 @@ function OrEndoscopeHeadlamp() {
       color={ENDOSCOPE.colorHex}
     />
   );
+}
+
+const MODULE_2_ID = 2;
+
+function Module2CameraTelemetrySampler({
+  sessionId,
+  recording,
+  telemetryApiRef,
+}: {
+  sessionId: string | null;
+  recording: boolean;
+  telemetryApiRef: MutableRefObject<{ push: (s: CameraTelemetrySample) => void }>;
+}) {
+  const { camera } = useThree();
+  const vec = useMemo(() => new THREE.Vector3(), []);
+  const accum = useRef(0);
+  useFrame((_, delta) => {
+    if (!sessionId || !recording) return;
+    accum.current += delta;
+    if (accum.current < 0.1) return;
+    accum.current = 0;
+    camera.getWorldPosition(vec);
+    telemetryApiRef.current.push({
+      x: vec.x,
+      y: vec.y,
+      z: vec.z,
+      recorded_at: new Date().toISOString(),
+    });
+  });
+  return null;
 }
 
 function createSyringesTexture() {
@@ -142,13 +186,15 @@ function ProjectOrb({
   orbRadius: number;
   crosshairRadiusPx: number;
   onOrbProjection: (data: { progress: number }) => void;
-  onCapture: () => void;
+  onCapture: (metrics: CameraOrbCaptureMetrics) => void;
 }) {
   const { camera, size } = useThree();
   const progressRef = useRef(0);
   const lastReportedRef = useRef(-1);
   const center = useRef(new THREE.Vector3(...orbPosition)).current;
   const edge = useRef(new THREE.Vector3()).current;
+  const camWorldPos = useRef(new THREE.Vector3());
+  const camWorldDir = useRef(new THREE.Vector3());
 
   useFrame((_, delta) => {
     center.set(orbPosition[0], orbPosition[1], orbPosition[2]);
@@ -180,7 +226,18 @@ function ProjectOrb({
     if (inCenter && rightSize) {
       progressRef.current = Math.min(1, progressRef.current + delta / CAPTURE_DURATION);
       if (progressRef.current >= 1) {
-        onCapture();
+        camera.getWorldPosition(camWorldPos.current);
+        camera.getWorldDirection(camWorldDir.current);
+        onCapture({
+          capture_cam_x: camWorldPos.current.x,
+          capture_cam_y: camWorldPos.current.y,
+          capture_cam_z: camWorldPos.current.z,
+          capture_forward_x: camWorldDir.current.x,
+          capture_forward_y: camWorldDir.current.y,
+          capture_forward_z: camWorldDir.current.z,
+          capture_screen_dist_px: dist,
+          capture_screen_radius_px: screenRadius,
+        });
         progressRef.current = 0;
       }
     } else {
@@ -350,8 +407,11 @@ interface CameraControlSceneProps {
   onCameraModeActiveChange?: (active: boolean) => void;
   orbPosition?: [number, number, number];
   onOrbProjection?: (data: { progress: number }) => void;
-  onCapture?: () => void;
+  onCapture?: (metrics: CameraOrbCaptureMetrics) => void;
   onOrbHint?: (hint: { x: number; y: number; angle: number } | null, canvasW?: number, canvasH?: number) => void;
+  module2SessionId?: string | null;
+  module2TelemetryRecording?: boolean;
+  module2TelemetryApiRef?: MutableRefObject<{ push: (s: CameraTelemetrySample) => void }>;
 }
 
 function CameraControlScene({
@@ -365,8 +425,11 @@ function CameraControlScene({
   onCameraModeActiveChange,
   orbPosition = [1.4, 0.3, 4.05],
   onOrbProjection = () => {},
-  onCapture = () => {},
+  onCapture = (_metrics: CameraOrbCaptureMetrics) => {},
   onOrbHint = () => {},
+  module2SessionId = null,
+  module2TelemetryRecording = false,
+  module2TelemetryApiRef,
 }: CameraControlSceneProps) {
   const organTexture = useLoader(TextureLoader, organsImage);
   const whiteboardTexture = useLoader(TextureLoader, whiteboardImage);
@@ -379,6 +442,13 @@ function CameraControlScene({
   return (
     <>
       <OrEndoscopeHeadlamp />
+      {module2TelemetryApiRef != null && (
+        <Module2CameraTelemetrySampler
+          sessionId={module2SessionId}
+          recording={module2TelemetryRecording}
+          telemetryApiRef={module2TelemetryApiRef}
+        />
+      )}
       <CameraControlRig
         geomagicLatestRef={geomagicLatestRef}
         fovRef={fov}
@@ -1923,10 +1993,16 @@ function pickNewOrbPosition(current: [number, number, number]): [number, number,
 
 const CameraControl = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const sessionIdFromState = (location.state as { sessionId?: string } | null)?.sessionId ?? null;
+
   const [countdown, setCountdown] = useState<number | 'GO!' | null>(null);
   const [showRedOrb, setShowRedOrb] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(60);
   const [timerActive, setTimerActive] = useState(false);
+  const [sessionDbEnded, setSessionDbEnded] = useState(false);
+  const timerSecondsRef = useRef(timerSeconds);
+  timerSecondsRef.current = timerSeconds;
   const fovRef = useRef(CAMERA_FOV_MAX);
   const [orbPosition, setOrbPosition] = useState<[number, number, number]>(
     ORB_SPAWN_POSITIONS_VALID[0] ?? ORB_SPAWN_POSITIONS_FRONT[0]
@@ -1952,7 +2028,133 @@ const CameraControl = () => {
     canvasW: number;
     canvasH: number;
   }>({ hint: null, canvasW: 1, canvasH: 1 });
-  const geomagicLatestRef = useGeomagicLatestRef();
+
+  const bridgeEventsRef = useRef<GeomagicBridgeEvents>({ reconnectAfterClose: true });
+  /** After GO (timed orb phase); avoids false abandon on StrictMode remount / early WS close. */
+  const exerciseLiveForAbandonRef = useRef(false);
+  const exerciseEndedRef = useRef(false);
+  const abandonOnceRef = useRef(false);
+  const incompleteFlowStartedRef = useRef(false);
+  const sessionIdRef = useRef<string | null>(null);
+  const telemetryBufferRef = useRef<CameraTelemetrySample[]>([]);
+  const telemetrySaveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const activeOrbIdRef = useRef<string | null>(null);
+  const lastOrbSpawnKeyRef = useRef('');
+  const telemetryApiRef = useRef<{ push: (s: CameraTelemetrySample) => void }>({
+    push: () => {},
+  });
+  const handleAbandonSessionRef = useRef<() => Promise<void>>(async () => {});
+
+  useEffect(() => {
+    sessionIdRef.current = sessionIdFromState;
+  }, [sessionIdFromState]);
+
+  useEffect(() => {
+    exerciseLiveForAbandonRef.current = false;
+  }, [sessionIdFromState]);
+
+  useEffect(() => {
+    if (timerActive && showRedOrb) {
+      exerciseLiveForAbandonRef.current = true;
+    }
+  }, [timerActive, showRedOrb]);
+
+  useEffect(() => {
+    if (sessionIdFromState) return;
+    navigate('/module/2/instructions', { replace: true });
+  }, [sessionIdFromState, navigate]);
+
+  const flushTelemetryBuffer = useCallback(async () => {
+    const sid = sessionIdRef.current;
+    if (!sid) return;
+    const batch = [...telemetryBufferRef.current];
+    telemetryBufferRef.current = [];
+    await insertCameraTelemetryBatch(sid, MODULE_2_ID, batch);
+  }, []);
+
+  useEffect(() => {
+    telemetryApiRef.current.push = (sample) => {
+      if (sessionDbEnded || !sessionIdRef.current) return;
+      if (!timerActive || !showRedOrb) return;
+      telemetryBufferRef.current.push(sample);
+      if (telemetryBufferRef.current.length >= 10) {
+        const sid = sessionIdRef.current;
+        const toSave = [...telemetryBufferRef.current];
+        telemetryBufferRef.current = [];
+        void insertCameraTelemetryBatch(sid, MODULE_2_ID, toSave);
+      }
+    };
+  }, [timerActive, showRedOrb, sessionDbEnded]);
+
+  const handleAbandonSession = useCallback(async () => {
+    if (!sessionIdFromState) {
+      navigate('/modules');
+      return;
+    }
+    const sid = sessionIdRef.current;
+    if (!sid || abandonOnceRef.current) return;
+    abandonOnceRef.current = true;
+    exerciseEndedRef.current = true;
+    setSessionDbEnded(true);
+    if (telemetrySaveIntervalRef.current) {
+      clearInterval(telemetrySaveIntervalRef.current);
+      telemetrySaveIntervalRef.current = null;
+    }
+    await flushTelemetryBuffer();
+    await invokeModule2AbandonSession(sid);
+    navigate('/modules');
+  }, [navigate, flushTelemetryBuffer, sessionIdFromState]);
+
+  useEffect(() => {
+    handleAbandonSessionRef.current = handleAbandonSession;
+  }, [handleAbandonSession]);
+
+  if (sessionIdFromState) {
+    bridgeEventsRef.current.reconnectAfterClose = false;
+    bridgeEventsRef.current.onUnexpectedClose = () => {
+      if (exerciseEndedRef.current) return;
+      if (!exerciseLiveForAbandonRef.current) return;
+      void handleAbandonSessionRef.current();
+    };
+  } else {
+    bridgeEventsRef.current.reconnectAfterClose = true;
+    bridgeEventsRef.current.onUnexpectedClose = undefined;
+  }
+
+  const geomagicLatestRef = useGeomagicLatestRef(bridgeEventsRef);
+
+  useEffect(() => {
+    if (!sessionIdFromState) return;
+    telemetrySaveIntervalRef.current = setInterval(() => {
+      if (telemetryBufferRef.current.length > 0) {
+        void flushTelemetryBuffer();
+      }
+    }, 1000);
+    return () => {
+      if (telemetrySaveIntervalRef.current) {
+        clearInterval(telemetrySaveIntervalRef.current);
+        telemetrySaveIntervalRef.current = null;
+      }
+    };
+  }, [sessionIdFromState, flushTelemetryBuffer]);
+
+  useEffect(() => {
+    return () => {
+      if (telemetrySaveIntervalRef.current) {
+        clearInterval(telemetrySaveIntervalRef.current);
+      }
+      const sid = sessionIdRef.current;
+      const batch = [...telemetryBufferRef.current];
+      telemetryBufferRef.current = [];
+      if (sid && batch.length > 0) {
+        void insertCameraTelemetryBatch(sid, MODULE_2_ID, batch);
+      }
+      if (!exerciseEndedRef.current && sid && exerciseLiveForAbandonRef.current) {
+        exerciseEndedRef.current = true;
+        void invokeModule2AbandonSession(sid);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -1978,15 +2180,26 @@ const CameraControl = () => {
 
   useEffect(() => {
     if (orbsCollected !== 5) return;
-    const timeTakenSeconds = 60 - timerSeconds;
+    const timeTakenSeconds = 60 - timerSecondsRef.current;
     const delay = 600;
     const id = setTimeout(() => {
-      navigate('/module/2/complete', {
-        state: { orbsCollected: 5, totalOrbs: 5, timeTakenSeconds },
-      });
+      void (async () => {
+        const sid = sessionIdRef.current;
+        exerciseEndedRef.current = true;
+        setSessionDbEnded(true);
+        if (telemetrySaveIntervalRef.current) {
+          clearInterval(telemetrySaveIntervalRef.current);
+          telemetrySaveIntervalRef.current = null;
+        }
+        await flushTelemetryBuffer();
+        if (sid) await invokeModule2CompleteSession(sid);
+        navigate('/module/2/complete', {
+          state: { orbsCollected: 5, totalOrbs: 5, timeTakenSeconds },
+        });
+      })();
     }, delay);
     return () => clearTimeout(id);
-  }, [orbsCollected, timerSeconds, navigate]);
+  }, [orbsCollected, navigate, flushTelemetryBuffer]);
 
   useEffect(() => {
     if (!showRedOrb) setOrbHintState((prev) => ({ ...prev, hint: null }));
@@ -1995,13 +2208,37 @@ const CameraControl = () => {
   const onOrbProjection = useCallback((data: { progress: number }) => {
     setCaptureProgress(data.progress);
   }, []);
-  const onCapture = useCallback(() => {
+  const onCapture = useCallback(async (metrics: CameraOrbCaptureMetrics) => {
+    const orbId = activeOrbIdRef.current;
+    if (sessionIdFromState && orbId) {
+      await markCameraOrbCollected(orbId, metrics);
+      activeOrbIdRef.current = null;
+    }
     const targetIndex = orbsCollected;
     setFlyingOrb({ targetIndex });
     setOrbsCollected((c) => Math.min(5, c + 1));
     setOrbPosition((p) => pickNewOrbPosition(p));
     setCaptureProgress(0);
-  }, [orbsCollected]);
+  }, [orbsCollected, sessionIdFromState]);
+
+  useEffect(() => {
+    if (!sessionIdFromState || !timerActive || !showRedOrb) return;
+    const orbIndex = orbsCollected + 1;
+    if (orbIndex > 5) return;
+    const key = `${orbIndex}|${orbPosition.join(',')}`;
+    if (lastOrbSpawnKeyRef.current === key) return;
+    lastOrbSpawnKeyRef.current = key;
+    void (async () => {
+      const id = await insertCameraOrbRow({
+        sessionId: sessionIdFromState,
+        orbIndex,
+        x: orbPosition[0],
+        y: orbPosition[1],
+        z: orbPosition[2],
+      });
+      if (id) activeOrbIdRef.current = id;
+    })();
+  }, [sessionIdFromState, timerActive, showRedOrb, orbsCollected, orbPosition]);
 
   useEffect(() => {
     if (flyingOrb == null || flyingOrb.targetX != null) return;
@@ -2064,8 +2301,28 @@ const CameraControl = () => {
   // When timer hits zero and not all orbs collected, go to incomplete page
   useEffect(() => {
     if (!timerActive || timerSeconds !== 0 || orbsCollected >= 5) return;
-    navigate('/module/2/incomplete', { state: { orbsCollected, totalOrbs: 5 } });
-  }, [timerActive, timerSeconds, orbsCollected, navigate]);
+    if (incompleteFlowStartedRef.current) return;
+    incompleteFlowStartedRef.current = true;
+    exerciseEndedRef.current = true;
+    setSessionDbEnded(true);
+    if (telemetrySaveIntervalRef.current) {
+      clearInterval(telemetrySaveIntervalRef.current);
+      telemetrySaveIntervalRef.current = null;
+    }
+    const sid = sessionIdRef.current;
+    const orbsForResult = orbsCollected;
+    let cancelled = false;
+    void (async () => {
+      await flushTelemetryBuffer();
+      if (cancelled) return;
+      if (sid) await invokeModule2CompleteSession(sid);
+      if (cancelled) return;
+      navigate('/module/2/incomplete', { state: { orbsCollected: orbsForResult, totalOrbs: 5 } });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [timerActive, timerSeconds, orbsCollected, navigate, flushTelemetryBuffer]);
 
   const showCountdownOverlay = countdown !== null;
   const timerDisplay = timerActive
@@ -2124,7 +2381,7 @@ const CameraControl = () => {
       >
         <button
           type="button"
-          onClick={() => navigate('/modules')}
+          onClick={() => void handleAbandonSession()}
           className="flex items-center gap-2 hover:opacity-80 transition-opacity bg-transparent border-none cursor-pointer text-sm font-medium"
           style={{ color: '#ffffff' }}
         >
@@ -2167,6 +2424,11 @@ const CameraControl = () => {
                 onOrbProjection={onOrbProjection}
                 onCapture={onCapture}
                 onOrbHint={onOrbHint}
+                module2SessionId={sessionIdFromState}
+                module2TelemetryRecording={
+                  Boolean(sessionIdFromState && timerActive && showRedOrb && !sessionDbEnded)
+                }
+                module2TelemetryApiRef={telemetryApiRef}
               />
             </Suspense>
           </Canvas>

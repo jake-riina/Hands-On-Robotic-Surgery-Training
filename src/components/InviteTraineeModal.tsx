@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { inviteTrainee, inviteTrainer, type InvitationRole } from '../lib/invitationService';
+import { getCurrentUserProfile } from '../lib/userService';
 import { supabase } from '../lib/supabaseClient';
 
 interface InviteTraineeModalProps {
@@ -47,10 +48,19 @@ const InviteTraineeModal: React.FC<InviteTraineeModalProps> = ({
         return;
       }
 
-      // Invite user based on selected role
+      const inviterProfile = await getCurrentUserProfile();
+      const departmentId = inviterProfile?.department_id?.trim();
+      if (!departmentId) {
+        setError(
+          'Your account has no department assigned. Update your profile or contact an administrator before sending invites.'
+        );
+        setIsLoading(false);
+        return;
+      }
+
       const result = inviteRole === 'trainer'
-        ? await inviteTrainer(email, user.id)
-        : await inviteTrainee(email, user.id);
+        ? await inviteTrainer(email, departmentId)
+        : await inviteTrainee(email, departmentId);
       
       if (result.success) {
         setSuccess(true);

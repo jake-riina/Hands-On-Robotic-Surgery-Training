@@ -40,11 +40,6 @@ const AdminDashboard: React.FC = () => {
         return;
       }
 
-      if (profile.role === 'trainer') {
-        navigate('/admin/trainees');
-        return;
-      }
-
       // Set first name for greeting
       setFirstName(profile.first_name || '');
       setCurrentRole(profile.role || '');

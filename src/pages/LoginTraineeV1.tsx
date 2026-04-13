@@ -1,9 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
+import {
+  ADMIN_SIGNUP_DEPARTMENT_NAMES,
+  type AdminSignupDepartmentName,
+} from '../lib/adminDepartmentOptions';
+import {
+  finalizeAdminSignupWithRpc,
+  getViteProgramIdOrThrow,
+} from '../lib/adminSignupService';
 
 /* ---------------- TYPES ---------------- */
-type UserRole = 'trainee' | 'admin';
+type UserRole = 'trainee' | 'trainer' | 'admin';
 
 /* ---------------- LOGIN COMPONENT ---------------- */
 const images = [
@@ -23,7 +31,16 @@ const LoginTraineeV1: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [current, setCurrent] = useState(0);
   const [isSignUp, setIsSignUp] = useState(false);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [department, setDepartment] = useState<AdminSignupDepartmentName | ''>('');
   const [showSignOutPopup, setShowSignOutPopup] = useState(false);
+
+  const resetAdminSignupFields = () => {
+    setFirstName('');
+    setLastName('');
+    setDepartment('');
+  };
 
   /* ---------- Carousel auto-rotate ---------- */
   useEffect(() => {
@@ -64,7 +81,7 @@ const LoginTraineeV1: React.FC = () => {
         if (profile?.role === 'admin') {
           navigate('/admin/dashboard');
         } else if (profile?.role === 'trainer') {
-          navigate('/admin/trainees');
+          navigate('/admin/dashboard');
         } else {
           navigate('/dashboard');
         }
@@ -72,6 +89,13 @@ const LoginTraineeV1: React.FC = () => {
     };
     checkSession();
   }, [navigate]);
+
+  const formatAuthOrRpcError = (err: unknown): string => {
+    if (err && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string') {
+      return (err as { message: string }).message;
+    }
+    return 'Something went wrong. Please try again.';
+  };
 
   /* ---------- Sign-In Handler ---------- */
   const handleSignIn = async (e: React.FormEvent) => {
@@ -81,29 +105,77 @@ const LoginTraineeV1: React.FC = () => {
 
     try {
       if (isSignUp) {
-        // Sign up new user
+        if (role === 'admin') {
+          if (!department) {
+            setError('Please select a department.');
+            setIsLoading(false);
+            return;
+          }
+          if (!firstName.trim() || !lastName.trim()) {
+            setError('First name and last name are required.');
+            setIsLoading(false);
+            return;
+          }
+          try {
+            getViteProgramIdOrThrow();
+          } catch {
+            setError('Application is missing program configuration (VITE_PROGRAM_ID). Contact support.');
+            setIsLoading(false);
+            return;
+          }
+        }
+
         const { data, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
         });
         if (signUpError) throw signUpError;
-        if (data.user) {
-          // Create user profile with selected role
-          // Note: 'admin' role is selected when "Physician" button is clicked
+
+        const user = data.user;
+        if (!user?.id) {
+          throw new Error('Sign up did not return a user. Please try again.');
+        }
+
+        if (role === 'admin') {
+          if (!data.session) {
+            setError(
+              'Your account was created, but a browser session was not started (often due to email confirmation). ' +
+                'After you confirm your email and sign in, contact support if your profile is still incomplete.',
+            );
+            setIsLoading(false);
+            return;
+          }
+
+          const userEmail = user.email ?? email;
+          try {
+            await finalizeAdminSignupWithRpc({
+              userId: user.id,
+              email: userEmail,
+              firstName: firstName.trim(),
+              lastName: lastName.trim(),
+              departmentName: department as AdminSignupDepartmentName,
+            });
+          } catch (rpcErr) {
+            await supabase.auth.signOut();
+            setError(
+              `Account was created, but profile setup failed: ${formatAuthOrRpcError(rpcErr)}. ` +
+                'You have been signed out. If this persists after retrying, contact support.',
+            );
+            setIsLoading(false);
+            return;
+          }
+
+          navigate('/admin/dashboard');
+        } else {
           const { error: profileError } = await supabase
             .from('user_profiles')
             .upsert({
-              user_id: data.user.id,
-              email: data.user.email,
-              role: role, // role is 'admin' or 'trainee'
+              user_id: user.id,
+              email: user.email,
+              role: role,
             });
           if (profileError) throw profileError;
-          // Navigate based on role
-          if (role === 'admin') {
-            navigate('/admin/dashboard');
-          } else {
-            navigate('/dashboard');
-          }
+          navigate('/dashboard');
         }
       } else {
         // Sign in existing user
@@ -119,11 +191,32 @@ const LoginTraineeV1: React.FC = () => {
             .select('role')
             .eq('user_id', data.user.id)
             .single();
-          
+
+          if (profile?.role === 'trainer' && role !== 'trainer') {
+            await supabase.auth.signOut();
+            setRole('trainer');
+            setIsSignUp(false);
+            resetAdminSignupFields();
+            setError(
+              'Trainer accounts must sign in with the Trainer option. Trainer is now selected — enter your password and sign in again.',
+            );
+            return;
+          }
+
+          if (role === 'trainer') {
+            if (profile?.role !== 'trainer') {
+              await supabase.auth.signOut();
+              setError(
+                'This sign-in option is for trainer accounts only. Choose Trainee or Admin if you use a different account type.',
+              );
+              return;
+            }
+            navigate('/admin/dashboard');
+            return;
+          }
+
           if (profile?.role === 'admin') {
             navigate('/admin/dashboard');
-          } else if (profile?.role === 'trainer') {
-            navigate('/admin/trainees');
           } else {
             navigate('/dashboard');
           }
@@ -232,48 +325,80 @@ const LoginTraineeV1: React.FC = () => {
               }}
             >
               <button
+                type="button"
                 onClick={() => {
                   setRole('trainee');
-                  setIsSignUp(false); // Reset to sign in when switching
+                  setIsSignUp(false);
+                  resetAdminSignupFields();
                 }}
                 className="px-6 py-2 font-medium transition-all duration-200"
                 style={
                   role === 'trainee'
-                    ? { 
-                        backgroundColor: '#2563eb', 
+                    ? {
+                        backgroundColor: '#2563eb',
                         color: 'white',
                         borderTopLeftRadius: '9999px',
                         borderBottomLeftRadius: '9999px',
-                        fontSize: '16px'
+                        fontSize: '16px',
                       }
-                    : { 
-                        backgroundColor: '#ffffff', 
+                    : {
+                        backgroundColor: '#ffffff',
                         color: '#000000',
-                        fontSize: '16px'
+                        fontSize: '16px',
+                        borderTopLeftRadius: '9999px',
+                        borderBottomLeftRadius: '9999px',
                       }
                 }
               >
                 Trainee
               </button>
               <button
+                type="button"
+                onClick={() => {
+                  setRole('trainer');
+                  setIsSignUp(false);
+                  resetAdminSignupFields();
+                }}
+                className="px-6 py-2 font-medium transition-all duration-200"
+                style={
+                  role === 'trainer'
+                    ? {
+                        backgroundColor: '#2563eb',
+                        color: 'white',
+                        fontSize: '16px',
+                      }
+                    : {
+                        backgroundColor: '#ffffff',
+                        color: '#000000',
+                        fontSize: '16px',
+                      }
+                }
+              >
+                Trainer
+              </button>
+              <button
+                type="button"
                 onClick={() => {
                   setRole('admin');
-                  setIsSignUp(false); // Reset to sign in when switching
+                  setIsSignUp(false);
+                  resetAdminSignupFields();
                 }}
                 className="px-6 py-2 font-medium transition-all duration-200"
                 style={
                   role === 'admin'
-                    ? { 
-                        backgroundColor: '#2563eb', 
+                    ? {
+                        backgroundColor: '#2563eb',
                         color: 'white',
                         borderTopRightRadius: '9999px',
                         borderBottomRightRadius: '9999px',
-                        fontSize: '16px'
+                        fontSize: '16px',
                       }
-                    : { 
-                        backgroundColor: '#ffffff', 
+                    : {
+                        backgroundColor: '#ffffff',
                         color: '#000000',
-                        fontSize: '16px'
+                        fontSize: '16px',
+                        borderTopRightRadius: '9999px',
+                        borderBottomRightRadius: '9999px',
                       }
                 }
               >
@@ -290,17 +415,30 @@ const LoginTraineeV1: React.FC = () => {
               width: '25vw',
               minWidth: '400px',
               maxWidth: '500px',
-              height: '500px',
+              minHeight: '500px',
               borderRadius: '0.5rem',
               boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)'
             }}
           >
           <div
             className="w-full text-center"
-            style={{ padding: '0 2rem', marginBottom: '1rem', marginTop: '-40px' }}
+            style={{
+              padding: '0 2rem',
+              marginBottom: '1rem',
+              marginTop: isSignUp ? '1.25rem' : '-40px',
+            }}
           >
-            <h2 className="font-bold text-gray-900 mb-2" style={{ fontSize: '24px' }}>{isSignUp ? 'Sign Up' : 'Sign In'}</h2>
-            <p className="text-gray-600" style={{ fontSize: '16px' }}>{isSignUp ? 'Create an account to get started' : 'Welcome Back! Please enter your details'}</p>
+            <h2
+              className={`font-bold text-gray-900 ${isSignUp ? 'mb-0' : 'mb-2'}`}
+              style={{ fontSize: '24px' }}
+            >
+              {isSignUp ? 'Sign Up' : 'Sign In'}
+            </h2>
+            {!isSignUp && (
+              <p className="text-gray-600" style={{ fontSize: '16px' }}>
+                Welcome Back! Please enter your details
+              </p>
+            )}
           </div>
           <form
             className="space-y-4 w-full"
@@ -330,9 +468,66 @@ const LoginTraineeV1: React.FC = () => {
               </div>
             </div>
 
-
-
-
+            {role === 'admin' && isSignUp && (
+              <>
+                <div className="px-1 w-full flex justify-center mb-4">
+                  <div style={{ minWidth: '0', width: '75%' }}>
+                    <label htmlFor="firstName" className="block font-medium text-gray-700 mb-1" style={{ fontSize: '13px' }}>
+                      First name
+                    </label>
+                    <input
+                      type="text"
+                      id="firstName"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      className="py-6 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full"
+                      style={{ paddingLeft: '10px', paddingRight: '10px', boxSizing: 'border-box', height: '50px', fontSize: '16px' }}
+                      placeholder="First name"
+                      autoComplete="given-name"
+                    />
+                  </div>
+                </div>
+                <div className="px-1 w-full flex justify-center mb-4">
+                  <div style={{ minWidth: '0', width: '75%' }}>
+                    <label htmlFor="lastName" className="block font-medium text-gray-700 mb-1" style={{ fontSize: '13px' }}>
+                      Last name
+                    </label>
+                    <input
+                      type="text"
+                      id="lastName"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      className="py-6 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full"
+                      style={{ paddingLeft: '10px', paddingRight: '10px', boxSizing: 'border-box', height: '50px', fontSize: '16px' }}
+                      placeholder="Last name"
+                      autoComplete="family-name"
+                    />
+                  </div>
+                </div>
+                <div className="px-1 w-full flex justify-center mb-8">
+                  <div style={{ minWidth: '0', width: '75%' }}>
+                    <label htmlFor="department" className="block font-medium text-gray-700 mb-1" style={{ fontSize: '13px' }}>
+                      Department
+                    </label>
+                    <select
+                      id="department"
+                      value={department}
+                      onChange={(e) => setDepartment(e.target.value as AdminSignupDepartmentName | '')}
+                      className="py-6 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full bg-white"
+                      style={{ paddingLeft: '10px', paddingRight: '10px', boxSizing: 'border-box', height: '50px', fontSize: '16px' }}
+                      required
+                    >
+                      <option value="">Select department</option>
+                      {ADMIN_SIGNUP_DEPARTMENT_NAMES.map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* Password Input */}
             <div className="px-1 w-full flex justify-center">
@@ -431,7 +626,11 @@ const LoginTraineeV1: React.FC = () => {
                   <span className="text-gray-600" style={{ fontSize: '13px' }}>Already have an account? </span>
                   <a 
                     href="#" 
-                    onClick={(e) => { e.preventDefault(); setIsSignUp(false); }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setIsSignUp(false);
+                      resetAdminSignupFields();
+                    }}
                     className="text-blue-600 hover:underline font-medium" 
                     style={{ color: '#2563eb', fontSize: '13px' }}
                   >
@@ -443,7 +642,11 @@ const LoginTraineeV1: React.FC = () => {
                   <span className="text-gray-600" style={{ fontSize: '13px' }}>Don't have an account? </span>
                   <a 
                     href="#" 
-                    onClick={(e) => { e.preventDefault(); setIsSignUp(true); }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setIsSignUp(true);
+                      resetAdminSignupFields();
+                    }}
                     className="text-blue-600 hover:underline font-medium" 
                     style={{ color: '#2563eb', fontSize: '13px' }}
                   >

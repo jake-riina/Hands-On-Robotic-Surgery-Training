@@ -66,6 +66,12 @@ const TraineeRegistration: React.FC = () => {
         return;
       }
 
+      if (validation.role !== 'trainee') {
+        setError('This invitation is not for a trainee account.');
+        setIsValidating(false);
+        return;
+      }
+
       setInvitationEmail(validation.email || '');
       setIsValidating(false);
     };
@@ -136,10 +142,29 @@ const TraineeRegistration: React.FC = () => {
           return;
         }
       }
-      
+
       // In dev mode, prevent actual account creation
       if (isDev && (!token || token === 'dev')) {
         setError('Development mode: Account creation is disabled. Use a real token to test registration.');
+        setIsLoading(false);
+        return;
+      }
+
+      const programId = (import.meta.env.VITE_PROGRAM_ID as string | undefined)?.trim();
+      if (!programId) {
+        setError('Application configuration error: VITE_PROGRAM_ID is not set.');
+        setIsLoading(false);
+        return;
+      }
+
+      if (validation.role !== 'trainee') {
+        setError('This invitation is not for a trainee account.');
+        setIsLoading(false);
+        return;
+      }
+
+      if (!validation.departmentId) {
+        setError('This invitation is missing a department. Please request a new invite.');
         setIsLoading(false);
         return;
       }
@@ -204,41 +229,47 @@ const TraineeRegistration: React.FC = () => {
         .eq('user_id', userId)
         .single();
 
+      const profilePayload = {
+        user_id: userId,
+        department_id: validation.departmentId,
+        program_id: programId,
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        email: validation.email!,
+        experience_level: experienceLevel,
+        role: 'trainee' as const,
+      };
+
       if (!existingProfile) {
-        // Create user profile with trainee role
-        const { error: profileError } = await supabase
-          .from('user_profiles')
-          .insert({
-            user_id: userId,
-            email: validation.email!,
-            role: 'trainee',
-            first_name: firstName.trim(),
-            last_name: lastName.trim(),
-            experience_level: experienceLevel,
-          });
+        const { error: profileError } = await supabase.from('user_profiles').insert(profilePayload);
 
         if (profileError) {
-          // If profile creation fails, user might already have one
-          // Try to update it instead
           const { error: updateError } = await supabase
             .from('user_profiles')
             .update({
-              first_name: firstName.trim(),
-              last_name: lastName.trim(),
-              experience_level: experienceLevel,
+              department_id: profilePayload.department_id,
+              program_id: profilePayload.program_id,
+              first_name: profilePayload.first_name,
+              last_name: profilePayload.last_name,
+              email: profilePayload.email,
+              experience_level: profilePayload.experience_level,
+              role: profilePayload.role,
             })
             .eq('user_id', userId);
 
           if (updateError) throw updateError;
         }
       } else {
-        // Profile exists, update it with registration data
         const { error: updateError } = await supabase
           .from('user_profiles')
           .update({
-            first_name: firstName.trim(),
-            last_name: lastName.trim(),
-            experience_level: experienceLevel,
+            department_id: profilePayload.department_id,
+            program_id: profilePayload.program_id,
+            first_name: profilePayload.first_name,
+            last_name: profilePayload.last_name,
+            email: profilePayload.email,
+            experience_level: profilePayload.experience_level,
+            role: profilePayload.role,
           })
           .eq('user_id', userId);
 
@@ -255,26 +286,23 @@ const TraineeRegistration: React.FC = () => {
           console.warn('Password update failed:', updatePasswordError);
           // Continue anyway - they can reset password later
         }
+
       }
 
-      // Mark invitation token as used (token is guaranteed to be defined here since we return early in dev mode)
-      if (token) {
-        await markTokenAsUsed(token);
-      }
-
-      // Sign in the user
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: validation.email!,
         password: password,
       });
 
       if (signInError) {
-        // User created but sign-in failed - redirect to login
         navigate('/');
         return;
       }
 
-      // Redirect to trainee dashboard
+      if (token) {
+        await markTokenAsUsed(token);
+      }
+
       navigate('/dashboard');
     } catch (err: any) {
       setError(err.message || 'Failed to create account. Please try again.');

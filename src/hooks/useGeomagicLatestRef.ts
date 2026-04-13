@@ -3,11 +3,21 @@ import { BRIDGE_WS_URL, type GeomagicArm, type TouchStateMessage } from '../type
 
 export type LatestByArmRef = MutableRefObject<Record<GeomagicArm, TouchStateMessage | null>>;
 
+/** Optional bridge behavior (e.g. Module 2: abandon on disconnect, disable reconnect). */
+export type GeomagicBridgeEvents = {
+  /** When false, the socket will not auto-reconnect after a close. Default: reconnect. */
+  reconnectAfterClose?: boolean;
+  /** Called when the socket closes for any reason other than hook cleanup. */
+  onUnexpectedClose?: () => void;
+};
+
 /**
  * Subscribes to haptics-bridge WebSocket and writes latest left/right state into refs only
  * (no React state on the hot path).
  */
-export function useGeomagicLatestRef(): LatestByArmRef {
+export function useGeomagicLatestRef(
+  eventsRef?: MutableRefObject<GeomagicBridgeEvents>
+): LatestByArmRef {
   const latestRef = useRef<Record<GeomagicArm, TouchStateMessage | null>>({
     left: null,
     right: null,
@@ -34,6 +44,9 @@ export function useGeomagicLatestRef(): LatestByArmRef {
       ws.onclose = () => {
         socket = null;
         if (cancelled) return;
+        const ev = eventsRef?.current;
+        ev?.onUnexpectedClose?.();
+        if (ev?.reconnectAfterClose === false) return;
         reconnectTimer = setTimeout(connect, 1500);
       };
       ws.onerror = () => {

@@ -60,7 +60,7 @@ export const router = createBrowserRouter([
     element: <AdminAnalytics />,
   },
   {
-    path: '/register/:token',
+    path: '/register/trainee/:token',
     element: <TraineeRegistration />,
   },
   {

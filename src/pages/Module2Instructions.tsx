@@ -1,6 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import { v4 as uuidv4 } from 'uuid';
-import { supabase } from '../lib/supabaseClient';
+import { createModule2Session } from '../lib/module2SessionService';
 import ProfileDropdown from '../components/ProfileDropdown';
 import analyticsNavStyles from './Module2Analytics.module.css';
 
@@ -104,64 +103,12 @@ const Module2Instructions = () => {
 
 
   const handleBeginTraining = async () => {
-    try {
-      // Generate a unique session ID
-      const sessionId = uuidv4();
-      console.log('Generated session ID:', sessionId);
-      
-      // Get current user
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
-      if (userError) {
-        console.error('Error getting user:', userError);
-      }
-      
-      if (!user) {
-        console.error('User not authenticated');
-        alert('Please log in to begin training');
-        return;
-      }
-
-      console.log('User ID:', user.id);
-      console.log('Attempting to insert session...');
-
-      // Store session in Supabase
-      const { data, error } = await supabase
-        .from('sessions_trainee')
-        .insert({
-          trainee_session_id: sessionId,
-          user_id: user.id,
-          module_id: 2,
-          exercise_id: 1,
-          started_at: new Date().toISOString(),
-          session_status: 'in_progress'
-        })
-        .select();
-
-      if (error) {
-        console.error('Error saving session to Supabase:', error);
-        console.error('Error details:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
-        });
-        alert(`Error saving session: ${error.message}. Check console for details.`);
-        // Still navigate even if save fails
-      } else {
-        console.log('Session saved successfully to Supabase:', data);
-        console.log('Session ID:', sessionId);
-      }
-
-      // Navigate to module 2 camera control (game) with session ID
-      navigate('/module/2/camera-control', { state: { sessionId } });
-    } catch (err) {
-      console.error('Error in handleBeginTraining:', err);
-      alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
-      // Still navigate even if there's an error
-      const sessionId = uuidv4();
-      navigate('/module/2/camera-control', { state: { sessionId } });
+    const result = await createModule2Session();
+    if (!result.ok) {
+      alert(result.error);
+      return;
     }
+    navigate('/module/2/camera-control', { state: { sessionId: result.sessionId } });
   };
 
   return (
@@ -266,7 +213,7 @@ const Module2Instructions = () => {
             {/* Step-by-step instructions */}
             <div className="mx-auto text-center" style={{ marginBottom: '48px', maxWidth: '900px' }}>
               <p className="text-lg leading-relaxed" style={{ color: 'white', marginBottom: '16px' }}>
-                Press clutch button to activate camera movement. Surgical target should remain in the middle of the screen. The goal is to navigate the camera to collect objects around the room by centering the target center on them for 5 seconds. A new one will appear after one is collected that you have to look for, and your tally will be in the upper right hand corner. You will have 90 seconds to complete and then the module will end.
+                Press clutch button to activate camera movement. Surgical target should remain in the middle of the screen. The goal is to navigate the camera to collect objects around the room by centering the target center on them for 5 seconds. A new one will appear after one is collected that you have to look for, and your tally will be in the upper right hand corner. You will have 60 seconds to complete and then the module will end.
               </p>
             </div>
 

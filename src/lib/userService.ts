@@ -9,6 +9,8 @@ export interface UserProfile {
   first_name?: string;
   last_name?: string;
   experience_level?: string;
+  /** FK to `public.departments` — required for invites and RPCs that scope by department */
+  department_id?: string | null;
   department?: 'ENT' | 'Cardiothoracic' | 'Urology' | string;
 }
 
