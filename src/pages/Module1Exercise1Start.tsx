@@ -1,6 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
-import { supabase } from '../lib/supabaseClient';
 import {
   MODULE1_EXERCISE_DURATION_SECONDS,
   MODULE1_GAUGE_PSI_MAX,
@@ -13,6 +12,10 @@ import {
 import { useBLE } from '../contexts/BLEContext';
 import RoboticGripper from '../components/RoboticGripper';
 import ProfileDropdown from '../components/ProfileDropdown';
+import {
+  insertPressureTelemetryBatch,
+  invokeModule1CompleteSession,
+} from '../lib/module1PressureSessionService';
 
 // Web Bluetooth API types
 declare global {
@@ -55,6 +58,11 @@ interface BluetoothRemoteGATTCharacteristic extends EventTarget {
   service?: BluetoothRemoteGATTService;
   addEventListener(type: 'characteristicvaluechanged', listener: (event: Event) => void): void;
 }
+
+type PressureTelemetryBufferedSample = {
+  recorded_at: string;
+  psi_value: number;
+};
 
 const Module1Exercise1Start = () => {
   const navigate = useNavigate();
@@ -254,10 +262,11 @@ const Module1Exercise1Start = () => {
  const timeOnThresholdRef = useRef<number>(0);
  const lastCheckTimeRef = useRef<number | null>(null);
  const thresholdCheckIntervalRef = useRef<number | null>(null);
- const readingsBufferRef = useRef<Array<{timestamp_ms: number, force_psi: number}>>([]);
+const readingsBufferRef = useRef<PressureTelemetryBufferedSample[]>([]);
  const saveIntervalRef = useRef<number | null>(null);
  const exerciseStartedRef = useRef<boolean>(false);
  const sessionIdRef = useRef<string | undefined>(sessionId);
+const completeOnceRef = useRef<boolean>(false);
 
  const TARGET_MIN = MODULE1_TARGET_PSI_MIN;
  const TARGET_MAX = MODULE1_TARGET_PSI_MAX;
@@ -265,8 +274,8 @@ const Module1Exercise1Start = () => {
  // Mock sensor - simulates pressure fluctuations (fallback if BLE not available)
  // Note: This is kept for potential fallback, but BLE context handles pressure updates
 
- // Function to save readings to Supabase (batched)
- const saveReadingsToSupabase = async (readings: Array<{timestamp_ms: number, force_psi: number}>) => {
+// Function to save telemetry to Supabase (batched)
+const saveReadingsToSupabase = async (readings: PressureTelemetryBufferedSample[]) => {
    const currentSessionId = sessionIdRef.current;
    if (!currentSessionId || readings.length === 0) {
      console.warn('Cannot save readings - sessionId:', currentSessionId, 'readings count:', readings.length);
@@ -275,25 +284,8 @@ const Module1Exercise1Start = () => {
 
    try {
      console.log(`Attempting to save ${readings.length} readings to Supabase for session:`, currentSessionId);
-     const { data, error } = await supabase
-       .from('trainee_readings')
-       .insert(
-         readings.map(reading => ({
-           trainee_session_id: currentSessionId,
-           timestamp_ms: reading.timestamp_ms,
-           force_psi: reading.force_psi,
-           flex_value: null,
-           imu_value: null
-         }))
-       )
-       .select();
-
-     if (error) {
-       console.error('Error saving readings to Supabase:', error);
-       console.error('Error details:', JSON.stringify(error, null, 2));
-     } else {
-       console.log(`Successfully saved ${readings.length} readings to Supabase. Data:`, data);
-     }
+    await insertPressureTelemetryBatch(currentSessionId, readings);
+    console.log(`Saved ${readings.length} pressure telemetry rows to Supabase.`);
    } catch (err) {
      console.error('Exception saving readings:', err);
    }
@@ -333,10 +325,10 @@ const Module1Exercise1Start = () => {
 // Save readings to Supabase when pressure changes from BLE
 useEffect(() => {
   if (bleIsConnected && pressure > 0 && sessionIdRef.current) {
-    const timestamp = Date.now();
+    const recorded_at = new Date().toISOString();
     readingsBufferRef.current.push({
-      timestamp_ms: timestamp,
-      force_psi: pressure
+      recorded_at,
+      psi_value: pressure
     });
     
     console.log('Added reading to buffer. Buffer size:', readingsBufferRef.current.length);
@@ -430,6 +422,9 @@ useEffect(() => {
  // Score = (time in green zone, ms) / (full exercise duration, ms) × 100
  useEffect(() => {
    if (exerciseStarted && timeRemaining === 0 && startTimeRef.current !== null) {
+    if (completeOnceRef.current) return;
+    completeOnceRef.current = true;
+
      const timeInGreenMs = timeOnThresholdRef.current;
      const calculatedScore = module1ScorePercent(timeInGreenMs);
      setScore(calculatedScore);
@@ -450,13 +445,19 @@ useEffect(() => {
       console.warn('Unable to persist module 1 score to localStorage:', err);
     }
 
-     // Save any remaining readings in buffer
-     if (readingsBufferRef.current.length > 0 && sessionIdRef.current) {
-       const readingsToSave = [...readingsBufferRef.current];
-       readingsBufferRef.current = [];
-       console.log('Saving final', readingsToSave.length, 'readings to Supabase');
-       saveReadingsToSupabase(readingsToSave);
-     }
+    void (async () => {
+      // Save any remaining readings in buffer before completion scoring.
+      if (readingsBufferRef.current.length > 0 && sessionIdRef.current) {
+        const readingsToSave = [...readingsBufferRef.current];
+        readingsBufferRef.current = [];
+        console.log('Saving final', readingsToSave.length, 'readings to Supabase');
+        await saveReadingsToSupabase(readingsToSave);
+      }
+
+      if (sessionIdRef.current) {
+        await invokeModule1CompleteSession(sessionIdRef.current);
+      }
+    })();
    }
  }, [exerciseStarted, timeRemaining]);
 
