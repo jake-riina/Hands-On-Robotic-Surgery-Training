@@ -26,6 +26,13 @@ export type RingInteractionController = {
   pegLayoutById: Record<string, PegLayoutEntry>;
 };
 
+export type RingInteractionEvent =
+  | { type: 'hand_to_hand_start'; ringId: string; fromSide: ToolArmSide; toSide: ToolArmSide }
+  | { type: 'hand_to_hand_complete'; ringId: string; toSide: ToolArmSide }
+  | { type: 'hand_to_peg_start'; ringId: string; side: ToolArmSide }
+  | { type: 'hand_to_peg_complete'; ringId: string; side: ToolArmSide }
+  | { type: 'drop'; ringId: string; side: ToolArmSide | null };
+
 const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 
 const getGripFlags = (toolKinematicsRef: ToolKinematicsRef) => {
@@ -89,6 +96,7 @@ export function updateRingInteractions({
   toolKinematicsRef,
   boardCenterWorld,
   deltaSec,
+  onEvent,
 }: {
   ringStateRef: MutableRefObject<RingStateMap>;
   controller: RingInteractionController;
@@ -96,6 +104,7 @@ export function updateRingInteractions({
   toolKinematicsRef: ToolKinematicsRef;
   boardCenterWorld: THREE.Vector3;
   deltaSec: number;
+  onEvent?: (event: RingInteractionEvent) => void;
 }) {
   const settings = pegTransferReferenceValues.interactionDefaults;
   const grip = getGripFlags(toolKinematicsRef);
@@ -148,6 +157,21 @@ export function updateRingInteractions({
     ring.position.copy(pegLocalToWorld(local, boardCenterWorld));
   };
 
+  const resetRingToHomeAsDrop = (ringId: string) => {
+    const ring = ringStateRef.current[ringId];
+    if (!ring) return;
+    const dropSide = ring.heldBy ?? controller.lastInteractedSideByRingId[ringId] ?? null;
+    ring.heldBy = null;
+    const home = controller.homePoseByRingId[ringId];
+    if (home) {
+      ring.position.copy(home.position);
+      ring.quaternion.copy(home.quaternion);
+      controller.attachedPegIdByRingId[ringId] = home.pegId;
+    }
+    controller.stateByRingId[ringId] = 'IDLE';
+    onEvent?.({ type: 'drop', ringId, side: dropSide });
+  };
+
   for (const ring of Object.values(ringStateRef.current)) {
     const ringId = ring.id;
     const state = controller.stateByRingId[ringId];
@@ -165,6 +189,8 @@ export function updateRingInteractions({
         ring.heldBy = null;
         controller.stateByRingId[ringId] = 'VALID_COMPLETE';
         controller.attachedPegIdByRingId[ringId] = ring.targetPegId;
+        const completedSide = ring.requiredDestinationSide;
+        onEvent?.({ type: 'hand_to_peg_complete', ringId, side: completedSide });
       }
       continue;
     }
@@ -204,13 +230,18 @@ export function updateRingInteractions({
         ring.heldBy = chosen;
         controller.lastInteractedSideByRingId[ringId] = chosen;
         controller.stateByRingId[ringId] = 'HELD_BY_ORIGIN';
+        const toSide: ToolArmSide = chosen === 'left' ? 'right' : 'left';
+        onEvent?.({ type: 'hand_to_hand_start', ringId, fromSide: chosen, toSide });
       }
       continue;
     }
 
     if (state === 'HELD_BY_ORIGIN') {
       const holder = ring.heldBy;
-      if (!holder) continue;
+      if (!holder) {
+        resetRingToHomeAsDrop(ringId);
+        continue;
+      }
       const receiver: ToolArmSide = holder === 'left' ? 'right' : 'left';
       const holderReleased = holder === 'left' ? grip.leftReleased : grip.rightReleased;
       const receiverGrab = receiver === 'left' ? grip.leftCanGrab : grip.rightCanGrab;
@@ -229,12 +260,13 @@ export function updateRingInteractions({
         ring.hasTransferredHands = true;
         controller.lastInteractedSideByRingId[ringId] = receiver;
         controller.stateByRingId[ringId] = 'HELD_BY_DESTINATION';
+        onEvent?.({ type: 'hand_to_hand_complete', ringId, toSide: receiver });
+        onEvent?.({ type: 'hand_to_peg_start', ringId, side: receiver });
         continue;
       }
 
       if (holderReleased) {
-        ring.heldBy = null;
-        controller.stateByRingId[ringId] = 'IDLE';
+        resetRingToHomeAsDrop(ringId);
         continue;
       }
 
@@ -244,7 +276,10 @@ export function updateRingInteractions({
 
     if (state === 'HELD_BY_DESTINATION') {
       const holder = ring.heldBy;
-      if (!holder) continue;
+      if (!holder) {
+        resetRingToHomeAsDrop(ringId);
+        continue;
+      }
       const other: ToolArmSide = holder === 'left' ? 'right' : 'left';
       const holderReleased = holder === 'left' ? grip.leftReleased : grip.rightReleased;
       const otherGrab = other === 'left' ? grip.leftCanGrab : grip.rightCanGrab;
@@ -279,14 +314,8 @@ export function updateRingInteractions({
           }
         }
 
-        // Invalid release: return to spawn pose.
-        const home = controller.homePoseByRingId[ringId];
-        if (home) {
-          ring.position.copy(home.position);
-          ring.quaternion.copy(home.quaternion);
-          controller.attachedPegIdByRingId[ringId] = home.pegId;
-        }
-        controller.stateByRingId[ringId] = 'IDLE';
+        // Invalid release: treat as drop and return to the ring's original home peg.
+        resetRingToHomeAsDrop(ringId);
         continue;
       }
 

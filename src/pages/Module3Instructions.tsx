@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { createModule3Session } from '../lib/module3PegSessionService';
 import analyticsNavStyles from './Module2Analytics.module.css';
 
 /** Green used for transferred rings on the Peg Transfer page. */
@@ -7,6 +9,8 @@ const PEG_TRANSFER_GREEN = '#22c55e';
 const Module3Instructions = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [beginLoading, setBeginLoading] = useState(false);
+  const [beginError, setBeginError] = useState<string | null>(null);
 
   const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: 'dashboard', className: 'text-white no-underline', iconColor: 'white' },
@@ -67,8 +71,18 @@ const Module3Instructions = () => {
     </svg>
   );
 
-  const handleBeginTraining = () => {
-    navigate('/module/3/peg-transfer');
+  const handleBeginTraining = async () => {
+    setBeginError(null);
+    setBeginLoading(true);
+    const result = await createModule3Session(null);
+    setBeginLoading(false);
+    if (!result.ok) {
+      setBeginError(result.error);
+      return;
+    }
+    navigate('/module/3/peg-transfer', {
+      state: { sessionId: result.sessionId, startedAt: result.startedAt },
+    });
   };
 
   return (
@@ -163,26 +177,35 @@ const Module3Instructions = () => {
               </p>
             </div>
 
-            <div className="flex items-center justify-between" style={{ marginTop: '120px' }}>
-              <div className="flex items-center" style={{ gap: '32px' }}>
-                <div className="flex items-center gap-2">
-                  <StarIcon />
-                  <span className="text-lg" style={{ color: 'white' }}>Optimal Pressure</span>
+            <div className="flex flex-col items-end gap-3" style={{ marginTop: '120px' }}>
+              {beginError ? (
+                <p className="text-center text-sm max-w-xl" style={{ color: '#fca5a5', margin: 0 }}>
+                  {beginError}
+                </p>
+              ) : null}
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center" style={{ gap: '32px' }}>
+                  <div className="flex items-center gap-2">
+                    <StarIcon />
+                    <span className="text-lg" style={{ color: 'white' }}>Optimal Pressure</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <StarIcon />
+                    <span className="text-lg" style={{ color: 'white' }}>Steady Movement</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <StarIcon />
-                  <span className="text-lg" style={{ color: 'white' }}>Steady Movement</span>
-                </div>
-              </div>
 
-              <div className="flex gap-4">
-                <button
-                  onClick={handleBeginTraining}
-                  className="px-12 py-4 rounded-xl font-semibold text-white text-2xl transition-colors hover:opacity-90"
-                  style={{ backgroundColor: '#1DA5FF', color: '#ffffff' }}
-                >
-                  Begin Training
-                </button>
+                <div className="flex gap-4">
+                  <button
+                    type="button"
+                    disabled={beginLoading}
+                    onClick={() => void handleBeginTraining()}
+                    className="px-12 py-4 rounded-xl font-semibold text-white text-2xl transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
+                    style={{ backgroundColor: '#1DA5FF', color: '#ffffff' }}
+                  >
+                    {beginLoading ? 'Starting…' : 'Begin Training'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

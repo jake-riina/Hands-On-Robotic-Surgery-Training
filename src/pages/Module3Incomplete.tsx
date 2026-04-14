@@ -57,7 +57,7 @@ const Module3Incomplete = () => {
   const totalRings = 8;
   const score = state.score ?? 30;
 
-  const handleRepeatModule = () => navigate('/module/3/peg-transfer');
+  const handleRepeatModule = () => navigate('/module/3/instructions');
   const handleHome = () => navigate('/dashboard');
   const handleNextModule = () => navigate('/modules');
 
