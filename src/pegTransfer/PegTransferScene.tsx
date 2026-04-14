@@ -3,6 +3,7 @@ import type { ThreeEvent } from '@react-three/fiber';
 import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import * as THREE from 'three';
 import type { LatestByArmRef } from '../hooks/useGeomagicLatestRef';
+import { initPegRings, type PegRingRow } from '../lib/module3PegSessionService';
 import type { TouchStateMessage } from '../types/geomagicBridge';
 import { canCalibrateDevices } from './pegTransferDeviceCalibration';
 import {
@@ -32,7 +33,11 @@ import {
 } from './pegFieldLayout';
 import { createInitialRingState, createRingHomePoseMap, type RingStateMap } from './ringState';
 import { PegRings } from './PegRings';
-import { initRingInteractionController, updateRingInteractions } from './ringInteraction';
+import {
+  initRingInteractionController,
+  type RingInteractionEvent,
+  updateRingInteractions,
+} from './ringInteraction';
 import { pegTransferReferenceValues } from './pegTransferReferenceValues';
 import { pegTransferBoardCenterWorld, resolvePegTransferWorldRig } from './pegTransferWorldRig';
 
@@ -64,18 +69,40 @@ function EndoscopeHeadlamp() {
 
 const MOUSE_JAW_DEBUG = import.meta.env.DEV;
 
+function buildModule3PegRingInsertConfigs(ringMap: RingStateMap): { ring_index: number; target_peg_label: string }[] {
+  const configs: { ring_index: number; target_peg_label: string }[] = [];
+  for (let i = 1; i <= 5; i++) {
+    const r = ringMap[`ring-${i}`];
+    if (r) configs.push({ ring_index: i, target_peg_label: r.targetPegId });
+  }
+  return configs;
+}
+
+function sceneRingIdsFromPegRingRows(rings: PegRingRow[]): Record<string, string> {
+  const m: Record<string, string> = {};
+  for (const row of rings) {
+    m[`ring-${row.ring_index}`] = row.ring_id;
+  }
+  return m;
+}
+
+/** One in-flight or completed insert per session (avoids duplicate rows under React StrictMode remounts). */
+const module3PegRingsInitBySession = new Map<string, Promise<PegRingRow[] | null>>();
+
 function RingInteractionDriver({
   ringStateRef,
   interactionController,
   worldFrameRef,
   toolKinematicsRef,
   pauseRef,
+  onEvent,
 }: {
   ringStateRef: MutableRefObject<RingStateMap>;
   interactionController: ReturnType<typeof initRingInteractionController>;
   worldFrameRef: ReturnType<typeof createWorldFrameRef>;
   toolKinematicsRef: ReturnType<typeof initRcmKinematicsController>['toolKinematicsRef'];
   pauseRef: MutableRefObject<boolean>;
+  onEvent?: (event: RingInteractionEvent) => void;
 }) {
   useFrame((_, delta) => {
     if (pauseRef.current) return;
@@ -86,6 +113,7 @@ function RingInteractionDriver({
       toolKinematicsRef,
       boardCenterWorld: pegTransferBoardCenterWorld,
       deltaSec: delta,
+      onEvent,
     });
   });
   return null;
@@ -206,6 +234,9 @@ export function PegTransferScene({
   pendingCalibrateRef,
   onDeviceCalibrationApplied,
   toolMotionEpoch = 0,
+  module3SessionId = null,
+  onModule3PegRingsInserted,
+  onRingInteractionEvent,
 }: {
   disableConstrainedCamera?: boolean;
   geomagicLatestRef: LatestByArmRef;
@@ -213,6 +244,10 @@ export function PegTransferScene({
   pendingCalibrateRef: MutableRefObject<boolean>;
   onDeviceCalibrationApplied?: () => void;
   toolMotionEpoch?: number;
+  /** When set, inserts `peg_rings` after calibration (`simulationEnabled`) once. */
+  module3SessionId?: string | null;
+  onModule3PegRingsInserted?: (sceneRingIdToDbRingId: Record<string, string>) => void;
+  onRingInteractionEvent?: (event: RingInteractionEvent) => void;
 }) {
   const { camera } = useThree();
   const simulationEnabledRef = useRef(simulationEnabled);
@@ -231,6 +266,8 @@ export function PegTransferScene({
   );
   const pauseRingInteractionRef = useRef(false);
   const tempRingPointerDownRef = useRef<((ringId: string, event: ThreeEvent<PointerEvent>) => void) | null>(null);
+  const onModule3PegRingsInsertedRef = useRef(onModule3PegRingsInserted);
+  onModule3PegRingsInsertedRef.current = onModule3PegRingsInserted;
 
   // Fixed world trocars and camera basis calibration.
   const leftTrocarWorldRef = useRef(new THREE.Vector3());
@@ -312,6 +349,30 @@ export function PegTransferScene({
     rigCalibratedRef.current = true;
     setRigVisualReady(true);
   }, [camera, controller]);
+
+  useEffect(() => {
+    if (!module3SessionId || !simulationEnabled) return;
+
+    const configs = buildModule3PegRingInsertConfigs(ringStateRef.current);
+    let p = module3PegRingsInitBySession.get(module3SessionId);
+
+    if (!p) {
+      p = initPegRings(module3SessionId, configs).then((res) => {
+        if (!res.ok) {
+          console.error('initPegRings', res.error);
+          module3PegRingsInitBySession.delete(module3SessionId);
+          return null;
+        }
+        return res.rings;
+      });
+      module3PegRingsInitBySession.set(module3SessionId, p);
+      void p.then((rings) => {
+        if (rings) {
+          onModule3PegRingsInsertedRef.current?.(sceneRingIdsFromPegRingRows(rings));
+        }
+      });
+    }
+  }, [module3SessionId, simulationEnabled]);
 
   useFrame((_, delta) => {
     if (!rigCalibratedRef.current) return;
@@ -443,6 +504,7 @@ export function PegTransferScene({
             worldFrameRef={worldFrameRef}
             toolKinematicsRef={controller.toolKinematicsRef}
             pauseRef={pauseRingInteractionRef}
+            onEvent={onRingInteractionEvent}
           />
           {MOUSE_JAW_DEBUG && (
             <TempMouseJawDriver

@@ -57,7 +57,7 @@ const CompleteModule2 = () => {
 
   const handleRetry = () => navigate('/module/2/camera-control');
   const handleReturnToDashboard = () => navigate('/dashboard');
-  const handleNextModule = () => navigate('/module/3/peg-transfer');
+  const handleNextModule = () => navigate('/module/3/instructions');
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#26313E' }}>
