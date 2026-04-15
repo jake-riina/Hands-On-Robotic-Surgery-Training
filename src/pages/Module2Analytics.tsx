@@ -1,9 +1,15 @@
+import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import styles from './Module2Analytics.module.css';
+import { supabase } from '../lib/supabaseClient';
 
 const Module2Analytics = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [highestScore, setHighestScore] = useState<number | null>(null);
+  const [progressPoints, setProgressPoints] = useState<
+    { completedAt: string; scorePct: number; completionSeconds: number | null }[]
+  >([]);
 
   const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
@@ -62,13 +68,23 @@ const Module2Analytics = () => {
     </svg>
   );
 
-  const chartData = [
-    { time: 1, score: 20 },
-    { time: 2, score: 45 },
-    { time: 3, score: 38 },
-    { time: 4, score: 62 },
-    { time: 5, score: 85 },
-  ];
+  const formatTimestamp = (isoTimestamp: string) => {
+    const date = new Date(isoTimestamp);
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${month}/${day} ${hours}:${minutes}`;
+  };
+
+  const formatDuration = (seconds: number | null) => {
+    if (seconds === null || Number.isNaN(seconds)) return 'N/A';
+    const totalSeconds = Math.max(0, Math.round(seconds));
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+  };
+
   const chartWidth = 420;
   const chartHeight = 240;
   const padding = { top: 20, right: 20, bottom: 28, left: 36 };
@@ -76,11 +92,22 @@ const Module2Analytics = () => {
   const innerHeight = chartHeight - padding.top - padding.bottom;
   const scoreMin = 0;
   const scoreMax = 100;
-  const timeMin = 0;
-  const timeMax = 6;
-  const xScale = (t: number) => padding.left + (t - timeMin) / (timeMax - timeMin) * innerWidth;
+  const progressTimes = progressPoints.map((point) => new Date(point.completedAt).getTime());
+  const minTime = progressTimes.length > 0 ? Math.min(...progressTimes) : 0;
+  const maxTime = progressTimes.length > 0 ? Math.max(...progressTimes) : 0;
+  const xScale = (timeMs: number) => {
+    if (progressPoints.length <= 1 || maxTime === minTime) {
+      return padding.left + innerWidth / 2;
+    }
+    return padding.left + ((timeMs - minTime) / (maxTime - minTime)) * innerWidth;
+  };
   const yScale = (s: number) => padding.top + innerHeight - (s - scoreMin) / (scoreMax - scoreMin) * innerHeight;
-  const points = chartData.map((d) => `${xScale(d.time)},${yScale(d.score)}`).join(' ');
+  const plottedPoints = progressPoints.map((point) => ({
+    ...point,
+    x: xScale(new Date(point.completedAt).getTime()),
+    y: yScale(point.scorePct),
+  }));
+  const points = plottedPoints.map((point) => `${point.x},${point.y}`).join(' ');
   const axisStroke = 'rgba(255,255,255,0.5)';
   const x1 = padding.left;
   const y1 = padding.top + innerHeight;
@@ -90,6 +117,105 @@ const Module2Analytics = () => {
   const timeLabelY = padding.top + innerHeight / 2;
   const scoreLabelX = padding.left + innerWidth / 2;
   const scoreLabelY = chartHeight - 8;
+  const normalizedHighestScore = Math.max(0, Math.min(100, highestScore ?? 0));
+
+  useEffect(() => {
+    const fetchHighestScore = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setHighestScore(null);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('trainee_best_scores')
+        .select('best_score')
+        .eq('user_id', user.id)
+        .eq('module_id', 2)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error loading module 2 highest score:', error);
+        setHighestScore(null);
+        return;
+      }
+
+      setHighestScore(data?.best_score !== null && data?.best_score !== undefined ? data.best_score * 100 : null);
+    };
+
+    fetchHighestScore();
+  }, []);
+
+  useEffect(() => {
+    const fetchProgressData = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setProgressPoints([]);
+        return;
+      }
+
+      const { data: sessions, error: sessionsError } = await supabase
+        .from('sessions')
+        .select('session_id, completed_at')
+        .eq('user_id', user.id)
+        .eq('module_id', 2)
+        .not('completed_at', 'is', null)
+        .order('completed_at', { ascending: true });
+
+      if (sessionsError) {
+        console.error('Error loading module 2 sessions:', sessionsError);
+        setProgressPoints([]);
+        return;
+      }
+
+      const sessionIds = (sessions ?? []).map((session) => session.session_id as string);
+      if (sessionIds.length === 0) {
+        setProgressPoints([]);
+        return;
+      }
+
+      const { data: cameraRows, error: cameraError } = await supabase
+        .from('camera_sessions')
+        .select('session_id, score, time_to_completion')
+        .in('session_id', sessionIds);
+
+      if (cameraError) {
+        console.error('Error loading module 2 camera scores:', cameraError);
+        setProgressPoints([]);
+        return;
+      }
+
+      const cameraBySession = new Map(
+        (cameraRows ?? []).map((row) => [
+          row.session_id as string,
+          {
+            score: row.score as number | null,
+            duration: row.time_to_completion as number | null,
+          },
+        ])
+      );
+
+      const mappedPoints = (sessions ?? [])
+        .map((session) => {
+          const sessionId = session.session_id as string;
+          const match = cameraBySession.get(sessionId);
+          if (!match || match.score === null || match.score === undefined || !session.completed_at) {
+            return null;
+          }
+
+          return {
+            completedAt: session.completed_at as string,
+            scorePct: Math.max(0, Math.min(100, match.score * 100)),
+            completionSeconds: match.duration,
+          };
+        })
+        .filter((point): point is { completedAt: string; scorePct: number; completionSeconds: number | null } => point !== null);
+
+      setProgressPoints(mappedPoints);
+    };
+
+    fetchProgressData();
+  }, []);
 
   const handleTryAgain = () => {
     navigate('/module/2/instructions');
@@ -183,10 +309,12 @@ const Module2Analytics = () => {
                         strokeWidth="8"
                         strokeLinecap="round"
                         strokeDasharray={2 * Math.PI * 42}
-                        strokeDashoffset={2 * Math.PI * 42 * (1 - 80 / 100)}
+                        strokeDashoffset={2 * Math.PI * 42 * (1 - normalizedHighestScore / 100)}
                       />
                     </svg>
-                    <span className="absolute text-xl font-bold" style={{ color: 'white' }}>80%</span>
+                    <span className="absolute text-xl font-bold" style={{ color: 'white' }}>
+                      {highestScore !== null ? `${Math.round(normalizedHighestScore)}%` : '--'}
+                    </span>
                   </div>
                 </div>
 
@@ -210,16 +338,24 @@ const Module2Analytics = () => {
               <div className={styles.rightCard}>
                 <h2 className={styles.cardTitle} style={{ marginBottom: '16px', width: '100%' }}>My Progress</h2>
                 <div className={styles.chartWrapper}>
-                  <svg width="100%" height="100%" viewBox={`0 0 ${chartWidth} ${chartHeight}`} className={styles.progressChart} preserveAspectRatio="xMidYMid meet">
-                    <line x1={x1} y1={y1} x2={x1} y2={y2} stroke={axisStroke} strokeWidth="1" />
-                    <line x1={x1} y1={y1} x2={x2} y2={y1} stroke={axisStroke} strokeWidth="1" />
-                    <polyline fill="none" stroke="#1DA5FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={points} />
-                    {chartData.map((d, i) => (
-                      <circle key={i} cx={xScale(d.time)} cy={yScale(d.score)} r="5" fill="#ef4444" stroke="#1e2733" strokeWidth="1" />
-                    ))}
-                    <text x={timeLabelX} y={timeLabelY} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="12" transform={`rotate(-90, ${timeLabelX}, ${timeLabelY})`}>Attempt</text>
-                    <text x={scoreLabelX} y={scoreLabelY} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="12">Score</text>
-                  </svg>
+                  {progressPoints.length === 0 ? (
+                    <div className="flex h-full w-full items-center justify-center text-sm" style={{ color: 'rgba(255,255,255,0.75)' }}>
+                      No completed sessions
+                    </div>
+                  ) : (
+                    <svg width="100%" height="100%" viewBox={`0 0 ${chartWidth} ${chartHeight}`} className={styles.progressChart} preserveAspectRatio="xMidYMid meet">
+                      <line x1={x1} y1={y1} x2={x1} y2={y2} stroke={axisStroke} strokeWidth="1" />
+                      <line x1={x1} y1={y1} x2={x2} y2={y1} stroke={axisStroke} strokeWidth="1" />
+                      <polyline fill="none" stroke="#1DA5FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={points} />
+                      {plottedPoints.map((point, i) => (
+                        <circle key={i} cx={point.x} cy={point.y} r="5" fill="#ef4444" stroke="#1e2733" strokeWidth="1">
+                          <title>{`Score: ${Math.round(point.scorePct)}%\nCompletion Time: ${formatDuration(point.completionSeconds)}\nCompleted: ${formatTimestamp(point.completedAt)}`}</title>
+                        </circle>
+                      ))}
+                      <text x={timeLabelX} y={timeLabelY} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="12" transform={`rotate(-90, ${timeLabelX}, ${timeLabelY})`}>Score</text>
+                      <text x={scoreLabelX} y={scoreLabelY} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="12">Time</text>
+                    </svg>
+                  )}
                 </div>
               </div>
             </div>
