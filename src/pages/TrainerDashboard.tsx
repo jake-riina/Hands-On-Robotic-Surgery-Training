@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import ProfileDropdown from '../components/ProfileDropdown';
+import TraineeModuleProgressModal from '../components/TraineeModuleProgressModal';
 import styles from './TrainerDashboard.module.css';
 import adminDashboardStyles from './AdminDashboard.module.css';
 
@@ -22,12 +23,15 @@ const TrainerDashboard: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [currentRole, setCurrentRole] = useState<string>('');
+  const [firstName, setFirstName] = useState<string>('');
   const [moduleAveragePercent, setModuleAveragePercent] = useState<number>(0);
   const [departmentTrainees, setDepartmentTrainees] = useState<TraineeListItem[]>([]);
   const [trainerDepartmentId, setTrainerDepartmentId] = useState<string | null>(null);
   const [activeModuleIndex, setActiveModuleIndex] = useState<number>(0);
+  const [progressModalTrainee, setProgressModalTrainee] = useState<TraineeListItem | null>(null);
 
   const activeModule = MODULE_CARDS[activeModuleIndex];
+  const activeModuleNumber = (activeModuleIndex + 1) as 1 | 2 | 3;
 
   useEffect(() => {
     const checkUser = async () => {
@@ -52,6 +56,7 @@ const TrainerDashboard: React.FC = () => {
         return;
       }
       setCurrentRole(profile.role || '');
+      setFirstName(typeof profile.first_name === 'string' ? profile.first_name.trim() : '');
 
       // Module averages remain department-scoped.
       if (profile.department_id) {
@@ -194,6 +199,12 @@ const TrainerDashboard: React.FC = () => {
   const dash = 2 * Math.PI * r;
   const offset = dash * (1 - moduleAveragePercent / 100);
 
+  const progressModalDisplayName = progressModalTrainee
+    ? `${progressModalTrainee.first_name ?? ''} ${progressModalTrainee.last_name ?? ''}`.trim() ||
+      progressModalTrainee.email ||
+      'Trainee'
+    : '';
+
   return (
     <div className={styles.page}>
       <header className="flex items-center justify-between px-6 py-2" style={{ backgroundColor: '#1E2733' }}>
@@ -254,7 +265,7 @@ const TrainerDashboard: React.FC = () => {
 
         <main className={styles.main}>
           <h2 className="text-2xl font-semibold" style={{ color: '#ffffff', margin: '0 0 28px 0' }}>
-            Hello, Trainer
+            Hello, {firstName || 'Trainer'}
           </h2>
 
           <div className={styles.grid}>
@@ -334,7 +345,11 @@ const TrainerDashboard: React.FC = () => {
                       </svg>
                     </div>
                     <p className={styles.traineeName}>{displayName}</p>
-                    <button type="button" className={styles.rowBtn}>
+                    <button
+                      type="button"
+                      className={styles.rowBtn}
+                      onClick={() => setProgressModalTrainee(trainee)}
+                    >
                       View Progress
                     </button>
                   </div>
@@ -348,6 +363,15 @@ const TrainerDashboard: React.FC = () => {
           </div>
         </main>
       </div>
+
+      <TraineeModuleProgressModal
+        isOpen={progressModalTrainee !== null}
+        onClose={() => setProgressModalTrainee(null)}
+        traineeUserId={progressModalTrainee?.user_id ?? ''}
+        displayName={progressModalDisplayName}
+        moduleId={activeModuleNumber}
+        departmentId={trainerDepartmentId}
+      />
     </div>
   );
 };

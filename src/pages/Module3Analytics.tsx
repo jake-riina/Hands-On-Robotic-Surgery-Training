@@ -7,9 +7,56 @@ const Module3Analytics = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [highestScore, setHighestScore] = useState<number | null>(null);
+  const [fastestSeconds, setFastestSeconds] = useState<number | null>(null);
   const [progressPoints, setProgressPoints] = useState<
     { completedAt: string; scorePct: number; completionSeconds: number | null }[]
   >([]);
+
+  type TransfersTooltipState = {
+    visible: boolean;
+    xPct: number;
+    yPct: number;
+    lines: string[];
+  };
+
+  const [dropsBars, setDropsBars] = useState<
+    { sessionLabel: string; completedAt: string; drops: number }[]
+  >([]);
+  const [overallTotalTransfers, setOverallTotalTransfers] = useState<number | null>(null);
+  const [transfersByHand, setTransfersByHand] = useState<
+    {
+      side: 'left' | 'right';
+      completedCount: number;
+      failedCount: number;
+      completedPct: number;
+      failedPct: number;
+    }[]
+  >([]);
+  const [dropsTooltip, setDropsTooltip] = useState<TransfersTooltipState>({
+    visible: false,
+    xPct: 50,
+    yPct: 50,
+    lines: [],
+  });
+  const [transferTooltip, setTransferTooltip] = useState<TransfersTooltipState>({
+    visible: false,
+    xPct: 50,
+    yPct: 50,
+    lines: [],
+  });
+
+  type TooltipState = {
+    visible: boolean;
+    xPct: number;
+    yPct: number;
+    lines: string[];
+  };
+  const [progressTooltip, setProgressTooltip] = useState<TooltipState>({
+    visible: false,
+    xPct: 50,
+    yPct: 50,
+    lines: [],
+  });
 
   const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
@@ -85,6 +132,17 @@ const Module3Analytics = () => {
     return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
   };
 
+  const formatFastestTimeLabel = (seconds: number | null) => {
+    if (seconds === null || Number.isNaN(seconds)) return '--';
+    const s = Math.max(0, Math.round(seconds));
+    const mins = Math.floor(s / 60);
+    const secs = s % 60;
+    if (mins > 0) {
+      return `${mins} minute${mins === 1 ? '' : 's'}, ${secs} second${secs === 1 ? '' : 's'}`;
+    }
+    return `${secs} second${secs === 1 ? '' : 's'}`;
+  };
+
   const chartWidth = 420;
   const chartHeight = 240;
   const padding = { top: 20, right: 20, bottom: 28, left: 36 };
@@ -151,6 +209,10 @@ const Module3Analytics = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         setProgressPoints([]);
+        setFastestSeconds(null);
+        setDropsBars([]);
+        setOverallTotalTransfers(null);
+        setTransfersByHand([]);
         return;
       }
 
@@ -165,25 +227,45 @@ const Module3Analytics = () => {
       if (sessionsError) {
         console.error('Error loading module 3 sessions:', sessionsError);
         setProgressPoints([]);
+        setFastestSeconds(null);
+        setDropsBars([]);
+        setOverallTotalTransfers(null);
+        setTransfersByHand([]);
         return;
       }
 
       const sessionIds = (sessions ?? []).map((session) => session.session_id as string);
       if (sessionIds.length === 0) {
         setProgressPoints([]);
+        setFastestSeconds(null);
+        setDropsBars([]);
+        setOverallTotalTransfers(null);
+        setTransfersByHand([]);
         return;
       }
 
       const { data: pegRows, error: pegError } = await supabase
         .from('peg_sessions')
-        .select('session_id, score, time_to_completion')
+        .select(
+          'session_id, score, time_to_completion, total_drops, total_transfers, transfers_completed'
+        )
         .in('session_id', sessionIds);
 
       if (pegError) {
         console.error('Error loading module 3 peg scores:', pegError);
         setProgressPoints([]);
+        setFastestSeconds(null);
+        setDropsBars([]);
+        setOverallTotalTransfers(null);
+        setTransfersByHand([]);
         return;
       }
+
+      const completionValues = (pegRows ?? [])
+        .map((row) => row.time_to_completion)
+        .filter((t): t is number => t !== null && t !== undefined && !Number.isNaN(Number(t)))
+        .map((t) => Number(t));
+      setFastestSeconds(completionValues.length > 0 ? Math.min(...completionValues) : null);
 
       const pegBySession = new Map(
         (pegRows ?? []).map((row) => [
@@ -191,9 +273,80 @@ const Module3Analytics = () => {
           {
             score: row.score as number | null,
             duration: row.time_to_completion as number | null,
+            totalDrops: row.total_drops as number | null,
+            totalTransfers: row.total_transfers as number | null,
+            transfersCompleted: row.transfers_completed as number | null,
           },
         ])
       );
+
+      // Left chart: raw drop counts per module-3 session (skip sessions where total_drops is null).
+      const tempDropsBars: { sessionLabel: string; completedAt: string; drops: number }[] = [];
+      let completedDropsIndex = 0;
+      for (const session of sessions ?? []) {
+        const sessionId = session.session_id as string;
+        const match = pegBySession.get(sessionId);
+        if (!match) continue;
+        if (match.totalDrops === null || match.totalDrops === undefined) continue;
+        if (!session.completed_at) continue;
+        completedDropsIndex += 1;
+        tempDropsBars.push({
+          sessionLabel: `Session ${completedDropsIndex}`,
+          completedAt: session.completed_at as string,
+          drops: Number(match.totalDrops),
+        });
+      }
+
+      // Denominator for right chart percentages: sum total_transfers across all module-3 sessions.
+      const totalTransfersOverall = (pegRows ?? [])
+        .map((row) => row.total_transfers)
+        .filter((v): v is number => v !== null && v !== undefined && !Number.isNaN(Number(v)))
+        .map((v) => Number(v))
+        .reduce((sum, v) => sum + v, 0);
+
+      // Right chart: count peg_transfers for each side + completion state.
+      const { data: pegTransfersRows, error: pegTransfersError } = await supabase
+        .from('peg_transfers')
+        .select('from_side, is_completed')
+        .in('session_id', sessionIds);
+
+      if (pegTransfersError) {
+        console.error('Error loading module 3 transfers:', pegTransfersError);
+      }
+
+      const sideCounts: Record<'left' | 'right', { completed: number; failed: number }> = {
+        left: { completed: 0, failed: 0 },
+        right: { completed: 0, failed: 0 },
+      };
+
+      for (const row of pegTransfersRows ?? []) {
+        const sideRaw = (row.from_side as string | null | undefined)?.toLowerCase?.() ?? '';
+        const side: 'left' | 'right' =
+          sideRaw.includes('left') ? 'left' : sideRaw.includes('right') ? 'right' : 'left';
+
+        const isCompleted = row.is_completed;
+        if (isCompleted === true) sideCounts[side].completed += 1;
+        else if (isCompleted === false) sideCounts[side].failed += 1;
+      }
+
+      const tempTransfersByHand: {
+        side: 'left' | 'right';
+        completedCount: number;
+        failedCount: number;
+        completedPct: number;
+        failedPct: number;
+      }[] = (['left', 'right'] as const).map((side) => {
+        const completedCount = sideCounts[side].completed;
+        const failedCount = sideCounts[side].failed;
+        const den = totalTransfersOverall > 0 ? totalTransfersOverall : 0;
+        const completedPct = den > 0 ? (completedCount / den) * 100 : 0;
+        const failedPct = den > 0 ? (failedCount / den) * 100 : 0;
+        return { side, completedCount, failedCount, completedPct, failedPct };
+      });
+
+      setDropsBars(tempDropsBars);
+      setOverallTotalTransfers(totalTransfersOverall);
+      setTransfersByHand(tempTransfersByHand);
 
       const mappedPoints = (sessions ?? [])
         .map((session) => {
@@ -220,6 +373,42 @@ const Module3Analytics = () => {
   const handleTryAgain = () => {
     navigate('/module/3/instructions');
   };
+
+  const dropsChartWidth = 420;
+  const dropsChartHeight = 220;
+  const dropsPadding = { top: 16, right: 16, bottom: 38, left: 48 };
+  const dropsInnerWidth = dropsChartWidth - dropsPadding.left - dropsPadding.right;
+  const dropsInnerHeight = dropsChartHeight - dropsPadding.top - dropsPadding.bottom;
+  const dropsMax = dropsBars.length > 0 ? Math.max(...dropsBars.map((b) => b.drops)) : 0;
+  const dropsBaselineY = dropsPadding.top + dropsInnerHeight;
+  const dropsYScale = (v: number) => {
+    if (dropsMax <= 0) return dropsBaselineY;
+    const clamped = Math.max(0, v);
+    return dropsBaselineY - (clamped / dropsMax) * dropsInnerHeight;
+  };
+
+  const dropCount = dropsBars.length;
+  const dropGap = 10;
+  const dropBarWidth =
+    dropCount > 0 ? Math.max(8, (dropsInnerWidth - dropGap * Math.max(0, dropCount - 1)) / dropCount) : 20;
+
+  const transferChartWidth = 420;
+  const transferChartHeight = 220;
+  const transferPadding = { top: 16, right: 16, bottom: 38, left: 48 };
+  const transferInnerWidth = transferChartWidth - transferPadding.left - transferPadding.right;
+  const transferInnerHeight = transferChartHeight - transferPadding.top - transferPadding.bottom;
+  const transferBaselineY = transferPadding.top + transferInnerHeight;
+  const transferYScalePct = (pct: number) => {
+    const clamped = Math.max(0, Math.min(100, pct));
+    return transferBaselineY - (clamped / 100) * transferInnerHeight;
+  };
+  const transferCenterX = transferPadding.left + transferInnerWidth / 2;
+  const transferHalfWidth = transferInnerWidth / 2;
+  const transferWithinHalfGap = 10;
+  const transferBarWidth = Math.max(10, (transferHalfWidth - transferWithinHalfGap) / 2);
+
+  const transfersLeft = transfersByHand.find((t) => t.side === 'left');
+  const transfersRight = transfersByHand.find((t) => t.side === 'right');
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#2a3642' }}>
@@ -293,9 +482,9 @@ const Module3Analytics = () => {
             </div>
 
             <div className={styles.analyticsContentArea}>
-            <div className={styles.analyticsLayout}>
-              <div className={styles.leftColumnWrapper}>
-                <div className={styles.card}>
+              <div className={styles.analyticsLayout}>
+                <div className={styles.topMetricsRow}>
+                  <div className={styles.card}>
                   <h2 className={styles.cardTitle}>Highest Score</h2>
                   <div className="relative flex items-center justify-center" style={{ width: '100px', height: '100px', margin: '0 auto' }}>
                     <svg width="100" height="100" viewBox="0 0 100 100" className="transform -rotate-90" style={{ display: 'block' }}>
@@ -316,26 +505,26 @@ const Module3Analytics = () => {
                       {highestScore !== null ? `${Math.round(normalizedHighestScore)}%` : '--'}
                     </span>
                   </div>
-                </div>
+                  </div>
 
-                <div className={`${styles.card} ${styles.topCard}`}>
+                  <div className={`${styles.card} ${styles.topCard}`}>
                   <h2 className={styles.cardTitle}>Top</h2>
                   <div className={styles.topCardBody}>
                     <p className={styles.cardValue}>5%</p>
                     <p className={styles.cardSubtext}>of Department</p>
                   </div>
-                </div>
+                  </div>
 
-                <div className={styles.card}>
+                  <div className={styles.card}>
                   <h2 className={styles.cardTitle}>Fastest Time</h2>
-                  <p className={styles.cardValue}>56 seconds</p>
+                  <p className={styles.cardValue}>{formatFastestTimeLabel(fastestSeconds)}</p>
                   <button type="button" onClick={handleTryAgain} className={styles.tryAgainButton}>
                     Try Again
                   </button>
+                  </div>
                 </div>
-              </div>
 
-              <div className={styles.rightCard}>
+                <div className={styles.rightCard}>
                 <h2 className={styles.cardTitle} style={{ marginBottom: '16px', width: '100%' }}>My Progress</h2>
                 <div className={styles.chartWrapper}>
                   {progressPoints.length === 0 ? (
@@ -343,22 +532,267 @@ const Module3Analytics = () => {
                       No completed sessions
                     </div>
                   ) : (
-                    <svg width="100%" height="100%" viewBox={`0 0 ${chartWidth} ${chartHeight}`} className={styles.progressChart} preserveAspectRatio="xMidYMid meet">
-                      <line x1={x1} y1={y1} x2={x1} y2={y2} stroke={axisStroke} strokeWidth="1" />
-                      <line x1={x1} y1={y1} x2={x2} y2={y1} stroke={axisStroke} strokeWidth="1" />
-                      <polyline fill="none" stroke="#1DA5FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={points} />
-                      {plottedPoints.map((point, i) => (
-                        <circle key={i} cx={point.x} cy={point.y} r="5" fill="#ef4444" stroke="#1e2733" strokeWidth="1">
-                          <title>{`Score: ${Math.round(point.scorePct)}%\nCompletion Time: ${formatDuration(point.completionSeconds)}\nCompleted: ${formatTimestamp(point.completedAt)}`}</title>
-                        </circle>
-                      ))}
-                      <text x={timeLabelX} y={timeLabelY} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="12" transform={`rotate(-90, ${timeLabelX}, ${timeLabelY})`}>Score</text>
-                      <text x={scoreLabelX} y={scoreLabelY} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="12">Time</text>
-                    </svg>
+                    <>
+                      <svg width="100%" height="100%" viewBox={`0 0 ${chartWidth} ${chartHeight}`} className={styles.progressChart} preserveAspectRatio="xMidYMid meet">
+                        <line x1={x1} y1={y1} x2={x1} y2={y2} stroke={axisStroke} strokeWidth="1" />
+                        <line x1={x1} y1={y1} x2={x2} y2={y1} stroke={axisStroke} strokeWidth="1" />
+                        <polyline fill="none" stroke="#1DA5FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={points} />
+                        {plottedPoints.map((point, i) => (
+                          <circle
+                            key={i}
+                            cx={point.x}
+                            cy={point.y}
+                            r="5"
+                            fill="#ef4444"
+                            stroke="#1e2733"
+                            strokeWidth="1"
+                            onMouseEnter={() =>
+                              setProgressTooltip({
+                                visible: true,
+                                xPct: (point.x / chartWidth) * 100,
+                                yPct: (point.y / chartHeight) * 100,
+                                lines: [
+                                  `Score: ${Math.round(point.scorePct)}%`,
+                                  `Completion Time: ${formatDuration(point.completionSeconds)}`,
+                                  `Completed: ${formatTimestamp(point.completedAt)}`,
+                                ],
+                              })
+                            }
+                            onMouseLeave={() => setProgressTooltip((prev) => ({ ...prev, visible: false }))}
+                          />
+                        ))}
+                        <text x={timeLabelX} y={timeLabelY} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="12" transform={`rotate(-90, ${timeLabelX}, ${timeLabelY})`}>Score</text>
+                        <text x={scoreLabelX} y={scoreLabelY} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="12">Time</text>
+                      </svg>
+                      {progressTooltip.visible && (
+                        <div
+                          className={styles.chartTooltip}
+                          style={{
+                            left: `${progressTooltip.xPct}%`,
+                            top: `max(8%, calc(${progressTooltip.yPct}% - 20px))`,
+                          }}
+                        >
+                          {progressTooltip.lines.map((line) => (
+                            <div key={line}>{line}</div>
+                          ))}
+                          <div className={styles.chartTooltipArrow} />
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
-            </div>
+
+                <div className={styles.transfersCard}>
+                  <h2 className={styles.cardTitle} style={{ marginBottom: '16px', width: '100%' }}>
+                    Transfers
+                  </h2>
+                  <div className={styles.transfersGrid}>
+                    {/* Left: drops count per completed module 3 session */}
+                    <div className={styles.transfersPanel}>
+                      <div className={styles.transfersChartWrapper}>
+                        {dropsBars.length === 0 ? (
+                          <div className="flex h-full w-full items-center justify-center text-sm" style={{ color: 'rgba(255,255,255,0.75)' }}>
+                            No drop data
+                          </div>
+                        ) : (
+                          <svg
+                            width="100%"
+                            height="100%"
+                            viewBox={`0 0 ${dropsChartWidth} ${dropsChartHeight}`}
+                            className={styles.progressChart}
+                            preserveAspectRatio="xMidYMid meet"
+                          >
+                            <line x1={dropsPadding.left} y1={dropsBaselineY} x2={dropsPadding.left + dropsInnerWidth} y2={dropsBaselineY} stroke={axisStroke} strokeWidth="1" />
+                            {dropsBars.map((bar, i) => {
+                              const x = dropsPadding.left + i * (dropBarWidth + dropGap);
+                              const y = dropsYScale(bar.drops);
+                              const height = dropsBaselineY - y;
+                              const tooltipX = x + dropBarWidth / 2;
+                              const tooltipY = y;
+                              return (
+                                <g key={`${bar.sessionLabel}-${i}`}>
+                                  <rect
+                                    x={x}
+                                    y={y}
+                                    width={dropBarWidth}
+                                    height={Math.max(1, height)}
+                                    fill="#1DA5FF"
+                                    onMouseEnter={() =>
+                                      setDropsTooltip({
+                                        visible: true,
+                                        xPct: (tooltipX / dropsChartWidth) * 100,
+                                        yPct: (tooltipY / dropsChartHeight) * 100,
+                                        lines: [
+                                          `Drops: ${bar.drops}`,
+                                          `Completed: ${formatTimestamp(bar.completedAt)}`,
+                                        ],
+                                      })
+                                    }
+                                    onMouseLeave={() => setDropsTooltip((prev) => ({ ...prev, visible: false }))}
+                                  />
+                                  <text x={tooltipX} y={dropsChartHeight - 12} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="10">
+                                    {bar.sessionLabel.replace('Session ', 'S')}
+                                  </text>
+                                </g>
+                              );
+                            })}
+                            <text
+                              x={dropsPadding.left - 24}
+                              y={dropsPadding.top + dropsInnerHeight / 2}
+                              textAnchor="middle"
+                              fill="rgba(255,255,255,0.85)"
+                              fontSize="11"
+                              transform={`rotate(-90, ${dropsPadding.left - 24}, ${dropsPadding.top + dropsInnerHeight / 2})`}
+                            >
+                              Drops
+                            </text>
+                          </svg>
+                        )}
+                        {dropsTooltip.visible && (
+                          <div
+                            className={styles.chartTooltip}
+                            style={{
+                              left: `${dropsTooltip.xPct}%`,
+                              top: `max(8%, calc(${dropsTooltip.yPct}% - 20px))`,
+                            }}
+                          >
+                            {dropsTooltip.lines.map((line) => (
+                              <div key={line}>{line}</div>
+                            ))}
+                            <div className={styles.chartTooltipArrow} />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Right: transfer success (paired bars) */}
+                    <div className={styles.transfersPanel}>
+                      <div className={styles.transfersRightHeader}>
+                        Total transfers attempted: {overallTotalTransfers ?? '--'}
+                      </div>
+                      <div className={styles.transfersChartWrapper}>
+                        {overallTotalTransfers === null ? (
+                          <div className="flex h-full w-full items-center justify-center text-sm" style={{ color: 'rgba(255,255,255,0.75)' }}>
+                            No transfer data
+                          </div>
+                        ) : (
+                          <svg
+                            width="100%"
+                            height="100%"
+                            viewBox={`0 0 ${transferChartWidth} ${transferChartHeight}`}
+                            className={styles.progressChart}
+                            preserveAspectRatio="xMidYMid meet"
+                          >
+                            <line x1={transferPadding.left} y1={transferBaselineY} x2={transferPadding.left + transferInnerWidth} y2={transferBaselineY} stroke={axisStroke} strokeWidth="1" />
+                            <line x1={transferCenterX} y1={transferPadding.top} x2={transferCenterX} y2={transferBaselineY} stroke="rgba(255,255,255,0.35)" strokeWidth="2" />
+
+                            {(['left', 'right'] as const).map((side) => {
+                              const t = side === 'left' ? transfersLeft : transfersRight;
+                              const completedPct = t?.completedPct ?? 0;
+                              const failedPct = t?.failedPct ?? 0;
+                              const completedCount = t?.completedCount ?? 0;
+                              const failedCount = t?.failedCount ?? 0;
+
+                              const sideStartX = side === 'left' ? transferPadding.left : transferCenterX;
+                              const completedX = sideStartX + (transferHalfWidth - transferWithinHalfGap - transferBarWidth) / 2;
+                              const failedX = completedX + transferBarWidth + transferWithinHalfGap;
+
+                              const completedY = transferYScalePct(completedPct);
+                              const failedY = transferYScalePct(failedPct);
+                              const completedHeight = transferBaselineY - completedY;
+                              const failedHeight = transferBaselineY - failedY;
+
+                              const completedTooltipX = completedX + transferBarWidth / 2;
+                              const completedTooltipY = completedY;
+                              const failedTooltipX = failedX + transferBarWidth / 2;
+                              const failedTooltipY = failedY;
+
+                              return (
+                                <g key={side}>
+                                  <rect
+                                    x={completedX}
+                                    y={completedY}
+                                    width={transferBarWidth}
+                                    height={Math.max(1, completedHeight)}
+                                    fill="#16a34a"
+                                    onMouseEnter={() =>
+                                      setTransferTooltip({
+                                        visible: true,
+                                        xPct: (completedTooltipX / transferChartWidth) * 100,
+                                        yPct: (completedTooltipY / transferChartHeight) * 100,
+                                        lines: [
+                                          `Completed transfers: ${completedCount}`,
+                                          `Success: ${completedPct.toFixed(2)}%`,
+                                          `Hand: ${side}`,
+                                        ],
+                                      })
+                                    }
+                                    onMouseLeave={() => setTransferTooltip((prev) => ({ ...prev, visible: false }))}
+                                  />
+                                  <rect
+                                    x={failedX}
+                                    y={failedY}
+                                    width={transferBarWidth}
+                                    height={Math.max(1, failedHeight)}
+                                    fill="#dc2626"
+                                    onMouseEnter={() =>
+                                      setTransferTooltip({
+                                        visible: true,
+                                        xPct: (failedTooltipX / transferChartWidth) * 100,
+                                        yPct: (failedTooltipY / transferChartHeight) * 100,
+                                        lines: [
+                                          `Failed transfers: ${failedCount}`,
+                                          `Failure: ${failedPct.toFixed(2)}%`,
+                                          `Hand: ${side}`,
+                                        ],
+                                      })
+                                    }
+                                    onMouseLeave={() => setTransferTooltip((prev) => ({ ...prev, visible: false }))}
+                                  />
+                                </g>
+                              );
+                            })}
+
+                            <text
+                              x={transferPadding.left + transferHalfWidth / 2}
+                              y={transferChartHeight - 12}
+                              textAnchor="middle"
+                              fill="rgba(255,255,255,0.85)"
+                              fontSize="11"
+                            >
+                              {transfersLeft ? transfersLeft.side : 'left'}
+                            </text>
+                            <text
+                              x={transferCenterX + transferHalfWidth / 2}
+                              y={transferChartHeight - 12}
+                              textAnchor="middle"
+                              fill="rgba(255,255,255,0.85)"
+                              fontSize="11"
+                            >
+                              {transfersRight ? transfersRight.side : 'right'}
+                            </text>
+                          </svg>
+                        )}
+                        {transferTooltip.visible && (
+                          <div
+                            className={styles.chartTooltip}
+                            style={{
+                              left: `${transferTooltip.xPct}%`,
+                              top: `max(8%, calc(${transferTooltip.yPct}% - 20px))`,
+                            }}
+                          >
+                            {transferTooltip.lines.map((line) => (
+                              <div key={line}>{line}</div>
+                            ))}
+                            <div className={styles.chartTooltipArrow} />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </main>

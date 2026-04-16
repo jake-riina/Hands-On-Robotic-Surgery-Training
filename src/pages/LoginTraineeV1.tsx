@@ -26,7 +26,6 @@ const LoginTraineeV1: React.FC = () => {
   const [role, setRole] = useState<UserRole>('trainee');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [current, setCurrent] = useState(0);
@@ -409,7 +408,7 @@ const LoginTraineeV1: React.FC = () => {
 
           {/* Sign In Form - White rounded box */}
           <div
-            className="bg-white rounded-lg p-8 shadow-lg flex flex-col items-center justify-center"
+            className="bg-white rounded-lg shadow-lg flex flex-col items-center justify-center"
             style={{
               backgroundColor: '#ffffff',
               width: '25vw',
@@ -417,7 +416,8 @@ const LoginTraineeV1: React.FC = () => {
               maxWidth: '500px',
               minHeight: '500px',
               borderRadius: '0.5rem',
-              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)'
+              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+              padding: '2rem',
             }}
           >
           <div
@@ -425,7 +425,7 @@ const LoginTraineeV1: React.FC = () => {
             style={{
               padding: '0 2rem',
               marginBottom: '1rem',
-              marginTop: isSignUp ? '1.25rem' : '-40px',
+              marginTop: isSignUp ? '1.25rem' : '0',
             }}
           >
             <h2
@@ -551,36 +551,12 @@ const LoginTraineeV1: React.FC = () => {
 
 
 
-            {/* Remember Me & Forgot Password */}
-            <div className="px-1 w-full flex justify-center">
-              <div style={{ minWidth: '0', width: '75%' }}>
-                <div className="flex items-center justify-between w-full">
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                    <span className="ml-2 text-gray-700" style={{ fontSize: '13px' }}>Remember for 30 Days</span>
-                  </label>
-                  <a href="#" className="text-blue-600 hover:underline" style={{ color: '#2563eb', fontSize: '13px' }}>
-                    Forgot Password?
-                  </a>
-                </div>
-              </div>
-            </div>
-
-
-
-
-
             {/* Sign In Button */}
             <div
               style={{
                 minWidth: '0',
                 width: '60%',
-                margin: '1rem auto',
+                margin: '1rem auto 0 auto',
               }}
             >
               <button

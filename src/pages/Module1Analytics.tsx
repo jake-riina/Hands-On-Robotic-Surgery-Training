@@ -11,6 +11,19 @@ const Module1Analytics = () => {
     { completedAt: string; scorePct: number; completionSeconds: number | null }[]
   >([]);
 
+  type TooltipState = {
+    visible: boolean;
+    xPct: number;
+    yPct: number;
+    lines: string[];
+  };
+  const [progressTooltip, setProgressTooltip] = useState<TooltipState>({
+    visible: false,
+    xPct: 50,
+    yPct: 50,
+    lines: [],
+  });
+
   const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
     { path: '/modules', label: 'Modules', icon: 'modules' },
@@ -335,18 +348,53 @@ const Module1Analytics = () => {
                       No completed sessions
                     </div>
                   ) : (
-                    <svg width="100%" height="100%" viewBox={`0 0 ${chartWidth} ${chartHeight}`} className={styles.progressChart} preserveAspectRatio="xMidYMid meet">
-                      <line x1={x1} y1={y1} x2={x1} y2={y2} stroke={axisStroke} strokeWidth="1" />
-                      <line x1={x1} y1={y1} x2={x2} y2={y1} stroke={axisStroke} strokeWidth="1" />
-                      <polyline fill="none" stroke="#1DA5FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={points} />
-                      {plottedPoints.map((point, i) => (
-                        <circle key={i} cx={point.x} cy={point.y} r="5" fill="#ef4444" stroke="#1e2733" strokeWidth="1">
-                          <title>{`Score: ${Math.round(point.scorePct)}%\nCompletion Time: ${formatDuration(point.completionSeconds)}\nCompleted: ${formatTimestamp(point.completedAt)}`}</title>
-                        </circle>
-                      ))}
-                      <text x={timeLabelX} y={timeLabelY} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="12" transform={`rotate(-90, ${timeLabelX}, ${timeLabelY})`}>Score</text>
-                      <text x={scoreLabelX} y={scoreLabelY} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="12">Time</text>
-                    </svg>
+                    <>
+                      <svg width="100%" height="100%" viewBox={`0 0 ${chartWidth} ${chartHeight}`} className={styles.progressChart} preserveAspectRatio="xMidYMid meet">
+                        <line x1={x1} y1={y1} x2={x1} y2={y2} stroke={axisStroke} strokeWidth="1" />
+                        <line x1={x1} y1={y1} x2={x2} y2={y1} stroke={axisStroke} strokeWidth="1" />
+                        <polyline fill="none" stroke="#1DA5FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={points} />
+                        {plottedPoints.map((point, i) => (
+                          <circle
+                            key={i}
+                            cx={point.x}
+                            cy={point.y}
+                            r="5"
+                            fill="#ef4444"
+                            stroke="#1e2733"
+                            strokeWidth="1"
+                            onMouseEnter={() =>
+                              setProgressTooltip({
+                                visible: true,
+                                xPct: (point.x / chartWidth) * 100,
+                                yPct: (point.y / chartHeight) * 100,
+                                lines: [
+                                  `Score: ${Math.round(point.scorePct)}%`,
+                                  `Completion Time: ${formatDuration(point.completionSeconds)}`,
+                                  `Completed: ${formatTimestamp(point.completedAt)}`,
+                                ],
+                              })
+                            }
+                            onMouseLeave={() => setProgressTooltip((prev) => ({ ...prev, visible: false }))}
+                          />
+                        ))}
+                        <text x={timeLabelX} y={timeLabelY} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="12" transform={`rotate(-90, ${timeLabelX}, ${timeLabelY})`}>Score</text>
+                        <text x={scoreLabelX} y={scoreLabelY} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="12">Time</text>
+                      </svg>
+                      {progressTooltip.visible && (
+                        <div
+                          className={styles.chartTooltip}
+                          style={{
+                            left: `${progressTooltip.xPct}%`,
+                            top: `max(8%, calc(${progressTooltip.yPct}% - 20px))`,
+                          }}
+                        >
+                          {progressTooltip.lines.map((line) => (
+                            <div key={line}>{line}</div>
+                          ))}
+                          <div className={styles.chartTooltipArrow} />
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
