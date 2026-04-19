@@ -68,9 +68,9 @@
 /* Constrain analytics area to viewport so grid and cards have finite height; bottom spacing per Figma */
 .analyticsContentArea {
   box-sizing: border-box;
-  height: calc(100vh - 72px - 32px - 32px - 52px - 24px);
+  height: calc(100vh - 88px - 32px - 32px - 52px - 24px);
   min-height: 400px;
-  max-height: calc(100vh - 72px - 32px - 32px - 52px - 24px);
+  max-height: calc(100vh - 88px - 32px - 32px - 52px - 24px);
   margin-bottom: 56px;
   padding-bottom: 32px;
 }

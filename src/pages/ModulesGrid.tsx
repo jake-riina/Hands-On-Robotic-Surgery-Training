@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import type { Module } from '../api/mock/types';
 import { mockModulesAPI } from '../api/mock/modules';
 import ProfileDropdown from '../components/ProfileDropdown';
+import dashboardStyles from './AdminDashboard.module.css';
 
 const ModulesGrid = () => {
   const navigate = useNavigate();
@@ -76,26 +77,30 @@ const ModulesGrid = () => {
   const cardStyle = {
     backgroundColor: '#1E2733',
     boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3)',
+    borderRadius: '8px',
   };
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#26313E' }}>
       {/* Header */}
-      <header className="flex items-center justify-between px-6 py-2" style={{ backgroundColor: '#1E2733' }}>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center justify-center overflow-hidden" style={{ width: '72px', height: '72px' }}>
-            <img
-              src="/Logo.png"
-              alt="Logo"
-              className="object-contain"
-              style={{ width: '72px', height: '72px', maxWidth: '72px', maxHeight: '72px', objectFit: 'contain' }}
-            />
+      <header
+        className="flex items-center justify-between px-6 py-2 box-border shrink-0"
+        style={{
+          backgroundColor: '#1E2733',
+          height: '88px',
+          minHeight: '88px',
+          maxHeight: '88px',
+        }}
+      >
+        <div className="flex h-full min-h-0 flex-1 items-center gap-4 min-w-0">
+          <div className="flex h-full min-h-0 max-w-[min(280px,42vw)] items-center justify-center overflow-hidden">
+            <img src="/Logo.png" alt="Logo" className="block h-auto max-h-full w-auto max-w-full object-contain" />
           </div>
         </div>
         <ProfileDropdown />
       </header>
 
-      <div className="flex" style={{ minHeight: 'calc(100vh - 72px)' }}>
+      <div className="flex" style={{ minHeight: 'calc(100vh - 88px)' }}>
         {/* Sidebar */}
         <aside className="w-64" style={{ backgroundColor: '#1E2733' }}>
           <nav className="py-6">
@@ -145,7 +150,7 @@ const ModulesGrid = () => {
                 const isLocked = module.id !== 2 && module.id !== 3 && module.locked && !isUnlockedByUser;
                 const content = (
                   <div
-                    className="rounded-lg p-6 flex flex-col h-full transition-all"
+                    className="p-6 flex flex-col h-full transition-all"
                     style={{
                       ...cardStyle,
                       minHeight: '380px',
@@ -340,8 +345,8 @@ const ModulesGrid = () => {
                               setUnlockedModuleIds((prev) => new Set(prev).add(2));
                               navigate('/module/2/instructions');
                             }}
-                            className="inline-block px-8 py-2 rounded-lg font-medium text-center text-sm cursor-pointer hover:opacity-90 border-0"
-                            style={{ backgroundColor: '#1DA5FF', color: 'white', minWidth: '180px' }}
+                            className={`inline-flex items-center justify-center px-8 py-2 text-sm text-center border-0 ${dashboardStyles.traineeDashboardButtonChrome} ${dashboardStyles.gloveConnectButton}`}
+                            style={{ minWidth: '180px' }}
                           >
                             Go To Module
                           </button>
@@ -352,14 +357,14 @@ const ModulesGrid = () => {
                               setUnlockedModuleIds((prev) => new Set(prev).add(3));
                               navigate('/module/3/instructions');
                             }}
-                            className="inline-block px-8 py-2 rounded-lg font-medium text-center text-sm cursor-pointer hover:opacity-90 border-0"
-                            style={{ backgroundColor: '#1DA5FF', color: 'white', minWidth: '180px' }}
+                            className={`inline-flex items-center justify-center px-8 py-2 text-sm text-center border-0 ${dashboardStyles.traineeDashboardButtonChrome} ${dashboardStyles.gloveConnectButton}`}
+                            style={{ minWidth: '180px' }}
                           >
                             Go To Module
                           </button>
                         ) : (
                           <span
-                            className="inline-block px-8 py-2 rounded-lg font-medium text-center text-sm cursor-not-allowed"
+                            className={`inline-flex items-center justify-center px-8 py-2 font-medium text-center text-sm cursor-not-allowed border-0 ${dashboardStyles.traineeDashboardButtonChrome}`}
                             style={{ backgroundColor: '#374151', color: '#9CA3AF', minWidth: '180px' }}
                           >
                             Go To Module
@@ -374,8 +379,8 @@ const ModulesGrid = () => {
                                 ? '/module/3/instructions'
                                 : `/module/${module.id}/instructions`
                           }
-                          className="inline-block px-8 py-2 rounded-lg font-medium text-center transition-colors hover:opacity-90 text-sm"
-                          style={{ backgroundColor: '#1DA5FF', color: 'white', textDecoration: 'none', minWidth: '180px' }}
+                          className={`inline-flex items-center justify-center px-8 py-2 text-sm text-center border-0 no-underline ${dashboardStyles.traineeDashboardButtonChrome} ${dashboardStyles.gloveConnectButton}`}
+                          style={{ minWidth: '180px', textDecoration: 'none' }}
                         >
                           Go To Module
                         </Link>
