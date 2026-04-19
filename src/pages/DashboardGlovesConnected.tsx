@@ -4,6 +4,7 @@ import { useBLE } from '../contexts/BLEContext';
 import { supabase } from '../lib/supabaseClient';
 import ProfileDropdown from '../components/ProfileDropdown';
 import ChevronNavButtons from '../components/ChevronNavButtons';
+import dashboardStyles from './AdminDashboard.module.css';
 
 const EXPLORE_MODULES = [
   {
@@ -164,21 +165,18 @@ const DashboardGlovesConnected = () => {
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#26313E' }}>
       {/* Header Container - Top Bar */}
-      <header className="flex items-center justify-between px-6 py-2" style={{ backgroundColor: '#1E2733' }}>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center justify-center overflow-hidden" style={{ width: '72px', height: '72px' }}>
-            <img 
-              src="/Logo.png" 
-              alt="Logo" 
-              className="object-contain"
-              style={{ 
-                width: '72px', 
-                height: '72px', 
-                maxWidth: '72px', 
-                maxHeight: '72px',
-                objectFit: 'contain'
-              }}
-            />
+      <header
+        className="flex items-center justify-between px-6 py-2 box-border shrink-0"
+        style={{
+          backgroundColor: '#1E2733',
+          height: '88px',
+          minHeight: '88px',
+          maxHeight: '88px',
+        }}
+      >
+        <div className="flex h-full min-h-0 flex-1 items-center gap-4 min-w-0">
+          <div className="flex h-full min-h-0 max-w-[min(280px,42vw)] items-center justify-center overflow-hidden">
+            <img src="/Logo.png" alt="Logo" className="block h-auto max-h-full w-auto max-w-full object-contain" />
           </div>
         </div>
         {/* Profile picture */}
@@ -186,7 +184,7 @@ const DashboardGlovesConnected = () => {
       </header>
 
       {/* Main Layout Container */}
-      <div className="flex" style={{ minHeight: 'calc(100vh - 72px)' }}>
+      <div className="flex" style={{ minHeight: 'calc(100vh - 88px)' }}>
         {/* Sidebar Container - Left Navigation */}
         <aside className="w-64" style={{ backgroundColor: '#1E2733' }}>
           <nav className="py-6">
@@ -230,12 +228,13 @@ const DashboardGlovesConnected = () => {
             <div className="flex flex-col" style={{ height: '400px', gap: '24px', width: '320px' }}>
               {/* Box 1: Jake's Hands On Gloves Card */}
               <div 
-                className="rounded-lg relative" 
+                className="relative" 
                 style={{ 
                   backgroundColor: '#1E2733',
                   boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3)',
                   height: '170px',
-                  width: '100%'
+                  width: '100%',
+                  borderRadius: '8px',
                 }}
               >
                 {!isConnected && (
@@ -295,32 +294,31 @@ const DashboardGlovesConnected = () => {
                       type="button"
                       onClick={handleConnectGloves}
                       disabled={isConnecting}
-                      className="mt-2 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer hover:opacity-90 border-0 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:opacity-60"
-                      style={{
-                        backgroundColor: '#1DA5FF',
-                        color: 'white',
-                      }}
+                      className={`mt-4 px-4 py-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed ${dashboardStyles.traineeDashboardButtonChrome} ${dashboardStyles.gloveConnectButton}`}
                     >
                       {isConnecting ? 'Connecting...' : 'Connect'}
                     </button>
                   )}
 
-                  {/* Status message */}
-                  <p className="mt-2 text-xs" style={{ color: '#9CA3AF' }}>
-                    {connectionStatus}
-                  </p>
+                  {/* Extra BLE detail (errors, connecting, etc.) — hide when same as the dot + label line */}
+                  {connectionStatus !== 'Not connected' && connectionStatus !== 'Connected' && (
+                    <p className="mt-2 text-xs" style={{ color: '#9CA3AF' }}>
+                      {connectionStatus}
+                    </p>
+                  )}
                 </div>
               </div>
 
 
               {/* Box 4: Daily Challenge Card */}
               <div 
-                className="rounded-lg flex flex-col" 
+                className="flex flex-col" 
                 style={{ 
                   backgroundColor: '#1E2733',
                   boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3)',
                   height: '206px',
-                  width: '100%'
+                  width: '100%',
+                  borderRadius: '8px',
                 }}
               >
                 <div className="p-4 flex flex-col flex-1" style={{ minHeight: 0, boxSizing: 'border-box' }}>
@@ -353,12 +351,13 @@ const DashboardGlovesConnected = () => {
 
             {/* Box 2: Explore Modules Card - carousel for each of the 3 modules */}
             <div 
-              className="rounded-lg flex flex-col" 
+              className="flex flex-col" 
               style={{ 
                 backgroundColor: '#1E2733', 
                 height: '400px',
                 width: '320px',
-                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3)'
+                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3)',
+                borderRadius: '8px',
               }}
             >
               <div className="p-4 flex flex-col flex-1" style={{ minHeight: 0, boxSizing: 'border-box' }}>
@@ -417,13 +416,11 @@ const DashboardGlovesConnected = () => {
                       </p>
                       <div className="mt-auto flex-shrink-0">
                         <button 
-                          className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm cursor-pointer hover:opacity-90 border-0"
+                          type="button"
+                          className={`inline-flex items-center px-4 py-2 font-medium text-sm cursor-pointer hover:opacity-90 border-0 ${dashboardStyles.traineeDashboardButtonChrome}`}
                           style={{ backgroundColor: '#1DA5FF', color: 'white' }}
                           onClick={() => navigate(module.route)}
                         >
-                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M6 12l4-4-4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
                           <span className="text-sm">Go to Module</span>
                         </button>
                       </div>
@@ -439,12 +436,13 @@ const DashboardGlovesConnected = () => {
             
             {/* Box 3: My Skills Card */}
             <div 
-              className="rounded-lg flex flex-col" 
+              className="flex flex-col" 
               style={{ 
                 backgroundColor: '#1E2733', 
                 height: '400px',
                 width: '320px',
-                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3)'
+                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3)',
+                borderRadius: '8px',
               }}
             >
               <div className="p-4 flex flex-col flex-1" style={{ minHeight: 0, boxSizing: 'border-box' }}>
@@ -508,13 +506,11 @@ const DashboardGlovesConnected = () => {
                 })()}
                 <div className="mt-auto flex-shrink-0">
                   <button 
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm cursor-pointer hover:opacity-90 border-0"
+                    type="button"
+                    className={`inline-flex items-center px-4 py-2 font-medium text-sm cursor-pointer hover:opacity-90 border-0 ${dashboardStyles.traineeDashboardButtonChrome}`}
                     style={{ backgroundColor: '#1DA5FF', color: 'white' }}
                     onClick={() => navigate(MY_SKILLS_ANALYTICS_ROUTES[mySkillsModuleIndex] ?? '/analytics')}
                   >
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M6 12l4-4-4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
                     <span className="text-sm">Go to Analytics</span>
                   </button>
                 </div>
@@ -526,13 +522,14 @@ const DashboardGlovesConnected = () => {
 
           {/* Box 5: Continue Module 1 Card */}
           <div 
-            className="rounded-lg p-4" 
+            className="p-4" 
             style={{ 
               backgroundColor: '#1E2733',
               boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3)',
               width: '1008px',
               marginTop: '24px',
-              paddingBottom: '24px'
+              paddingBottom: '24px',
+              borderRadius: '8px',
             }}
           >
             <div className="flex" style={{ gap: '48px', alignItems: 'flex-start' }}>
@@ -576,7 +573,8 @@ const DashboardGlovesConnected = () => {
                   </div>
                 </div>
                 <button 
-                  className="px-6 py-2 rounded-lg font-medium text-sm cursor-pointer hover:opacity-90 border-0"
+                  type="button"
+                  className={`inline-flex items-center px-6 py-2 font-medium text-sm cursor-pointer hover:opacity-90 border-0 ${dashboardStyles.traineeDashboardButtonChrome}`}
                   style={{ backgroundColor: '#1DA5FF', color: 'white' }}
                   onClick={() => navigate('/module/1/instructions')}
                 >
