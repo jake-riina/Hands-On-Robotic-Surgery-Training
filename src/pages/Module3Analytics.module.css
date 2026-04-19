@@ -125,6 +125,15 @@
   min-height: 0;
 }
 
+.transfersPanelChartTitle {
+  margin: 0 0 10px 0;
+  width: 100%;
+  text-align: center;
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
 .transfersRightHeader {
   color: #9CA3AF;
   font-size: 12px;
@@ -219,6 +228,47 @@
   height: 100%;
   max-width: 100%;
   min-height: 0;
+}
+
+.chartNodeGroup {
+  cursor: pointer;
+}
+
+.chartNodeHit {
+  fill: transparent;
+}
+
+.chartNode {
+  fill: #ef4444;
+  stroke: #1e2733;
+  stroke-width: 1px;
+  pointer-events: none;
+  transition: filter 0.2s ease;
+}
+
+.chartNodeGroup:hover .chartNode {
+  filter: brightness(0.78);
+}
+
+.chartBarInteractive {
+  cursor: pointer;
+  transition: filter 0.2s ease;
+}
+
+.chartBarInteractive:hover {
+  filter: brightness(0.82);
+}
+
+.chartBarGroup {
+  cursor: pointer;
+}
+
+.chartBarVisible {
+  transition: filter 0.2s ease;
+}
+
+.chartBarGroup:hover .chartBarVisible {
+  filter: brightness(0.8);
 }
 
 .cardTitle {

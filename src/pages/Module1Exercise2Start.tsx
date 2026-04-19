@@ -4,9 +4,9 @@ import { useBLE } from '../contexts/BLEContext';
 import {
   MODULE1_EXERCISE_DURATION_SECONDS,
   MODULE1_GAUGE_PSI_MAX,
-  MODULE1_TARGET_PSI_MAX,
-  MODULE1_TARGET_PSI_MIN,
+  MODULE1_TARGET_SCHEDULE,
   module1ScorePercent,
+  module1TargetBandAtElapsedMs,
 } from '../lib/module1PressureGauge';
 
 const ForceSensorGraph = () => {
@@ -185,8 +185,6 @@ const ForceSensorGraph = () => {
   );
 };
 
-const TARGET_MIN = MODULE1_TARGET_PSI_MIN;
-const TARGET_MAX = MODULE1_TARGET_PSI_MAX;
 const PASSING_SCORE = 80;
 
 const Module1Exercise2Start = () => {
@@ -197,6 +195,7 @@ const Module1Exercise2Start = () => {
   const [timeRemaining, setTimeRemaining] = useState(MODULE1_EXERCISE_DURATION_SECONDS);
   const [score, setScore] = useState<number | null>(null);
   const [hasPassed, setHasPassed] = useState<boolean | null>(null);
+  const [, setTargetUiTick] = useState(0);
 
   // Spacebar testing / cheat pressure (same pattern as Exercise 1)
   const [cheatPressure, setCheatPressure] = useState<number | null>(null);
@@ -298,6 +297,17 @@ const Module1Exercise2Start = () => {
   const thresholdIntervalRef = useRef<number | null>(null);
   const timerIntervalRef = useRef<number | null>(null);
 
+  useEffect(() => {
+    if (!isExerciseActive || timeRemaining <= 0) return;
+    const id = window.setInterval(() => setTargetUiTick((t) => t + 1), 150);
+    return () => clearInterval(id);
+  }, [isExerciseActive, timeRemaining]);
+
+  const targetBandLive =
+    exerciseStarted && startTimeRef.current != null
+      ? module1TargetBandAtElapsedMs(Date.now() - startTimeRef.current)
+      : MODULE1_TARGET_SCHEDULE[0];
+
   // Start the exercise when we first see non-zero pressure
   useEffect(() => {
     if (!exerciseStarted && effectivePressure > 0) {
@@ -309,7 +319,7 @@ const Module1Exercise2Start = () => {
     }
   }, [effectivePressure, exerciseStarted]);
 
-  // Track time spent in the target pressure range (15–20 PSI); ref avoids resetting the interval every BLE sample
+  // Track time spent in the active target band (changes every 5s)
   useEffect(() => {
     if (!isExerciseActive || !exerciseStarted) {
       return;
@@ -320,8 +330,10 @@ const Module1Exercise2Start = () => {
       const last = lastCheckTimeRef.current ?? now;
       const delta = now - last;
       const p = effectivePressureRef.current;
+      const elapsedMs = now - (startTimeRef.current ?? now);
+      const { min, max } = module1TargetBandAtElapsedMs(elapsedMs);
 
-      if (p >= TARGET_MIN && p <= TARGET_MAX) {
+      if (p >= min && p <= max) {
         timeOnTargetRef.current += delta;
       }
 
@@ -427,7 +439,15 @@ const Module1Exercise2Start = () => {
             </p>
 
             <p className="text-center text-sm mb-2" style={{ color: '#D1D5DB' }}>
-              Target range: {TARGET_MIN}–{TARGET_MAX} PSI over {MODULE1_EXERCISE_DURATION_SECONDS} seconds.
+              Target updates every 5s (5–10, 12–17, 3–8, 15–20 PSI) over {MODULE1_EXERCISE_DURATION_SECONDS}s.
+              {exerciseStarted && timeRemaining > 0 ? (
+                <>
+                  {' '}
+                  <span className="font-semibold text-white">
+                    Now: {targetBandLive.min}–{targetBandLive.max} PSI
+                  </span>
+                </>
+              ) : null}{' '}
               Passing score: {PASSING_SCORE}%.
             </p>
 

@@ -9,7 +9,7 @@ const Module3Analytics = () => {
   const [highestScore, setHighestScore] = useState<number | null>(null);
   const [fastestSeconds, setFastestSeconds] = useState<number | null>(null);
   const [progressPoints, setProgressPoints] = useState<
-    { completedAt: string; scorePct: number; completionSeconds: number | null }[]
+    { sessionLabel: string; completedAt: string; scorePct: number; completionSeconds: number | null }[]
   >([]);
 
   type TransfersTooltipState = {
@@ -144,25 +144,23 @@ const Module3Analytics = () => {
   };
 
   const chartWidth = 420;
-  const chartHeight = 240;
-  const padding = { top: 20, right: 20, bottom: 28, left: 36 };
+  const chartHeight = 248;
+  const padding = { top: 20, right: 20, bottom: 36, left: 36 };
   const innerWidth = chartWidth - padding.left - padding.right;
   const innerHeight = chartHeight - padding.top - padding.bottom;
   const scoreMin = 0;
   const scoreMax = 100;
-  const progressTimes = progressPoints.map((point) => new Date(point.completedAt).getTime());
-  const minTime = progressTimes.length > 0 ? Math.min(...progressTimes) : 0;
-  const maxTime = progressTimes.length > 0 ? Math.max(...progressTimes) : 0;
-  const xScale = (timeMs: number) => {
-    if (progressPoints.length <= 1 || maxTime === minTime) {
+  const progressCount = progressPoints.length;
+  const xScaleByIndex = (i: number) => {
+    if (progressCount <= 1) {
       return padding.left + innerWidth / 2;
     }
-    return padding.left + ((timeMs - minTime) / (maxTime - minTime)) * innerWidth;
+    return padding.left + (i / (progressCount - 1)) * innerWidth;
   };
   const yScale = (s: number) => padding.top + innerHeight - (s - scoreMin) / (scoreMax - scoreMin) * innerHeight;
-  const plottedPoints = progressPoints.map((point) => ({
+  const plottedPoints = progressPoints.map((point, i) => ({
     ...point,
-    x: xScale(new Date(point.completedAt).getTime()),
+    x: xScaleByIndex(i),
     y: yScale(point.scorePct),
   }));
   const points = plottedPoints.map((point) => `${point.x},${point.y}`).join(' ');
@@ -174,7 +172,8 @@ const Module3Analytics = () => {
   const timeLabelX = padding.left - 16;
   const timeLabelY = padding.top + innerHeight / 2;
   const scoreLabelX = padding.left + innerWidth / 2;
-  const scoreLabelY = chartHeight - 8;
+  const scoreLabelY = chartHeight - 4;
+  const sessionTickLabelY = chartHeight - 20;
   const normalizedHighestScore = Math.max(0, Math.min(100, highestScore ?? 0));
 
   useEffect(() => {
@@ -362,7 +361,11 @@ const Module3Analytics = () => {
             completionSeconds: match.duration,
           };
         })
-        .filter((point): point is { completedAt: string; scorePct: number; completionSeconds: number | null } => point !== null);
+        .filter((point): point is { completedAt: string; scorePct: number; completionSeconds: number | null } => point !== null)
+        .map((point, index) => ({
+          ...point,
+          sessionLabel: `Session ${index + 1}`,
+        }));
 
       setProgressPoints(mappedPoints);
     };
@@ -380,12 +383,24 @@ const Module3Analytics = () => {
   const dropsInnerWidth = dropsChartWidth - dropsPadding.left - dropsPadding.right;
   const dropsInnerHeight = dropsChartHeight - dropsPadding.top - dropsPadding.bottom;
   const dropsMax = dropsBars.length > 0 ? Math.max(...dropsBars.map((b) => b.drops)) : 0;
+  const dropsAxisMax =
+    dropsMax <= 0 ? 1 : Math.max(dropsMax, Math.ceil(dropsMax / 5) * 5);
   const dropsBaselineY = dropsPadding.top + dropsInnerHeight;
   const dropsYScale = (v: number) => {
-    if (dropsMax <= 0) return dropsBaselineY;
-    const clamped = Math.max(0, v);
-    return dropsBaselineY - (clamped / dropsMax) * dropsInnerHeight;
+    const clamped = Math.max(0, Math.min(v, dropsAxisMax));
+    return dropsBaselineY - (clamped / dropsAxisMax) * dropsInnerHeight;
   };
+  const dropsYTicks = (() => {
+    const max = Math.round(dropsAxisMax);
+    if (max <= 12) {
+      return Array.from({ length: max + 1 }, (_, i) => i);
+    }
+    const step = Math.max(1, Math.ceil(max / 6));
+    const ticks: number[] = [];
+    for (let v = 0; v < max; v += step) ticks.push(v);
+    if (ticks[ticks.length - 1] !== max) ticks.push(max);
+    return ticks;
+  })();
 
   const dropCount = dropsBars.length;
   const dropGap = 10;
@@ -394,7 +409,7 @@ const Module3Analytics = () => {
 
   const transferChartWidth = 420;
   const transferChartHeight = 220;
-  const transferPadding = { top: 16, right: 16, bottom: 38, left: 48 };
+  const transferPadding = { top: 16, right: 16, bottom: 38, left: 58 };
   const transferInnerWidth = transferChartWidth - transferPadding.left - transferPadding.right;
   const transferInnerHeight = transferChartHeight - transferPadding.top - transferPadding.bottom;
   const transferBaselineY = transferPadding.top + transferInnerHeight;
@@ -402,10 +417,14 @@ const Module3Analytics = () => {
     const clamped = Math.max(0, Math.min(100, pct));
     return transferBaselineY - (clamped / 100) * transferInnerHeight;
   };
+  const transferYTicks = [0, 25, 50, 75, 100];
   const transferCenterX = transferPadding.left + transferInnerWidth / 2;
   const transferHalfWidth = transferInnerWidth / 2;
-  const transferWithinHalfGap = 10;
-  const transferBarWidth = Math.max(10, (transferHalfWidth - transferWithinHalfGap) / 2);
+  const transferCenterGap = 26;
+  const transferOuterGap = 12;
+  const transferWithinPairGap = 10;
+  const transferPairSpan = transferHalfWidth - transferCenterGap / 2 - transferOuterGap;
+  const transferBarWidth = Math.max(10, (transferPairSpan - transferWithinPairGap) / 2);
 
   const transfersLeft = transfersByHand.find((t) => t.side === 'left');
   const transfersRight = transfersByHand.find((t) => t.side === 'right');
@@ -538,31 +557,41 @@ const Module3Analytics = () => {
                         <line x1={x1} y1={y1} x2={x2} y2={y1} stroke={axisStroke} strokeWidth="1" />
                         <polyline fill="none" stroke="#1DA5FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={points} />
                         {plottedPoints.map((point, i) => (
-                          <circle
-                            key={i}
-                            cx={point.x}
-                            cy={point.y}
-                            r="5"
-                            fill="#ef4444"
-                            stroke="#1e2733"
-                            strokeWidth="1"
-                            onMouseEnter={() =>
-                              setProgressTooltip({
-                                visible: true,
-                                xPct: (point.x / chartWidth) * 100,
-                                yPct: (point.y / chartHeight) * 100,
-                                lines: [
-                                  `Score: ${Math.round(point.scorePct)}%`,
-                                  `Completion Time: ${formatDuration(point.completionSeconds)}`,
-                                  `Completed: ${formatTimestamp(point.completedAt)}`,
-                                ],
-                              })
-                            }
-                            onMouseLeave={() => setProgressTooltip((prev) => ({ ...prev, visible: false }))}
-                          />
+                          <g key={i} className={styles.chartNodeGroup}>
+                            <circle
+                              cx={point.x}
+                              cy={point.y}
+                              r="18"
+                              className={styles.chartNodeHit}
+                              onMouseEnter={() =>
+                                setProgressTooltip({
+                                  visible: true,
+                                  xPct: (point.x / chartWidth) * 100,
+                                  yPct: (point.y / chartHeight) * 100,
+                                  lines: [
+                                    `${point.sessionLabel}`,
+                                    `Score: ${Math.round(point.scorePct)}%`,
+                                    `Completion Time: ${formatDuration(point.completionSeconds)}`,
+                                    `Completed: ${formatTimestamp(point.completedAt)}`,
+                                  ],
+                                })
+                              }
+                              onMouseLeave={() => setProgressTooltip((prev) => ({ ...prev, visible: false }))}
+                            />
+                            <circle cx={point.x} cy={point.y} r="8" className={styles.chartNode} />
+                            <text
+                              x={point.x}
+                              y={sessionTickLabelY}
+                              textAnchor="middle"
+                              fill="rgba(255,255,255,0.85)"
+                              fontSize="10"
+                            >
+                              {point.sessionLabel.replace('Session ', 'S')}
+                            </text>
+                          </g>
                         ))}
                         <text x={timeLabelX} y={timeLabelY} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="12" transform={`rotate(-90, ${timeLabelX}, ${timeLabelY})`}>Score</text>
-                        <text x={scoreLabelX} y={scoreLabelY} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="12">Time</text>
+                        <text x={scoreLabelX} y={scoreLabelY} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="12">Session</text>
                       </svg>
                       {progressTooltip.visible && (
                         <div
@@ -590,6 +619,7 @@ const Module3Analytics = () => {
                   <div className={styles.transfersGrid}>
                     {/* Left: drops count per completed module 3 session */}
                     <div className={styles.transfersPanel}>
+                      <h3 className={styles.transfersPanelChartTitle}>Drops per Session</h3>
                       <div className={styles.transfersChartWrapper}>
                         {dropsBars.length === 0 ? (
                           <div className="flex h-full w-full items-center justify-center text-sm" style={{ color: 'rgba(255,255,255,0.75)' }}>
@@ -603,7 +633,45 @@ const Module3Analytics = () => {
                             className={styles.progressChart}
                             preserveAspectRatio="xMidYMid meet"
                           >
+                            {dropsYTicks.map((tick) => {
+                              const ty = dropsYScale(tick);
+                              return (
+                                <line
+                                  key={`drops-grid-${tick}`}
+                                  x1={dropsPadding.left}
+                                  y1={ty}
+                                  x2={dropsPadding.left + dropsInnerWidth}
+                                  y2={ty}
+                                  stroke="rgba(255,255,255,0.12)"
+                                  strokeWidth="1"
+                                />
+                              );
+                            })}
+                            <line
+                              x1={dropsPadding.left}
+                              y1={dropsPadding.top}
+                              x2={dropsPadding.left}
+                              y2={dropsBaselineY}
+                              stroke={axisStroke}
+                              strokeWidth="1"
+                            />
                             <line x1={dropsPadding.left} y1={dropsBaselineY} x2={dropsPadding.left + dropsInnerWidth} y2={dropsBaselineY} stroke={axisStroke} strokeWidth="1" />
+                            {dropsYTicks.map((tick) => {
+                              const ty = dropsYScale(tick);
+                              return (
+                                <text
+                                  key={`drops-tick-${tick}`}
+                                  x={dropsPadding.left - 8}
+                                  y={ty}
+                                  textAnchor="end"
+                                  dominantBaseline="middle"
+                                  fill="rgba(255,255,255,0.85)"
+                                  fontSize="10"
+                                >
+                                  {tick}
+                                </text>
+                              );
+                            })}
                             {dropsBars.map((bar, i) => {
                               const x = dropsPadding.left + i * (dropBarWidth + dropGap);
                               const y = dropsYScale(bar.drops);
@@ -618,6 +686,7 @@ const Module3Analytics = () => {
                                     width={dropBarWidth}
                                     height={Math.max(1, height)}
                                     fill="#1DA5FF"
+                                    className={styles.chartBarInteractive}
                                     onMouseEnter={() =>
                                       setDropsTooltip({
                                         visible: true,
@@ -638,14 +707,23 @@ const Module3Analytics = () => {
                               );
                             })}
                             <text
-                              x={dropsPadding.left - 24}
+                              x={dropsPadding.left - 28}
                               y={dropsPadding.top + dropsInnerHeight / 2}
                               textAnchor="middle"
                               fill="rgba(255,255,255,0.85)"
                               fontSize="11"
-                              transform={`rotate(-90, ${dropsPadding.left - 24}, ${dropsPadding.top + dropsInnerHeight / 2})`}
+                              transform={`rotate(-90, ${dropsPadding.left - 28}, ${dropsPadding.top + dropsInnerHeight / 2})`}
                             >
                               Drops
+                            </text>
+                            <text
+                              x={dropsPadding.left + dropsInnerWidth / 2}
+                              y={dropsChartHeight - 2}
+                              textAnchor="middle"
+                              fill="rgba(255,255,255,0.85)"
+                              fontSize="11"
+                            >
+                              Session
                             </text>
                           </svg>
                         )}
@@ -668,6 +746,7 @@ const Module3Analytics = () => {
 
                     {/* Right: transfer success (paired bars) */}
                     <div className={styles.transfersPanel}>
+                      <h3 className={styles.transfersPanelChartTitle}>Transfer Success by Hand</h3>
                       <div className={styles.transfersRightHeader}>
                         Total transfers attempted: {overallTotalTransfers ?? '--'}
                       </div>
@@ -684,8 +763,46 @@ const Module3Analytics = () => {
                             className={styles.progressChart}
                             preserveAspectRatio="xMidYMid meet"
                           >
+                            {transferYTicks.map((tick) => {
+                              const ty = transferYScalePct(tick);
+                              return (
+                                <line
+                                  key={`transfer-grid-${tick}`}
+                                  x1={transferPadding.left}
+                                  y1={ty}
+                                  x2={transferPadding.left + transferInnerWidth}
+                                  y2={ty}
+                                  stroke="rgba(255,255,255,0.12)"
+                                  strokeWidth="1"
+                                />
+                              );
+                            })}
+                            <line
+                              x1={transferPadding.left}
+                              y1={transferPadding.top}
+                              x2={transferPadding.left}
+                              y2={transferBaselineY}
+                              stroke={axisStroke}
+                              strokeWidth="1"
+                            />
                             <line x1={transferPadding.left} y1={transferBaselineY} x2={transferPadding.left + transferInnerWidth} y2={transferBaselineY} stroke={axisStroke} strokeWidth="1" />
-                            <line x1={transferCenterX} y1={transferPadding.top} x2={transferCenterX} y2={transferBaselineY} stroke="rgba(255,255,255,0.35)" strokeWidth="2" />
+                            {transferYTicks.map((tick) => {
+                              const ty = transferYScalePct(tick);
+                              return (
+                                <text
+                                  key={`transfer-tick-${tick}`}
+                                  x={transferPadding.left - 8}
+                                  y={ty}
+                                  textAnchor="end"
+                                  dominantBaseline="middle"
+                                  fill="rgba(255,255,255,0.85)"
+                                  fontSize="10"
+                                >
+                                  {tick}%
+                                </text>
+                              );
+                            })}
+                            <line x1={transferCenterX} y1={transferPadding.top + 8} x2={transferCenterX} y2={transferBaselineY} stroke="rgba(255,255,255,0.35)" strokeWidth="2" />
 
                             {(['left', 'right'] as const).map((side) => {
                               const t = side === 'left' ? transfersLeft : transfersRight;
@@ -694,9 +811,14 @@ const Module3Analytics = () => {
                               const completedCount = t?.completedCount ?? 0;
                               const failedCount = t?.failedCount ?? 0;
 
-                              const sideStartX = side === 'left' ? transferPadding.left : transferCenterX;
-                              const completedX = sideStartX + (transferHalfWidth - transferWithinHalfGap - transferBarWidth) / 2;
-                              const failedX = completedX + transferBarWidth + transferWithinHalfGap;
+                              const sideCenterX =
+                                side === 'left'
+                                  ? transferPadding.left + transferHalfWidth / 2
+                                  : transferCenterX + transferHalfWidth / 2;
+                              const pairWidth = transferBarWidth * 2 + transferWithinPairGap;
+                              const pairStartX = sideCenterX - pairWidth / 2;
+                              const completedX = pairStartX;
+                              const failedX = completedX + transferBarWidth + transferWithinPairGap;
 
                               const completedY = transferYScalePct(completedPct);
                               const failedY = transferYScalePct(failedPct);
@@ -716,6 +838,7 @@ const Module3Analytics = () => {
                                     width={transferBarWidth}
                                     height={Math.max(1, completedHeight)}
                                     fill="#16a34a"
+                                    className={styles.chartBarInteractive}
                                     onMouseEnter={() =>
                                       setTransferTooltip({
                                         visible: true,
@@ -736,6 +859,7 @@ const Module3Analytics = () => {
                                     width={transferBarWidth}
                                     height={Math.max(1, failedHeight)}
                                     fill="#dc2626"
+                                    className={styles.chartBarInteractive}
                                     onMouseEnter={() =>
                                       setTransferTooltip({
                                         visible: true,
@@ -754,6 +878,16 @@ const Module3Analytics = () => {
                               );
                             })}
 
+                            <text
+                              x={transferPadding.left - 50}
+                              y={transferPadding.top + transferInnerHeight / 2}
+                              textAnchor="middle"
+                              fill="rgba(255,255,255,0.85)"
+                              fontSize="11"
+                              transform={`rotate(-90, ${transferPadding.left - 50}, ${transferPadding.top + transferInnerHeight / 2})`}
+                            >
+                              Percentage
+                            </text>
                             <text
                               x={transferPadding.left + transferHalfWidth / 2}
                               y={transferChartHeight - 12}

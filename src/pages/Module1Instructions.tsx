@@ -1,77 +1,90 @@
+import { useCallback, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { module1PressureBarGradient, psiToBarPercent } from '../lib/module1PressureGauge';
 import ProfileDropdown from '../components/ProfileDropdown';
 import analyticsNavStyles from './Module2Analytics.module.css';
 import { createModule1Session } from '../lib/module1PressureSessionService';
 import { useBLE } from '../contexts/BLEContext';
+import { ModuleInstructionFlow } from '../components/instructions/ModuleInstructionFlow';
+import type { InstructionStep } from '../components/instructions/instructionFlowTypes';
+import { module1InstructionSteps } from '../config/module1InstructionSteps';
+import { module1InstructionVisualForStepId } from './module1/Module1InstructionVisuals';
 
 const Module1Instructions = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { device } = useBLE();
+  const [starting, setStarting] = useState(false);
 
-  // Navigation items with icons
   const navItems = [
-    { 
-      path: '/dashboard', 
-      label: 'Dashboard', 
-      icon: 'dashboard', 
+    {
+      path: '/dashboard',
+      label: 'Dashboard',
+      icon: 'dashboard',
       className: 'text-white no-underline',
-      iconColor: 'white'
+      iconColor: 'white',
     },
-    { 
-      path: '/modules', 
-      label: 'Modules', 
-      icon: 'modules', 
+    {
+      path: '/modules',
+      label: 'Modules',
+      icon: 'modules',
       className: 'text-white no-underline',
-      iconColor: 'white'
+      iconColor: 'white',
     },
-    { 
-      path: '/analytics', 
-      label: 'Analytics', 
-      icon: 'analytics', 
+    {
+      path: '/analytics',
+      label: 'Analytics',
+      icon: 'analytics',
       className: 'text-white no-underline',
-      iconColor: 'white'
+      iconColor: 'white',
     },
-    { 
-      path: '/settings', 
-      label: 'Settings', 
-      icon: 'settings', 
+    {
+      path: '/settings',
+      label: 'Settings',
+      icon: 'settings',
       className: 'text-white no-underline',
-      iconColor: 'white'
+      iconColor: 'white',
     },
   ];
 
-  // Icon components as inline SVGs
   const DashboardIcon = () => (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="3" y="3" width="6" height="6" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-      <rect x="11" y="3" width="6" height="6" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-      <rect x="3" y="11" width="6" height="6" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-      <rect x="11" y="11" width="6" height="6" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+      <rect x="3" y="3" width="6" height="6" stroke="currentColor" strokeWidth="1.5" fill="none" />
+      <rect x="11" y="3" width="6" height="6" stroke="currentColor" strokeWidth="1.5" fill="none" />
+      <rect x="3" y="11" width="6" height="6" stroke="currentColor" strokeWidth="1.5" fill="none" />
+      <rect x="11" y="11" width="6" height="6" stroke="currentColor" strokeWidth="1.5" fill="none" />
     </svg>
   );
 
   const ModulesIcon = () => (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="4" y="4" width="7" height="7" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-      <rect x="9" y="9" width="7" height="7" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+      <rect x="4" y="4" width="7" height="7" stroke="currentColor" strokeWidth="1.5" fill="none" />
+      <rect x="9" y="9" width="7" height="7" stroke="currentColor" strokeWidth="1.5" fill="none" />
     </svg>
   );
 
   const AnalyticsIcon = () => (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="3" y="15" width="3" height="2" fill="currentColor"/>
-      <rect x="7" y="11" width="3" height="6" fill="currentColor"/>
-      <rect x="11" y="8" width="3" height="9" fill="currentColor"/>
-      <rect x="15" y="4" width="3" height="13" fill="currentColor"/>
+      <rect x="3" y="15" width="3" height="2" fill="currentColor" />
+      <rect x="7" y="11" width="3" height="6" fill="currentColor" />
+      <rect x="11" y="8" width="3" height="9" fill="currentColor" />
+      <rect x="15" y="4" width="3" height="13" fill="currentColor" />
     </svg>
   );
 
   const SettingsIcon = () => (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-      <path d="M15.66 11.7l-.73-.42a3.5 3.5 0 000-1.56l.73-.42a.5.5 0 00.18-.68l-.68-1.18a.5.5 0 00-.69-.18l-.73.42a3.5 3.5 0 00-1.18-.68V6.5a.5.5 0 00-.5-.5H8.5a.5.5 0 00-.5.5v.84a3.5 3.5 0 00-1.18.68l-.73-.42a.5.5 0 00-.69.18l-.68 1.18a.5.5 0 00.18.68l.73.42a3.5 3.5 0 000 1.56l-.73.42a.5.5 0 00-.18.68l.68 1.18a.5.5 0 00.69.18l.73-.42a3.5 3.5 0 001.18.68v.84a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-.84a3.5 3.5 0 001.18-.68l.73.42a.5.5 0 00.69-.18l.68-1.18a.5.5 0 00-.18-.68z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+      <path
+        d="M10 12a2 2 0 100-4 2 2 0 000 4z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        fill="none"
+      />
+      <path
+        d="M15.66 11.7l-.73-.42a3.5 3.5 0 000-1.56l.73-.42a.5.5 0 00.18-.68l-.68-1.18a.5.5 0 00-.69-.18l-.73.42a3.5 3.5 0 00-1.18-.68V6.5a.5.5 0 00-.5-.5H8.5a.5.5 0 00-.5.5v.84a3.5 3.5 0 00-1.18.68l-.73-.42a.5.5 0 00-.69.18l-.68 1.18a.5.5 0 00.18.68l.73.42a3.5 3.5 0 000 1.56l-.73.42a.5.5 0 00-.18.68l.68 1.18a.5.5 0 00.69.18l.73-.42a3.5 3.5 0 001.18.68v.84a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-.84a3.5 3.5 0 001.18-.68l.73.42a.5.5 0 00.69-.18l.68-1.18a.5.5 0 00-.18-.68z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        fill="none"
+      />
     </svg>
   );
 
@@ -90,82 +103,99 @@ const Module1Instructions = () => {
     }
   };
 
-  // Star icon for achievements
-  const StarIcon = () => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="#FFD700" stroke="#FFD700" strokeWidth="1.5"/>
-    </svg>
-  );
-
-  /* Same left chevron as Analytics pages (Module2Analytics "‹ Module 1") */
   const ArrowLeftIcon = () => (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <path
+        d="M15 18l-6-6 6-6"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 
+  const decorateStep = useCallback((step: InstructionStep): InstructionStep => {
+    return {
+      ...step,
+      visual: module1InstructionVisualForStepId(step.id),
+    };
+  }, []);
 
-  const handleBeginTraining = async () => {
-    const result = await createModule1Session(device?.id ?? null);
-    if (!result.ok) {
-      alert(result.error);
-      return;
+  const handleStartModule = useCallback(async () => {
+    setStarting(true);
+    try {
+      const result = await createModule1Session(device?.id ?? null);
+      if (!result.ok) {
+        alert(result.error);
+        return;
+      }
+      navigate('/module/1/exercise/1/start', { state: { sessionId: result.sessionId } });
+    } finally {
+      setStarting(false);
     }
-    navigate('/module/1/exercise/1/start', { state: { sessionId: result.sessionId } });
-  };
+  }, [device?.id, navigate]);
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#26313E' }}>
-      {/* Header Container - Top Bar */}
       <header className="flex items-center justify-between px-6 py-2" style={{ backgroundColor: '#1E2733' }}>
         <div className="flex items-center gap-4">
-          <div className="flex items-center justify-center overflow-hidden" style={{ width: '72px', height: '72px' }}>
-            <img 
-              src="/Logo.png" 
-              alt="Logo" 
+          <div
+            className="flex items-center justify-center overflow-hidden"
+            style={{ width: '72px', height: '72px' }}
+          >
+            <img
+              src="/Logo.png"
+              alt="Logo"
               className="object-contain"
-              style={{ 
-                width: '72px', 
-                height: '72px', 
-                maxWidth: '72px', 
+              style={{
+                width: '72px',
+                height: '72px',
+                maxWidth: '72px',
                 maxHeight: '72px',
-                objectFit: 'contain'
+                objectFit: 'contain',
               }}
             />
           </div>
         </div>
-        {/* Profile picture */}
         <ProfileDropdown />
       </header>
 
-      {/* Main Layout Container */}
       <div className="flex" style={{ minHeight: 'calc(100vh - 72px)' }}>
-        {/* Sidebar Container - Left Navigation */}
-        <aside className="w-64" style={{ backgroundColor: '#1E2733' }}>
+        <aside className="w-64 shrink-0" style={{ backgroundColor: '#1E2733' }}>
           <nav className="py-6">
             <div className="space-y-2 pt-[30px]">
               {navItems.map((item) => {
-                const isActive = 
-                  (item.path === '/dashboard' && location.pathname.startsWith('/dashboard') && !location.pathname.startsWith('/modules')) ||
-                  (item.path === '/modules' && (location.pathname.startsWith('/modules') || location.pathname.startsWith('/module'))) ||
+                const isActive =
+                  (item.path === '/dashboard' &&
+                    location.pathname.startsWith('/dashboard') &&
+                    !location.pathname.startsWith('/modules')) ||
+                  (item.path === '/modules' &&
+                    (location.pathname.startsWith('/modules') ||
+                      location.pathname.startsWith('/module'))) ||
                   (item.path === '/analytics' && location.pathname.startsWith('/analytics')) ||
                   (item.path === '/settings' && location.pathname.startsWith('/settings'));
-                
+
                 return (
                   <button
                     key={item.path}
+                    type="button"
                     onClick={() => navigate(item.path)}
-                    style={{ 
+                    style={{
                       backgroundColor: '#1E2733',
                       border: 'none',
                       paddingTop: '1.5rem',
                       paddingBottom: '1.5rem',
-                      color: 'white'
+                      color: 'white',
                     }}
-                    className={`w-full flex items-center gap-3 px-6 mx-2 rounded-lg transition-colors border-none text-white`}
+                    className="w-full flex items-center gap-3 px-6 mx-2 rounded-lg transition-colors border-none text-white"
                   >
-                    <span className="flex-shrink-0" style={{ color: isActive ? '#1DA5FF' : 'white' }}>{getIcon(item.icon)}</span>
-                    <span className="font-medium" style={{ color: isActive ? '#1DA5FF' : 'white' }}>{item.label}</span>
+                    <span className="flex-shrink-0" style={{ color: isActive ? '#1DA5FF' : 'white' }}>
+                      {getIcon(item.icon)}
+                    </span>
+                    <span className="font-medium" style={{ color: isActive ? '#1DA5FF' : 'white' }}>
+                      {item.label}
+                    </span>
                   </button>
                 );
               })}
@@ -173,10 +203,8 @@ const Module1Instructions = () => {
           </nav>
         </aside>
 
-        {/* Main Content Area */}
-        <main className="flex-1" style={{ padding: '32px 48px' }}>
-          <div className="max-w-6xl mx-auto">
-            {/* Back Button — same chevron style as Analytics (‹ Module 1 / Module 3 ›) */}
+        <main className="flex-1 min-w-0" style={{ padding: 'clamp(20px, 4vw, 48px)' }}>
+          <div className="max-w-4xl mx-auto">
             <button
               type="button"
               onClick={() => navigate('/modules')}
@@ -190,92 +218,26 @@ const Module1Instructions = () => {
               </span>
             </button>
 
-            {/* Module Title */}
-            <h1 className="text-4xl font-bold mb-4 text-center" style={{ color: 'white' }}>
+            <h1
+              className="text-center font-bold m-0 mb-2"
+              style={{ color: 'white', fontSize: 'clamp(1.75rem, 4vw, 2.25rem)' }}
+            >
               Module 1: Pressure Control
             </h1>
-
-            {/* Instructional Text */}
-            <p className="text-lg leading-relaxed mx-auto text-center" style={{ color: 'white', marginBottom: '60px', maxWidth: '900px' }}>
-              In robotic surgery, your hands guide every movement of the instruments. The amount of pressure you apply to the console controls determines how firmly the robot interacts with tissue. Too much pressure can cause harm; too little can make movements imprecise.
+            <p
+              className="text-center m-0 mb-8"
+              style={{ color: '#94a3b8', fontSize: '1.0625rem', maxWidth: 560, marginInline: 'auto' }}
+            >
+              Quick onboarding—four short steps before you begin.
             </p>
 
-            {/* Embedded Application Preview */}
-            <div className="flex justify-center items-center" style={{ marginTop: '60px', marginBottom: '60px', gap: '80px' }}>
-              <div className="relative rounded-lg overflow-hidden shadow-lg" style={{ width: '100%', maxWidth: '350px', backgroundColor: '#26313E' }}>
-                <img 
-                  src="/image.png" 
-                  alt="Controller Preview" 
-                  className="w-full h-auto object-contain"
-                  onError={(e) => {
-                    console.error('Image failed to load:', e.currentTarget.src);
-                  }}
-                />
-              </div>
-              
-              {/* Pressure Gauge Bar - Non-functional */}
-              <div className="flex flex-col items-center" style={{ maxWidth: '300px' }}>
-                <div className="relative w-[300px] max-w-full">
-                  <div
-                    className="w-full h-[36px] rounded-[14px] shadow-lg mx-auto"
-                    style={{
-                      background: module1PressureBarGradient(),
-                      border: "1.5px solid #e2e8f0",
-                      boxShadow: "0 4px 24px 2px rgba(0,0,0,0.04)"
-                    }}
-                  />
-                  
-                  {/* Triangle at mid-target band (17.5 PSI on 0–35 scale, same as live exercise) */}
-                  <div 
-                    className="absolute top-full"
-                    style={{ 
-                      left: `${psiToBarPercent(17.5)}%`,
-                      transform: 'translateX(-50%)',
-                      marginTop: '12px'
-                    }}
-                  >
-                    <svg width="22" height="16" viewBox="0 0 22 16" className="text-white">
-                      <path d="M11 16L0 0h22L11 16z" fill="white" />
-                      <path d="M11 15L1.5 1h19L11 15z" fill="#e5e7eb" opacity="0.25" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Step-by-step instructions */}
-            <div className="mx-auto text-center" style={{ marginBottom: '48px', maxWidth: '900px' }}>
-              <p className="text-lg leading-relaxed" style={{ color: 'white', marginBottom: '16px' }}>
-                Slide your fingers through the loops on the mock controller and apply steady pressure. Keep the bar in the <strong style={{ color: '#22c55e' }}>green zone</strong> for as much of the <strong>20 seconds</strong> as you can. When time is up, you’ll receive a score based on how long you held optimal pressure.
-              </p>
-            </div>
-
-            {/* Bottom Section - Achievements and Begin Button */}
-            <div className="flex items-center justify-between" style={{ marginTop: '120px' }}>
-              {/* Achievements */}
-              <div className="flex items-center" style={{ gap: '32px' }}>
-                <div className="flex items-center gap-2">
-                  <StarIcon />
-                  <span className="text-lg" style={{ color: 'white' }}>Optimal Pressure</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <StarIcon />
-                  <span className="text-lg" style={{ color: 'white' }}>Consistent Force</span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-4">
-                {/* Begin Training Button */}
-                <button
-                  onClick={handleBeginTraining}
-                  className="px-12 py-4 rounded-xl font-semibold text-white text-2xl transition-colors hover:opacity-90"
-                  style={{ backgroundColor: '#1DA5FF', color: '#ffffff' }}
-                >
-                  Begin Training
-                </button>
-              </div>
-            </div>
+            <ModuleInstructionFlow
+              steps={module1InstructionSteps}
+              decorateStep={decorateStep}
+              onFinalAction={handleStartModule}
+              finalBusy={starting}
+              labels={{ finalCta: 'Start Module' }}
+            />
           </div>
         </main>
       </div>

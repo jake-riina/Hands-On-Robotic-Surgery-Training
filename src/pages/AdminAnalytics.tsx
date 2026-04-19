@@ -262,9 +262,16 @@ const AdminAnalytics: React.FC = () => {
                       <line x1={x1} y1={y1} x2={x1} y2={y2} stroke={axisStroke} strokeWidth="1" />
                       <line x1={x1} y1={y1} x2={x2} y2={y1} stroke={axisStroke} strokeWidth="1" />
                       <polyline fill="none" stroke="#1DA5FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={points} />
-                      {chartData.map((d, i) => (
-                        <circle key={i} cx={xScale(d.time)} cy={yScale(d.score)} r="5" fill="#ef4444" stroke="#1e2733" strokeWidth="1" />
-                      ))}
+                      {chartData.map((d, i) => {
+                        const cx = xScale(d.time);
+                        const cy = yScale(d.score);
+                        return (
+                          <g key={i} className={styles.chartNodeGroup}>
+                            <circle cx={cx} cy={cy} r="18" className={styles.chartNodeHit} />
+                            <circle cx={cx} cy={cy} r="8" className={styles.chartNode} />
+                          </g>
+                        );
+                      })}
                       <text x={timeLabelX} y={timeLabelY} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="12" transform={`rotate(-90, ${timeLabelX}, ${timeLabelY})`}>Period</text>
                       <text x={scoreLabelX} y={scoreLabelY} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="12">Progress %</text>
                     </svg>

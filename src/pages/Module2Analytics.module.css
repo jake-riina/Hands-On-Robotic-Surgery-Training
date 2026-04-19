@@ -214,6 +214,38 @@
   min-height: 0;
 }
 
+.chartNodeGroup {
+  cursor: pointer;
+}
+
+.chartNodeHit {
+  fill: transparent;
+}
+
+.chartNode {
+  fill: #ef4444;
+  stroke: #1e2733;
+  stroke-width: 1px;
+  pointer-events: none;
+  transition: filter 0.2s ease;
+}
+
+.chartNodeGroup:hover .chartNode {
+  filter: brightness(0.78);
+}
+
+.chartBarGroup {
+  cursor: pointer;
+}
+
+.chartBarVisible {
+  transition: filter 0.2s ease;
+}
+
+.chartBarGroup:hover .chartBarVisible {
+  filter: brightness(0.8);
+}
+
 .cardTitle {
   font-size: 1.25rem;
   font-weight: 700;

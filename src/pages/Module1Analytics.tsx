@@ -8,7 +8,7 @@ const Module1Analytics = () => {
   const location = useLocation();
   const [highestScore, setHighestScore] = useState<number | null>(null);
   const [progressPoints, setProgressPoints] = useState<
-    { completedAt: string; scorePct: number; completionSeconds: number | null }[]
+    { sessionLabel: string; completedAt: string; scorePct: number; completionSeconds: number | null }[]
   >([]);
 
   type TooltipState = {
@@ -99,25 +99,23 @@ const Module1Analytics = () => {
   };
 
   const chartWidth = 420;
-  const chartHeight = 240;
-  const padding = { top: 20, right: 20, bottom: 28, left: 36 };
+  const chartHeight = 248;
+  const padding = { top: 20, right: 20, bottom: 36, left: 36 };
   const innerWidth = chartWidth - padding.left - padding.right;
   const innerHeight = chartHeight - padding.top - padding.bottom;
   const scoreMin = 0;
   const scoreMax = 100;
-  const progressTimes = progressPoints.map((point) => new Date(point.completedAt).getTime());
-  const minTime = progressTimes.length > 0 ? Math.min(...progressTimes) : 0;
-  const maxTime = progressTimes.length > 0 ? Math.max(...progressTimes) : 0;
-  const xScale = (timeMs: number) => {
-    if (progressPoints.length <= 1 || maxTime === minTime) {
+  const progressCount = progressPoints.length;
+  const xScaleByIndex = (i: number) => {
+    if (progressCount <= 1) {
       return padding.left + innerWidth / 2;
     }
-    return padding.left + ((timeMs - minTime) / (maxTime - minTime)) * innerWidth;
+    return padding.left + (i / (progressCount - 1)) * innerWidth;
   };
   const yScale = (s: number) => padding.top + innerHeight - (s - scoreMin) / (scoreMax - scoreMin) * innerHeight;
-  const plottedPoints = progressPoints.map((point) => ({
+  const plottedPoints = progressPoints.map((point, i) => ({
     ...point,
-    x: xScale(new Date(point.completedAt).getTime()),
+    x: xScaleByIndex(i),
     y: yScale(point.scorePct),
   }));
   const points = plottedPoints.map((point) => `${point.x},${point.y}`).join(' ');
@@ -129,7 +127,8 @@ const Module1Analytics = () => {
   const timeLabelX = padding.left - 16;
   const timeLabelY = padding.top + innerHeight / 2;
   const scoreLabelX = padding.left + innerWidth / 2;
-  const scoreLabelY = chartHeight - 8;
+  const scoreLabelY = chartHeight - 4;
+  const sessionTickLabelY = chartHeight - 20;
   const normalizedHighestScore = Math.max(0, Math.min(100, highestScore ?? 0));
 
   useEffect(() => {
@@ -222,7 +221,11 @@ const Module1Analytics = () => {
             completionSeconds: match.duration,
           };
         })
-        .filter((point): point is { completedAt: string; scorePct: number; completionSeconds: number | null } => point !== null);
+        .filter((point): point is { completedAt: string; scorePct: number; completionSeconds: number | null } => point !== null)
+        .map((point, index) => ({
+          ...point,
+          sessionLabel: `Session ${index + 1}`,
+        }));
 
       setProgressPoints(mappedPoints);
     };
@@ -299,7 +302,7 @@ const Module1Analytics = () => {
 
             <div className={styles.analyticsContentArea}>
             <div className={styles.analyticsLayout}>
-              <div className={styles.leftColumnWrapper}>
+              <div className={styles.topMetricsRow}>
                 <div className={styles.card}>
                   <h2 className={styles.cardTitle}>Highest Score</h2>
                   <div className="relative flex items-center justify-center" style={{ width: '100px', height: '100px', margin: '0 auto' }}>
@@ -354,31 +357,41 @@ const Module1Analytics = () => {
                         <line x1={x1} y1={y1} x2={x2} y2={y1} stroke={axisStroke} strokeWidth="1" />
                         <polyline fill="none" stroke="#1DA5FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={points} />
                         {plottedPoints.map((point, i) => (
-                          <circle
-                            key={i}
-                            cx={point.x}
-                            cy={point.y}
-                            r="5"
-                            fill="#ef4444"
-                            stroke="#1e2733"
-                            strokeWidth="1"
-                            onMouseEnter={() =>
-                              setProgressTooltip({
-                                visible: true,
-                                xPct: (point.x / chartWidth) * 100,
-                                yPct: (point.y / chartHeight) * 100,
-                                lines: [
-                                  `Score: ${Math.round(point.scorePct)}%`,
-                                  `Completion Time: ${formatDuration(point.completionSeconds)}`,
-                                  `Completed: ${formatTimestamp(point.completedAt)}`,
-                                ],
-                              })
-                            }
-                            onMouseLeave={() => setProgressTooltip((prev) => ({ ...prev, visible: false }))}
-                          />
+                          <g key={i} className={styles.chartNodeGroup}>
+                            <circle
+                              cx={point.x}
+                              cy={point.y}
+                              r="18"
+                              className={styles.chartNodeHit}
+                              onMouseEnter={() =>
+                                setProgressTooltip({
+                                  visible: true,
+                                  xPct: (point.x / chartWidth) * 100,
+                                  yPct: (point.y / chartHeight) * 100,
+                                  lines: [
+                                    `${point.sessionLabel}`,
+                                    `Score: ${Math.round(point.scorePct)}%`,
+                                    `Completion Time: ${formatDuration(point.completionSeconds)}`,
+                                    `Completed: ${formatTimestamp(point.completedAt)}`,
+                                  ],
+                                })
+                              }
+                              onMouseLeave={() => setProgressTooltip((prev) => ({ ...prev, visible: false }))}
+                            />
+                            <circle cx={point.x} cy={point.y} r="8" className={styles.chartNode} />
+                            <text
+                              x={point.x}
+                              y={sessionTickLabelY}
+                              textAnchor="middle"
+                              fill="rgba(255,255,255,0.85)"
+                              fontSize="10"
+                            >
+                              {point.sessionLabel.replace('Session ', 'S')}
+                            </text>
+                          </g>
                         ))}
                         <text x={timeLabelX} y={timeLabelY} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="12" transform={`rotate(-90, ${timeLabelX}, ${timeLabelY})`}>Score</text>
-                        <text x={scoreLabelX} y={scoreLabelY} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="12">Time</text>
+                        <text x={scoreLabelX} y={scoreLabelY} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="12">Session</text>
                       </svg>
                       {progressTooltip.visible && (
                         <div

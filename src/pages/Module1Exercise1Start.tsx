@@ -3,10 +3,11 @@ import { useState, useEffect, useRef } from 'react';
 import {
   MODULE1_EXERCISE_DURATION_SECONDS,
   MODULE1_GAUGE_PSI_MAX,
-  MODULE1_TARGET_PSI_MAX,
-  MODULE1_TARGET_PSI_MIN,
-  module1PressureBarGradient,
+  module1NextTargetBandAfterCurrentSegment,
+  module1PressureBarGradientForBand,
   module1ScorePercent,
+  module1ShouldPreviewNextBand,
+  module1TargetBandAtElapsedMs,
   psiToBarPercent,
 } from '../lib/module1PressureGauge';
 import { useBLE } from '../contexts/BLEContext';
@@ -268,9 +269,6 @@ const readingsBufferRef = useRef<PressureTelemetryBufferedSample[]>([]);
  const sessionIdRef = useRef<string | undefined>(sessionId);
 const completeOnceRef = useRef<boolean>(false);
 
- const TARGET_MIN = MODULE1_TARGET_PSI_MIN;
- const TARGET_MAX = MODULE1_TARGET_PSI_MAX;
-
  // Mock sensor - simulates pressure fluctuations (fallback if BLE not available)
  // Note: This is kept for potential fallback, but BLE context handles pressure updates
 
@@ -375,8 +373,10 @@ useEffect(() => {
      const lastCheck = lastCheckTimeRef.current ?? now;
      const timeDelta = now - lastCheck;
      const p = effectivePressureRef.current;
+     const elapsedMs = now - (startTimeRef.current ?? now);
+     const { min, max } = module1TargetBandAtElapsedMs(elapsedMs);
 
-     if (p >= TARGET_MIN && p <= TARGET_MAX) {
+     if (p >= min && p <= max) {
        timeOnThresholdRef.current += timeDelta;
      }
 
@@ -486,11 +486,35 @@ useEffect(() => {
 
  // Gauge component
  const PressureGauge = () => {
+   const [, setBarTick] = useState(0);
+   useEffect(() => {
+     if (!exerciseStarted || timeRemaining <= 0) return;
+     const id = window.setInterval(() => setBarTick((t) => t + 1), 150);
+     return () => clearInterval(id);
+   }, [exerciseStarted, timeRemaining]);
+
+   const elapsedMs =
+     exerciseStarted && startTimeRef.current != null
+       ? Date.now() - startTimeRef.current
+       : 0;
+   const { min: bandMin, max: bandMax } = module1TargetBandAtElapsedMs(elapsedMs);
+   const nextBand = module1NextTargetBandAfterCurrentSegment(elapsedMs);
+   const showNextBandPreview =
+     exerciseStarted &&
+     timeRemaining > 0 &&
+     module1ShouldPreviewNextBand(elapsedMs) &&
+     nextBand != null;
    const trianglePosition = psiToBarPercent(effectivePressure);
-   const barGradient = module1PressureBarGradient();
+   const barGradient = module1PressureBarGradientForBand(bandMin, bandMax);
 
    return (
      <div className="flex flex-col items-center">
+       <style>{`
+         @keyframes nextBandHintPulse {
+           0%, 100% { opacity: 0.82; }
+           50% { opacity: 1; }
+         }
+       `}</style>
        {!exerciseStarted ? (
          <p className="text-white text-lg mb-4">
            Apply Pressure to Begin!
@@ -528,13 +552,36 @@ useEffect(() => {
          {/* Bar + arrow wrapper - arrow positioned relative to bar only */}
          <div className="relative w-full">
            <div
-             className="w-full h-[48px] rounded-[14px] shadow-lg"
+             className="relative w-full h-[48px] rounded-[14px] shadow-lg overflow-hidden"
              style={{
-               background: barGradient,
+               backgroundColor: '#dc2626',
+               backgroundImage: barGradient,
                border: "1.5px solid #e2e8f0",
                boxShadow: "0 4px 24px 2px rgba(0,0,0,0.04)"
              }}
-           />
+           >
+             {showNextBandPreview && nextBand != null ? (
+               <div
+                 className="pointer-events-none"
+                 style={{
+                   position: 'absolute',
+                   top: 0,
+                   height: '100%',
+                   zIndex: 1,
+                   left: `${psiToBarPercent(nextBand.min)}%`,
+                   width: `${Math.max(
+                     0.25,
+                     psiToBarPercent(nextBand.max) - psiToBarPercent(nextBand.min),
+                   )}%`,
+                   background:
+                     'linear-gradient(180deg, #4ade80 0%, #22c55e 42%, #16a34a 100%)',
+                   boxShadow:
+                     'inset 0 0 0 2px rgba(255,255,255,0.92), 0 0 18px rgba(74, 222, 128, 0.85)',
+                   animation: 'nextBandHintPulse 0.75s ease-in-out infinite',
+                 }}
+               />
+             ) : null}
+           </div>
            
            <div 
              className="absolute top-full transition-all duration-300 ease-out"
@@ -557,7 +604,7 @@ useEffect(() => {
            </p>
            {exerciseStarted && (
              <p className="text-white text-xs" style={{ opacity: 0.75 }}>
-               Target: {TARGET_MIN}–{TARGET_MAX} PSI
+               Target (this 5s): {bandMin}–{bandMax} PSI
              </p>
            )}
          </div>
@@ -695,7 +742,7 @@ useEffect(() => {
                   Apply pressure to the control handles and watch the bar respond.
                 </p>
                 <p className="text-lg leading-relaxed" style={{ color: 'white' }}>
-                  Keep the bar in the green zone for as much of the 20 seconds as possible. This zone represents optimal pressure for safe and precise movement!
+                  Keep the bar in the green zone for as much of the 20 seconds as you can. The target band shifts every 5 seconds (5–10, 12–17, 3–8, then 15–20 PSI), so you have to adjust pressure like you would when conditions change in a case.
                 </p>
               </div>
             </div>

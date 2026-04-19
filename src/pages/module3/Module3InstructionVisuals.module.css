@@ -1,0 +1,77 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+}
+
+.caption {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: #94a3b8;
+  text-align: center;
+  max-width: 480px;
+  line-height: 1.55;
+}
+
+.stage {
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(71, 85, 105, 0.45);
+}
+
+.stageImg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.diagram {
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+}
+
+.formulaRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.35em;
+  font-size: clamp(0.8125rem, 2.2vw, 1rem);
+  font-weight: 700;
+  color: #f8fafc;
+  max-width: 100%;
+  line-height: 1.45;
+  padding: 4px 0;
+}
+
+/* Page 3: empty region — mount animation / video here later */
+.handoffAnimHost {
+  width: 100%;
+  max-width: 440px;
+  min-height: min(240px, 42vw);
+  margin: 0 auto;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.35);
+  border: 1px dashed rgba(71, 85, 105, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.handoffAnimImg {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: min(210px, 34vw);
+  height: auto;
+  object-fit: contain;
+}

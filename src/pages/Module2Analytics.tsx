@@ -15,11 +15,11 @@ const Module2Analytics = () => {
   const location = useLocation();
   const [highestScore, setHighestScore] = useState<number | null>(null);
   const [progressPoints, setProgressPoints] = useState<
-    { completedAt: string; scorePct: number; completionSeconds: number | null }[]
+    { sessionLabel: string; completedAt: string; scorePct: number; completionSeconds: number | null }[]
   >([]);
   const [fastestSeconds, setFastestSeconds] = useState<number | null>(null);
   const [economyOfMotionPoints, setEconomyOfMotionPoints] = useState<
-    { completedAt: string; value: number }[]
+    { sessionLabel: string; completedAt: string; value: number }[]
   >([]);
   const [wastedMovementBars, setWastedMovementBars] = useState<
     { sessionLabel: string; completedAt: string; overshootDistance: number }[]
@@ -131,25 +131,23 @@ const Module2Analytics = () => {
   };
 
   const chartWidth = 420;
-  const chartHeight = 240;
-  const padding = { top: 20, right: 20, bottom: 28, left: 36 };
+  const chartHeight = 248;
+  const padding = { top: 20, right: 20, bottom: 36, left: 36 };
   const innerWidth = chartWidth - padding.left - padding.right;
   const innerHeight = chartHeight - padding.top - padding.bottom;
   const scoreMin = 0;
   const scoreMax = 100;
-  const progressTimes = progressPoints.map((point) => new Date(point.completedAt).getTime());
-  const minTime = progressTimes.length > 0 ? Math.min(...progressTimes) : 0;
-  const maxTime = progressTimes.length > 0 ? Math.max(...progressTimes) : 0;
-  const xScale = (timeMs: number) => {
-    if (progressPoints.length <= 1 || maxTime === minTime) {
+  const progressCount = progressPoints.length;
+  const xScaleByIndex = (i: number) => {
+    if (progressCount <= 1) {
       return padding.left + innerWidth / 2;
     }
-    return padding.left + ((timeMs - minTime) / (maxTime - minTime)) * innerWidth;
+    return padding.left + (i / (progressCount - 1)) * innerWidth;
   };
   const yScale = (s: number) => padding.top + innerHeight - (s - scoreMin) / (scoreMax - scoreMin) * innerHeight;
-  const plottedPoints = progressPoints.map((point) => ({
+  const plottedPoints = progressPoints.map((point, i) => ({
     ...point,
-    x: xScale(new Date(point.completedAt).getTime()),
+    x: xScaleByIndex(i),
     y: yScale(point.scorePct),
   }));
   const points = plottedPoints.map((point) => `${point.x},${point.y}`).join(' ');
@@ -161,22 +159,21 @@ const Module2Analytics = () => {
   const timeLabelX = padding.left - 16;
   const timeLabelY = padding.top + innerHeight / 2;
   const scoreLabelX = padding.left + innerWidth / 2;
-  const scoreLabelY = chartHeight - 8;
+  const scoreLabelY = chartHeight - 4;
+  const sessionTickLabelY = chartHeight - 20;
   const normalizedHighestScore = Math.max(0, Math.min(100, highestScore ?? 0));
 
   const motionChartWidth = 420;
-  const motionChartHeight = 220;
-  const motionPadding = { top: 16, right: 16, bottom: 30, left: 42 };
+  const motionChartHeight = 228;
+  const motionPadding = { top: 16, right: 16, bottom: 38, left: 42 };
   const motionInnerWidth = motionChartWidth - motionPadding.left - motionPadding.right;
   const motionInnerHeight = motionChartHeight - motionPadding.top - motionPadding.bottom;
-  const motionTimes = economyOfMotionPoints.map((point) => new Date(point.completedAt).getTime());
-  const motionMinTime = motionTimes.length > 0 ? Math.min(...motionTimes) : 0;
-  const motionMaxTime = motionTimes.length > 0 ? Math.max(...motionTimes) : 0;
-  const motionXScale = (timeMs: number) => {
-    if (economyOfMotionPoints.length <= 1 || motionMaxTime === motionMinTime) {
+  const motionCount = economyOfMotionPoints.length;
+  const motionXScaleByIndex = (i: number) => {
+    if (motionCount <= 1) {
       return motionPadding.left + motionInnerWidth / 2;
     }
-    return motionPadding.left + ((timeMs - motionMinTime) / (motionMaxTime - motionMinTime)) * motionInnerWidth;
+    return motionPadding.left + (i / (motionCount - 1)) * motionInnerWidth;
   };
   const motionValues = economyOfMotionPoints.map((point) => point.value);
   const motionMinValueRaw = motionValues.length > 0 ? Math.min(...motionValues) : 0;
@@ -187,9 +184,9 @@ const Module2Analytics = () => {
     motionPadding.top +
     motionInnerHeight -
     ((v - motionMinValue) / Math.max(0.0001, motionMaxValue - motionMinValue)) * motionInnerHeight;
-  const plottedMotionPoints = economyOfMotionPoints.map((point) => ({
+  const plottedMotionPoints = economyOfMotionPoints.map((point, i) => ({
     ...point,
-    x: motionXScale(new Date(point.completedAt).getTime()),
+    x: motionXScaleByIndex(i),
     y: motionYScale(point.value),
   }));
   const motionLinePoints = plottedMotionPoints.map((point) => `${point.x},${point.y}`).join(' ');
@@ -197,10 +194,12 @@ const Module2Analytics = () => {
   const motionY1 = motionPadding.top + motionInnerHeight;
   const motionX2 = motionPadding.left + motionInnerWidth;
   const motionY2 = motionPadding.top;
+  const motionSessionTickLabelY = motionChartHeight - 22;
+  const motionSessionAxisLabelY = motionChartHeight - 4;
 
   const barChartWidth = 420;
-  const barChartHeight = 220;
-  const barPadding = { top: 16, right: 16, bottom: 38, left: 48 };
+  const barChartHeight = 228;
+  const barPadding = { top: 16, right: 16, bottom: 46, left: 48 };
   const barInnerWidth = barChartWidth - barPadding.left - barPadding.right;
   const barInnerHeight = barChartHeight - barPadding.top - barPadding.bottom;
   const wasteValues = wastedMovementBars.map((bar) => bar.overshootDistance);
@@ -213,6 +212,8 @@ const Module2Analytics = () => {
   const barGap = 10;
   const computedBarWidth =
     barCount > 0 ? Math.max(8, (barInnerWidth - barGap * Math.max(0, barCount - 1)) / barCount) : 20;
+  const barSessionTickLabelY = barChartHeight - 20;
+  const barSessionsAxisLabelY = barChartHeight - 4;
 
   useEffect(() => {
     const fetchHighestScore = async () => {
@@ -325,12 +326,20 @@ const Module2Analytics = () => {
           }
 
           return {
+            sessionLabel: session.sessionLabel,
             completedAt: session.completedAt,
             scorePct: Math.max(0, Math.min(100, match.score * 100)),
             completionSeconds: match.duration,
           };
         })
-        .filter((point): point is { completedAt: string; scorePct: number; completionSeconds: number | null } => point !== null);
+        .filter(
+          (point): point is {
+            sessionLabel: string;
+            completedAt: string;
+            scorePct: number;
+            completionSeconds: number | null;
+          } => point !== null
+        );
 
       const mappedEconomyPoints = orderedSessions
         .map((session) => {
@@ -339,11 +348,14 @@ const Module2Analytics = () => {
             return null;
           }
           return {
+            sessionLabel: session.sessionLabel,
             completedAt: session.completedAt,
             value: Number(match.economyOfMotion),
           };
         })
-        .filter((point): point is { completedAt: string; value: number } => point !== null);
+        .filter(
+          (point): point is { sessionLabel: string; completedAt: string; value: number } => point !== null
+        );
 
       const mappedWasteBars = orderedSessions
         .map((session) => {
@@ -510,31 +522,41 @@ const Module2Analytics = () => {
                       <line x1={x1} y1={y1} x2={x2} y2={y1} stroke={axisStroke} strokeWidth="1" />
                       <polyline fill="none" stroke="#1DA5FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={points} />
                       {plottedPoints.map((point, i) => (
-                        <circle
-                          key={i}
-                          cx={point.x}
-                          cy={point.y}
-                          r="5"
-                          fill="#ef4444"
-                          stroke="#1e2733"
-                          strokeWidth="1"
-                          onMouseEnter={() =>
-                            setProgressTooltip({
-                              visible: true,
-                              xPct: (point.x / chartWidth) * 100,
-                              yPct: (point.y / chartHeight) * 100,
-                              lines: [
-                                `Score: ${Math.round(point.scorePct)}%`,
-                                `Completion Time: ${formatDuration(point.completionSeconds)}`,
-                                `Completed: ${formatTimestamp(point.completedAt)}`,
-                              ],
-                            })
-                          }
-                          onMouseLeave={() => setProgressTooltip((prev) => ({ ...prev, visible: false }))}
-                        />
+                        <g key={i} className={styles.chartNodeGroup}>
+                          <circle
+                            cx={point.x}
+                            cy={point.y}
+                            r="18"
+                            className={styles.chartNodeHit}
+                            onMouseEnter={() =>
+                              setProgressTooltip({
+                                visible: true,
+                                xPct: (point.x / chartWidth) * 100,
+                                yPct: (point.y / chartHeight) * 100,
+                                lines: [
+                                  `${point.sessionLabel}`,
+                                  `Score: ${Math.round(point.scorePct)}%`,
+                                  `Completion Time: ${formatDuration(point.completionSeconds)}`,
+                                  `Completed: ${formatTimestamp(point.completedAt)}`,
+                                ],
+                              })
+                            }
+                            onMouseLeave={() => setProgressTooltip((prev) => ({ ...prev, visible: false }))}
+                          />
+                          <circle cx={point.x} cy={point.y} r="8" className={styles.chartNode} />
+                          <text
+                            x={point.x}
+                            y={sessionTickLabelY}
+                            textAnchor="middle"
+                            fill="rgba(255,255,255,0.85)"
+                            fontSize="10"
+                          >
+                            {point.sessionLabel.replace('Session ', 'S')}
+                          </text>
+                        </g>
                       ))}
                       <text x={timeLabelX} y={timeLabelY} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="12" transform={`rotate(-90, ${timeLabelX}, ${timeLabelY})`}>Score</text>
-                      <text x={scoreLabelX} y={scoreLabelY} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="12">Time</text>
+                      <text x={scoreLabelX} y={scoreLabelY} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="12">Session</text>
                     </svg>
                   )}
                   {progressTooltip.visible && (
@@ -592,30 +614,40 @@ const Module2Analytics = () => {
                           <line x1={motionX1} y1={motionY1} x2={motionX2} y2={motionY1} stroke={axisStroke} strokeWidth="1" />
                           <polyline fill="none" stroke="#1DA5FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={motionLinePoints} />
                           {plottedMotionPoints.map((point, i) => (
-                            <circle
-                              key={i}
-                              cx={point.x}
-                              cy={point.y}
-                              r="4.5"
-                              fill="#ef4444"
-                              stroke="#1e2733"
-                              strokeWidth="1"
-                              onMouseEnter={() =>
-                                setEconomyTooltip({
-                                  visible: true,
-                                  xPct: (point.x / motionChartWidth) * 100,
-                                  yPct: (point.y / motionChartHeight) * 100,
-                                  lines: [
-                                    `Economy of motion: ${point.value.toFixed(3)}`,
-                                    `Completed: ${formatTimestamp(point.completedAt)}`,
-                                  ],
-                                })
-                              }
-                              onMouseLeave={() => setEconomyTooltip((prev) => ({ ...prev, visible: false }))}
-                            />
+                            <g key={i} className={styles.chartNodeGroup}>
+                              <circle
+                                cx={point.x}
+                                cy={point.y}
+                                r="16"
+                                className={styles.chartNodeHit}
+                                onMouseEnter={() =>
+                                  setEconomyTooltip({
+                                    visible: true,
+                                    xPct: (point.x / motionChartWidth) * 100,
+                                    yPct: (point.y / motionChartHeight) * 100,
+                                    lines: [
+                                      `${point.sessionLabel}`,
+                                      `Economy of motion: ${point.value.toFixed(3)}`,
+                                      `Completed: ${formatTimestamp(point.completedAt)}`,
+                                    ],
+                                  })
+                                }
+                                onMouseLeave={() => setEconomyTooltip((prev) => ({ ...prev, visible: false }))}
+                              />
+                              <circle cx={point.x} cy={point.y} r="7" className={styles.chartNode} />
+                              <text
+                                x={point.x}
+                                y={motionSessionTickLabelY}
+                                textAnchor="middle"
+                                fill="rgba(255,255,255,0.85)"
+                                fontSize="10"
+                              >
+                                {point.sessionLabel.replace('Session ', 'S')}
+                              </text>
+                            </g>
                           ))}
                           <text x={motionPadding.left - 16} y={motionPadding.top + motionInnerHeight / 2} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="11" transform={`rotate(-90, ${motionPadding.left - 16}, ${motionPadding.top + motionInnerHeight / 2})`}>Economy</text>
-                          <text x={motionPadding.left + motionInnerWidth / 2} y={motionChartHeight - 8} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="11">Time</text>
+                          <text x={motionPadding.left + motionInnerWidth / 2} y={motionSessionAxisLabelY} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="11">Session</text>
                         </svg>
                       )}
                       {economyTooltip.visible && (
@@ -671,8 +703,15 @@ const Module2Analytics = () => {
                             const height = Math.abs(yNeg - y);
                             const labelX = x + computedBarWidth / 2;
                             return (
-                              <g key={`${bar.sessionLabel}-${i}`}>
-                                <rect x={x} y={rectY} width={computedBarWidth} height={Math.max(1, height)} fill="#1DA5FF" />
+                              <g key={`${bar.sessionLabel}-${i}`} className={styles.chartBarGroup}>
+                                <rect
+                                  x={x}
+                                  y={rectY}
+                                  width={computedBarWidth}
+                                  height={Math.max(1, height)}
+                                  fill="#1DA5FF"
+                                  className={styles.chartBarVisible}
+                                />
                                 <rect
                                   x={x}
                                   y={rectY}
@@ -693,14 +732,14 @@ const Module2Analytics = () => {
                                   }
                                   onMouseLeave={() => setWasteTooltip((prev) => ({ ...prev, visible: false }))}
                                 />
-                                <text x={labelX} y={barChartHeight - 12} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="10">
+                                <text x={labelX} y={barSessionTickLabelY} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="10">
                                   {bar.sessionLabel.replace('Session ', 'S')}
                                 </text>
                               </g>
                             );
                           })}
                           <text x={barPadding.left - 24} y={barPadding.top + barInnerHeight / 2} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="11" transform={`rotate(-90, ${barPadding.left - 24}, ${barPadding.top + barInnerHeight / 2})`}>Distance</text>
-                          <text x={barPadding.left + barInnerWidth / 2} y={barChartHeight - 2} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="11">Sessions</text>
+                          <text x={barPadding.left + barInnerWidth / 2} y={barSessionsAxisLabelY} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="11">Sessions</text>
                         </svg>
                       )}
                       {wasteTooltip.visible && (

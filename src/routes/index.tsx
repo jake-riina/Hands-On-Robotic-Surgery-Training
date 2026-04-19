@@ -10,6 +10,7 @@ import Module1Exercise1Start from '../pages/Module1Exercise1Start';
 import Module1Exercise1Score from '../pages/Module1Exercise1Score';
 import Module1Exercise2Start from '../pages/Module1Exercise2Start';
 import Module1Exercise2Score from '../pages/Module1Exercise2Score';
+import ThreeDModule1 from '../pages/3DModule1';
 import Module2Instructions from '../pages/Module2Instructions';
 import Module3Instructions from '../pages/Module3Instructions';
 import CompletedModule from '../pages/CompletedModule';
@@ -105,6 +106,10 @@ export const router = createBrowserRouter([
   },
   {
     path: '/module/1/exercise/1/start',
+    element: <ThreeDModule1 />,
+  },
+  {
+    path: '/module/1/3d',
     element: <Module1Exercise1Start />,
   },
   {
