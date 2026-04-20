@@ -3,7 +3,7 @@ import styles from './Module3InstructionVisuals.module.css';
 
 /** `public/two hands.jpg` — spaces encoded for URL safety. */
 const MODULE3_TWO_HANDS_IMG = encodeURI('/two hands.jpg');
-const MODULE3_PUBLIC_IMG_FALLBACK = '/CamControl.png';
+const MODULE3_PUBLIC_IMG_FALLBACK = '/orb%20collection.png';
 const MODULE3_TRANSFER_FINAL_GIF = '/transfer-final.gif';
 
 function WhyPegTransferVisual() {

@@ -2,6 +2,14 @@
 
 export const BRIDGE_WS_URL = 'ws://localhost:4000';
 
+/** Sent by haptics-bridge when the Node ↔ C++ TCP link connects or drops (not device NDJSON). */
+export const BRIDGE_DEVICE_STATUS_TYPE = 'bridgeDeviceStatus' as const;
+
+export type BridgeDeviceStatusPayload = {
+  type: typeof BRIDGE_DEVICE_STATUS_TYPE;
+  connected: boolean;
+};
+
 export type GimbalPayload = {
   x: number;
   y: number;

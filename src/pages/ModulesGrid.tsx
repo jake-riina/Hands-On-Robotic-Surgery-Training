@@ -8,6 +8,9 @@ import analyticsPageStyles from './Module1Analytics.module.css';
 import dashboardStyles from './AdminDashboard.module.css';
 import { supabase } from '../lib/supabaseClient';
 
+const modulesFlatPrimaryBtnClass = `${dashboardStyles.traineeDashboardButtonChrome} ${dashboardStyles.traineeDashboardFlatPrimary}`;
+const modulesFlatLockedBtnClass = `${dashboardStyles.traineeDashboardButtonChrome} ${dashboardStyles.traineeDashboardFlatLocked}`;
+
 const SKILLS_SECTION_SPLIT = '\n\nSkills\n\n';
 
 const moduleDescriptionWrapperStyle = {
@@ -573,7 +576,7 @@ const ModulesGrid = () => {
                         }}
                       >
                         <img
-                          src="/CamControl.png"
+                          src="/orb%20collection.png"
                           alt="Camera control"
                           style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top center', display: 'block' }}
                         />
@@ -591,7 +594,7 @@ const ModulesGrid = () => {
                         }}
                       >
                         <img
-                          src="/Peg.png"
+                          src="/peg-transfer.png"
                           alt="Peg transfer"
                           style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top center', display: 'block' }}
                         />
@@ -609,7 +612,7 @@ const ModulesGrid = () => {
                               setUnlockedModuleIds((prev) => new Set(prev).add(2));
                               navigate('/module/2/instructions');
                             }}
-                            className={`inline-flex items-center justify-center px-8 py-2 text-sm text-center border-0 ${dashboardStyles.traineeDashboardButtonChrome} ${dashboardStyles.gloveConnectButton}`}
+                            className={`inline-flex items-center justify-center ${modulesFlatPrimaryBtnClass}`}
                             style={{ minWidth: '180px' }}
                           >
                             Start
@@ -621,15 +624,15 @@ const ModulesGrid = () => {
                               setUnlockedModuleIds((prev) => new Set(prev).add(3));
                               navigate('/module/3/instructions');
                             }}
-                            className={`inline-flex items-center justify-center px-8 py-2 text-sm text-center border-0 ${dashboardStyles.traineeDashboardButtonChrome} ${dashboardStyles.gloveConnectButton}`}
+                            className={`inline-flex items-center justify-center ${modulesFlatPrimaryBtnClass}`}
                             style={{ minWidth: '180px' }}
                           >
                             Start
                           </button>
                         ) : (
                           <span
-                            className={`inline-flex items-center justify-center px-8 py-2 font-medium text-center text-sm cursor-not-allowed border-0 ${dashboardStyles.traineeDashboardButtonChrome}`}
-                            style={{ backgroundColor: '#374151', color: '#9CA3AF', minWidth: '180px' }}
+                            className={`inline-flex items-center justify-center ${modulesFlatLockedBtnClass}`}
+                            style={{ minWidth: '180px' }}
                           >
                             Start
                           </span>
@@ -643,7 +646,7 @@ const ModulesGrid = () => {
                                 ? '/module/3/instructions'
                                 : `/module/${module.id}/instructions`
                           }
-                          className={`inline-flex items-center justify-center px-8 py-2 text-sm text-center border-0 no-underline ${dashboardStyles.traineeDashboardButtonChrome} ${dashboardStyles.gloveConnectButton}`}
+                          className={`inline-flex items-center justify-center no-underline ${modulesFlatPrimaryBtnClass}`}
                           style={{ minWidth: '180px', textDecoration: 'none' }}
                         >
                           Start

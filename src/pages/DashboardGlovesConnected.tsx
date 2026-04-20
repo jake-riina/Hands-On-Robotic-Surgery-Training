@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabaseClient';
 import ProfileDropdown from '../components/ProfileDropdown';
 import ChevronNavButtons from '../components/ChevronNavButtons';
 import DashboardMySkillsProgressChart from '../components/DashboardMySkillsProgressChart';
-import { BRIDGE_WS_URL } from '../types/geomagicBridge';
+import { BRIDGE_DEVICE_STATUS_TYPE, BRIDGE_WS_URL } from '../types/geomagicBridge';
 import analyticsPageStyles from './Module1Analytics.module.css';
 import dashboardStyles from './AdminDashboard.module.css';
 
@@ -14,21 +14,21 @@ const EXPLORE_MODULES = [
     id: 1,
     title: 'Module 1: Pressure Control',
     description: 'Develop precise force control for safe tissue interaction.',
-    cover: '/Mod1Cover.png',
+    cover: '/module1-instruction-live-module.png',
     route: '/module/1/instructions',
   },
   {
     id: 2,
     title: 'Module 2: Camera Control',
     description: 'Master camera navigation for optimal surgical visibility.',
-    cover: '/CamControl.png',
+    cover: '/orb%20collection.png',
     route: '/module/2/instructions',
   },
   {
     id: 3,
     title: 'Module 3: Peg Transfer',
     description: 'Build bimanual dexterity with precise peg transfers.',
-    cover: '/Peg.png',
+    cover: '/peg-transfer.png',
     route: '/module/3/instructions',
   },
 ];
@@ -40,6 +40,9 @@ const MY_SKILLS_MODULES = [
 ];
 const MY_SKILLS_ANALYTICS_ROUTES = ['/analytics', '/analytics/module2', '/analytics/module3'];
 
+/** Flat blue primary — same look as Connect controllers (no shadow). */
+const traineeDashboardFlatPrimaryClass = `${dashboardStyles.traineeDashboardButtonChrome} ${dashboardStyles.traineeDashboardFlatPrimary}`;
+
 const DashboardGlovesConnected = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -47,7 +50,10 @@ const DashboardGlovesConnected = () => {
   const [mySkillsModuleIndex, setMySkillsModuleIndex] = useState(0);
 
   const bridgeWsRef = useRef<WebSocket | null>(null);
-  const [bridgeConnected, setBridgeConnected] = useState(false);
+  /** Browser ↔ Node WebSocket open. */
+  const [bridgeSocketOpen, setBridgeSocketOpen] = useState(false);
+  /** Node ↔ C++ TCP, from bridge `bridgeDeviceStatus` messages. */
+  const [bridgeDeviceTcpConnected, setBridgeDeviceTcpConnected] = useState(false);
   const [bridgeConnecting, setBridgeConnecting] = useState(false);
   const [userFirstName, setUserFirstName] = useState('');
 
@@ -102,14 +108,26 @@ const DashboardGlovesConnected = () => {
   const handleConnectBridge = () => {
     if (bridgeWsRef.current?.readyState === WebSocket.OPEN || bridgeConnecting) return;
     setBridgeConnecting(true);
+    setBridgeDeviceTcpConnected(false);
     const ws = new WebSocket(BRIDGE_WS_URL);
     bridgeWsRef.current = ws;
     ws.onopen = () => {
-      setBridgeConnected(true);
+      setBridgeSocketOpen(true);
       setBridgeConnecting(false);
     };
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(String(event.data)) as { type?: string; connected?: boolean };
+        if (msg.type === BRIDGE_DEVICE_STATUS_TYPE && typeof msg.connected === 'boolean') {
+          setBridgeDeviceTcpConnected(msg.connected);
+        }
+      } catch {
+        // ignore device NDJSON / malformed frames
+      }
+    };
     ws.onclose = () => {
-      setBridgeConnected(false);
+      setBridgeSocketOpen(false);
+      setBridgeDeviceTcpConnected(false);
       setBridgeConnecting(false);
       if (bridgeWsRef.current === ws) bridgeWsRef.current = null;
     };
@@ -121,9 +139,13 @@ const DashboardGlovesConnected = () => {
   const handleDisconnectBridge = () => {
     bridgeWsRef.current?.close();
     bridgeWsRef.current = null;
-    setBridgeConnected(false);
+    setBridgeSocketOpen(false);
+    setBridgeDeviceTcpConnected(false);
     setBridgeConnecting(false);
   };
+
+  const bridgeEndToEndOk = bridgeSocketOpen && bridgeDeviceTcpConnected;
+  const bridgeWaitingDevice = bridgeSocketOpen && !bridgeDeviceTcpConnected && !bridgeConnecting;
 
   // Navigation items with icons
   const navItems = [
@@ -369,7 +391,7 @@ const DashboardGlovesConnected = () => {
                       type="button"
                       onClick={handleConnectGloves}
                       disabled={isConnecting}
-                      className={`mt-4 px-4 py-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed ${dashboardStyles.traineeDashboardButtonChrome} ${dashboardStyles.gloveConnectButton}`}
+                      className={`mt-4 self-start ${traineeDashboardFlatPrimaryClass}`}
                     >
                       {isConnecting ? 'Connecting…' : 'Connect gloves'}
                     </button>
@@ -391,24 +413,47 @@ const DashboardGlovesConnected = () => {
                       marginBottom: '10px',
                       padding: '8px 10px',
                       borderRadius: '8px',
-                      backgroundColor: bridgeConnecting ? 'rgba(245, 158, 11, 0.12)' : bridgeConnected ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
-                      border: `1px solid ${bridgeConnecting ? 'rgba(245, 158, 11, 0.35)' : bridgeConnected ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)'}`,
+                      backgroundColor:
+                        bridgeEndToEndOk
+                          ? 'rgba(16, 185, 129, 0.12)'
+                          : bridgeConnecting || bridgeWaitingDevice
+                            ? 'rgba(245, 158, 11, 0.12)'
+                            : 'rgba(239, 68, 68, 0.12)',
+                      border: `1px solid ${
+                        bridgeEndToEndOk
+                          ? 'rgba(16, 185, 129, 0.35)'
+                          : bridgeConnecting || bridgeWaitingDevice
+                            ? 'rgba(245, 158, 11, 0.35)'
+                            : 'rgba(239, 68, 68, 0.35)'
+                      }`,
                     }}
                     role="status"
                     aria-live="polite"
                   >
-                    {bridgeConnecting ? <StatusConnectingIcon /> : bridgeConnected ? <StatusConnectedIcon /> : <StatusDisconnectedIcon />}
+                    {bridgeConnecting || bridgeWaitingDevice ? (
+                      <StatusConnectingIcon />
+                    ) : bridgeEndToEndOk ? (
+                      <StatusConnectedIcon />
+                    ) : (
+                      <StatusDisconnectedIcon />
+                    )}
                     <span
                       style={{
                         fontSize: '14px',
                         fontWeight: 600,
-                        color: bridgeConnecting ? '#FBBF24' : bridgeConnected ? '#34D399' : '#F87171',
+                        color: bridgeEndToEndOk ? '#34D399' : bridgeConnecting || bridgeWaitingDevice ? '#FBBF24' : '#F87171',
                       }}
                     >
-                      {bridgeConnecting ? 'Connecting…' : bridgeConnected ? 'Connected' : 'Not Connected'}
+                      {bridgeConnecting
+                        ? 'Connecting…'
+                        : bridgeWaitingDevice
+                          ? 'Waiting for device…'
+                          : bridgeEndToEndOk
+                            ? 'Connected'
+                            : 'Not Connected'}
                     </span>
                   </div>
-                  {bridgeConnected ? (
+                  {bridgeSocketOpen ? (
                     <button
                       type="button"
                       onClick={handleDisconnectBridge}
@@ -433,18 +478,7 @@ const DashboardGlovesConnected = () => {
                       type="button"
                       onClick={handleConnectBridge}
                       disabled={bridgeConnecting}
-                      style={{
-                        alignSelf: 'flex-start',
-                        padding: '8px 16px',
-                        borderRadius: '8px',
-                        fontSize: '14px',
-                        fontWeight: 500,
-                        border: 'none',
-                        cursor: bridgeConnecting ? 'not-allowed' : 'pointer',
-                        opacity: bridgeConnecting ? 0.6 : 1,
-                        backgroundColor: '#1DA5FF',
-                        color: 'white',
-                      }}
+                      className={`mt-4 self-start ${traineeDashboardFlatPrimaryClass}`}
                     >
                       {bridgeConnecting ? 'Connecting…' : 'Connect controllers'}
                     </button>
@@ -514,7 +548,7 @@ const DashboardGlovesConnected = () => {
                             display: 'block',
                           }}
                           onError={(e) => {
-                            e.currentTarget.src = '/Mod1Cover.png';
+                            e.currentTarget.src = '/module1-instruction-live-module.png';
                           }}
                         />
                       </div>
@@ -536,8 +570,7 @@ const DashboardGlovesConnected = () => {
                       <div className="mt-auto flex-shrink-0" style={{ marginTop: '12px' }}>
                         <button
                           type="button"
-                          className={`inline-flex items-center gap-2 px-4 py-2 font-medium text-sm cursor-pointer hover:opacity-90 border-0 ${dashboardStyles.traineeDashboardButtonChrome}`}
-                          style={{ backgroundColor: '#1DA5FF', color: 'white' }}
+                          className={`inline-flex items-center gap-2 self-start ${traineeDashboardFlatPrimaryClass}`}
                           onClick={() => navigate(module.route)}
                         >
                           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -594,8 +627,7 @@ const DashboardGlovesConnected = () => {
                   <div style={{ marginTop: '12px', flexShrink: 0 }}>
                     <button
                       type="button"
-                      className={`inline-flex items-center gap-2 px-4 py-2 font-medium text-sm cursor-pointer hover:opacity-90 border-0 ${dashboardStyles.traineeDashboardButtonChrome}`}
-                      style={{ backgroundColor: '#1DA5FF', color: 'white' }}
+                      className={`inline-flex items-center gap-2 self-start ${traineeDashboardFlatPrimaryClass}`}
                       onClick={() => navigate(MY_SKILLS_ANALYTICS_ROUTES[mySkillsModuleIndex] ?? '/analytics')}
                     >
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -641,7 +673,7 @@ const DashboardGlovesConnected = () => {
                 }}
               >
                 <img
-                  src="/Mod1Cover.png"
+                  src="/module1-instruction-live-module.png"
                   alt="Module 1: Pressure"
                   style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center center', display: 'block' }}
                 />
@@ -678,8 +710,7 @@ const DashboardGlovesConnected = () => {
                 </div>
                 <button
                   type="button"
-                  className={`inline-flex items-center px-6 py-2 font-medium text-sm cursor-pointer hover:opacity-90 border-0 ${dashboardStyles.traineeDashboardButtonChrome}`}
-                  style={{ backgroundColor: '#1DA5FF', color: 'white' }}
+                  className={`inline-flex items-center self-start ${traineeDashboardFlatPrimaryClass}`}
                   onClick={() => navigate('/module/1/instructions')}
                 >
                   Continue

@@ -21,8 +21,8 @@ const ROLE_SLIDER_INDEX: Record<UserRole, number> = {
 
 /* ---------------- LOGIN COMPONENT ---------------- */
 const images = [
-  '/Screenshot-1.png',
-  '/Screenshot-2.png',
+  '/hand-controller.png',
+  '/sit%20at%20console.png',
   '/Screenshot-3.png',
 ];
 
@@ -651,15 +651,13 @@ const LoginTraineeV1: React.FC = () => {
             <h1 className="font-semibold leading-tight mb-2 text-white" style={{ color: '#ffffff', fontSize: '36px' }}>
               Democratizing Access to Robotic Surgery Training
             </h1>
-            <p className="opacity-90 text-white" style={{ color: '#ffffff', fontSize: '19px' }}>
-              Develop the right training habits with HandsOn
-            </p>
           </div>
 
           <div className="relative w-full h-[400px] flex items-center justify-center overflow-hidden z-5">
             {images.map((image, index) => {
               const offset = index - current;
               const isActive = index === current;
+              const isDualSlide = image === '/sit%20at%20console.png';
               return (
                 <div
                   key={index}
@@ -669,11 +667,18 @@ const LoginTraineeV1: React.FC = () => {
                     opacity: isActive ? 1 : 0,
                   }}
                 >
-                  <img
-                    src={image}
-                    alt={`carousel-${index}`}
-                    className="w-full h-full object-contain rounded-xl"
-                  />
+                  {isDualSlide ? (
+                    <div className="w-full h-full flex items-center justify-center gap-3">
+                      <img src="/module2-instruction-stylus-grip.png" alt={`carousel-${index}-left`} className="w-1/2 h-full object-contain rounded-xl" />
+                      <img src="/module2-instruction-stylus-grip.png" alt={`carousel-${index}-right`} className="w-1/2 h-full object-contain rounded-xl" />
+                    </div>
+                  ) : (
+                    <img
+                      src={image}
+                      alt={`carousel-${index}`}
+                      className="w-full h-full object-contain rounded-xl"
+                    />
+                  )}
                 </div>
               );
             })}

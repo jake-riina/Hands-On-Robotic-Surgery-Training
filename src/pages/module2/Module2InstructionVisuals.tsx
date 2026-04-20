@@ -11,7 +11,7 @@ const MODULE2_INSTRUCTION_STEP1_CONSOLE = encodeURI('/sit at console.png');
 /** Step 4: `public/orb collection.png` (sim screenshot with orb + crosshair). */
 const MODULE2_ORB_COLLECTION_IMG = encodeURI('/orb collection.png');
 /** Generic product art if a `public/` image is missing. */
-const MODULE2_PUBLIC_IMG_FALLBACK = '/CamControl.png';
+const MODULE2_PUBLIC_IMG_FALLBACK = '/orb%20collection.png';
 
 function WhyCameraVisual() {
   const [imgSrc, setImgSrc] = useState(MODULE2_INSTRUCTION_STEP1_CONSOLE);
