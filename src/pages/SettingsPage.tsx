@@ -102,15 +102,18 @@ const Settings = () => {
   if (isLoading) {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: '#26313E' }}>
-        <header className="flex items-center justify-between px-6 py-2" style={{ backgroundColor: '#1E2733' }}>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center justify-center overflow-hidden" style={{ width: '72px', height: '72px' }}>
-              <img 
-                src="/Logo.png" 
-                alt="Logo" 
-                className="object-contain"
-                style={{ width: '72px', height: '72px', maxWidth: '72px', maxHeight: '72px', objectFit: 'contain' }}
-              />
+        <header
+          className="flex items-center justify-between px-6 py-2 box-border shrink-0"
+          style={{
+            backgroundColor: '#1E2733',
+            height: '88px',
+            minHeight: '88px',
+            maxHeight: '88px',
+          }}
+        >
+          <div className="flex h-full min-h-0 flex-1 items-center gap-4 min-w-0">
+            <div className="flex h-full min-h-0 max-w-[min(280px,42vw)] items-center justify-center overflow-hidden">
+              <img src="/Logo.png" alt="Logo" className="block h-auto max-h-full w-auto max-w-full object-contain" />
             </div>
           </div>
           <ProfileDropdown />
@@ -119,7 +122,7 @@ const Settings = () => {
           display: 'flex', 
           alignItems: 'center', 
           justifyContent: 'center', 
-          minHeight: 'calc(100vh - 72px)' 
+          minHeight: 'calc(100vh - 88px)' 
         }}>
           <p style={{ color: '#9CA3AF' }}>Loading...</p>
         </div>
@@ -130,15 +133,18 @@ const Settings = () => {
   if (!profile) {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: '#26313E' }}>
-        <header className="flex items-center justify-between px-6 py-2" style={{ backgroundColor: '#1E2733' }}>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center justify-center overflow-hidden" style={{ width: '72px', height: '72px' }}>
-              <img 
-                src="/Logo.png" 
-                alt="Logo" 
-                className="object-contain"
-                style={{ width: '72px', height: '72px', maxWidth: '72px', maxHeight: '72px', objectFit: 'contain' }}
-              />
+        <header
+          className="flex items-center justify-between px-6 py-2 box-border shrink-0"
+          style={{
+            backgroundColor: '#1E2733',
+            height: '88px',
+            minHeight: '88px',
+            maxHeight: '88px',
+          }}
+        >
+          <div className="flex h-full min-h-0 flex-1 items-center gap-4 min-w-0">
+            <div className="flex h-full min-h-0 max-w-[min(280px,42vw)] items-center justify-center overflow-hidden">
+              <img src="/Logo.png" alt="Logo" className="block h-auto max-h-full w-auto max-w-full object-contain" />
             </div>
           </div>
           <ProfileDropdown />
@@ -147,7 +153,7 @@ const Settings = () => {
           display: 'flex', 
           alignItems: 'center', 
           justifyContent: 'center', 
-          minHeight: 'calc(100vh - 72px)' 
+          minHeight: 'calc(100vh - 88px)' 
         }}>
           <p style={{ color: '#9CA3AF' }}>Unable to load profile information</p>
         </div>
@@ -158,15 +164,18 @@ const Settings = () => {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#26313E' }}>
       {/* Header Container - Top Bar */}
-      <header className="flex items-center justify-between px-6 py-2" style={{ backgroundColor: '#1E2733' }}>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center justify-center overflow-hidden" style={{ width: '72px', height: '72px' }}>
-            <img 
-              src="/Logo.png" 
-              alt="Logo" 
-              className="object-contain"
-              style={{ width: '72px', height: '72px', maxWidth: '72px', maxHeight: '72px', objectFit: 'contain' }}
-            />
+      <header
+        className="flex items-center justify-between px-6 py-2 box-border shrink-0"
+        style={{
+          backgroundColor: '#1E2733',
+          height: '88px',
+          minHeight: '88px',
+          maxHeight: '88px',
+        }}
+      >
+        <div className="flex h-full min-h-0 flex-1 items-center gap-4 min-w-0">
+          <div className="flex h-full min-h-0 max-w-[min(280px,42vw)] items-center justify-center overflow-hidden">
+            <img src="/Logo.png" alt="Logo" className="block h-auto max-h-full w-auto max-w-full object-contain" />
           </div>
         </div>
         {/* Profile picture */}
@@ -174,7 +183,7 @@ const Settings = () => {
       </header>
 
       {/* Main Layout Container */}
-      <div style={{ display: 'flex', minHeight: 'calc(100vh - 72px)' }}>
+      <div style={{ display: 'flex', minHeight: 'calc(100vh - 88px)' }}>
         {/* Sidebar Container - Left Navigation */}
         <aside className="w-64" style={{ backgroundColor: '#1E2733' }}>
           <nav className="py-6">

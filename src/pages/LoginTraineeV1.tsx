@@ -13,6 +13,12 @@ import {
 /* ---------------- TYPES ---------------- */
 type UserRole = 'trainee' | 'trainer' | 'admin';
 
+const ROLE_SLIDER_INDEX: Record<UserRole, number> = {
+  trainee: 0,
+  trainer: 1,
+  admin: 2,
+};
+
 /* ---------------- LOGIN COMPONENT ---------------- */
 const images = [
   '/Screenshot-1.png',
@@ -313,16 +319,34 @@ const LoginTraineeV1: React.FC = () => {
       {/* Left Panel - Authentication */}
       <div className="w-1/2 flex flex-col items-center justify-center p-8" style={{ backgroundColor: '#26313E' }}>
         {/* Centered Sign In Container */}
-        <div className="flex flex-col items-center justify-center w-full">
-          {/* Role Selector - Pill-shaped segmented control - Centered above Sign In box */}
-          <div className="flex justify-center mb-8">
+        <div className="flex flex-col items-center justify-center w-full gap-14">
+          {/* Role Selector - pill segmented control with sliding active thumb */}
+          <div className="flex justify-center w-full px-2">
             <div
-              className="inline-flex rounded-full overflow-hidden"
-              style={{ 
+              className="relative flex w-full max-w-[400px] select-none overflow-hidden rounded-full"
+              style={{
+                padding: '4px',
                 backgroundColor: '#ffffff',
-                borderRadius: '9999px'
+                boxShadow: 'none',
               }}
             >
+              {/* Solid light track so unselected segments never pick up panel color */}
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 rounded-full"
+                style={{ backgroundColor: '#ffffff', zIndex: 0 }}
+              />
+              <div
+                aria-hidden
+                className="pointer-events-none absolute top-[4px] bottom-[4px] left-[4px] rounded-full"
+                style={{
+                  width: 'calc((100% - 8px) / 3)',
+                  backgroundColor: '#54A6F1',
+                  transform: `translateX(calc(${ROLE_SLIDER_INDEX[role]} * 100%))`,
+                  transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  zIndex: 1,
+                }}
+              />
               <button
                 type="button"
                 onClick={() => {
@@ -330,24 +354,16 @@ const LoginTraineeV1: React.FC = () => {
                   setIsSignUp(false);
                   resetAdminSignupFields();
                 }}
-                className="px-6 py-2 font-medium transition-all duration-200"
-                style={
-                  role === 'trainee'
-                    ? {
-                        backgroundColor: '#2563eb',
-                        color: 'white',
-                        borderTopLeftRadius: '9999px',
-                        borderBottomLeftRadius: '9999px',
-                        fontSize: '16px',
-                      }
-                    : {
-                        backgroundColor: '#ffffff',
-                        color: '#000000',
-                        fontSize: '16px',
-                        borderTopLeftRadius: '9999px',
-                        borderBottomLeftRadius: '9999px',
-                      }
-                }
+                className="relative z-[2] min-h-[40px] flex-1 rounded-full border-0 px-4 py-2 font-medium outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-[#54A6F1] focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+                style={{
+                  WebkitAppearance: 'none',
+                  appearance: 'none',
+                  backgroundColor: 'transparent',
+                  color: role === 'trainee' ? '#ffffff' : '#1a1a1a',
+                  fontSize: '15px',
+                  fontWeight: 500,
+                  letterSpacing: '0.01em',
+                }}
               >
                 Trainee
               </button>
@@ -358,20 +374,16 @@ const LoginTraineeV1: React.FC = () => {
                   setIsSignUp(false);
                   resetAdminSignupFields();
                 }}
-                className="px-6 py-2 font-medium transition-all duration-200"
-                style={
-                  role === 'trainer'
-                    ? {
-                        backgroundColor: '#2563eb',
-                        color: 'white',
-                        fontSize: '16px',
-                      }
-                    : {
-                        backgroundColor: '#ffffff',
-                        color: '#000000',
-                        fontSize: '16px',
-                      }
-                }
+                className="relative z-[2] min-h-[40px] flex-1 rounded-full border-0 px-4 py-2 font-medium outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-[#54A6F1] focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+                style={{
+                  WebkitAppearance: 'none',
+                  appearance: 'none',
+                  backgroundColor: 'transparent',
+                  color: role === 'trainer' ? '#ffffff' : '#1a1a1a',
+                  fontSize: '15px',
+                  fontWeight: 500,
+                  letterSpacing: '0.01em',
+                }}
               >
                 Trainer
               </button>
@@ -382,24 +394,16 @@ const LoginTraineeV1: React.FC = () => {
                   setIsSignUp(false);
                   resetAdminSignupFields();
                 }}
-                className="px-6 py-2 font-medium transition-all duration-200"
-                style={
-                  role === 'admin'
-                    ? {
-                        backgroundColor: '#2563eb',
-                        color: 'white',
-                        borderTopRightRadius: '9999px',
-                        borderBottomRightRadius: '9999px',
-                        fontSize: '16px',
-                      }
-                    : {
-                        backgroundColor: '#ffffff',
-                        color: '#000000',
-                        fontSize: '16px',
-                        borderTopRightRadius: '9999px',
-                        borderBottomRightRadius: '9999px',
-                      }
-                }
+                className="relative z-[2] min-h-[40px] flex-1 rounded-full border-0 px-4 py-2 font-medium outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-[#54A6F1] focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+                style={{
+                  WebkitAppearance: 'none',
+                  appearance: 'none',
+                  backgroundColor: 'transparent',
+                  color: role === 'admin' ? '#ffffff' : '#1a1a1a',
+                  fontSize: '15px',
+                  fontWeight: 500,
+                  letterSpacing: '0.01em',
+                }}
               >
                 Admin
               </button>
@@ -410,6 +414,7 @@ const LoginTraineeV1: React.FC = () => {
           <div
             className="bg-white rounded-lg shadow-lg flex flex-col items-center justify-center"
             style={{
+              marginTop: '20px',
               backgroundColor: '#ffffff',
               width: '25vw',
               minWidth: '400px',
@@ -562,12 +567,15 @@ const LoginTraineeV1: React.FC = () => {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                className="text-white transition-colors w-full disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ 
-                  backgroundColor: '#2563eb', 
+                  backgroundColor: '#1da5ff',
                   color: 'white', 
                   height: '50px',
-                  borderRadius: '0.75rem',
+                  borderRadius: '8px',
+                  border: 'none',
+                  fontWeight: 600,
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.16), 0 1px 3px rgba(0, 0, 0, 0.1)',
                   boxSizing: 'border-box',
                   padding: '0px',
                   fontSize: '16px'

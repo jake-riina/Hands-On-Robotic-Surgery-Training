@@ -7,6 +7,7 @@ import ChevronNavButtons from '../components/ChevronNavButtons';
 import DashboardMySkillsProgressChart from '../components/DashboardMySkillsProgressChart';
 import { BRIDGE_WS_URL } from '../types/geomagicBridge';
 import analyticsPageStyles from './Module1Analytics.module.css';
+import dashboardStyles from './AdminDashboard.module.css';
 
 const EXPLORE_MODULES = [
   {
@@ -219,21 +220,18 @@ const DashboardGlovesConnected = () => {
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#26313E' }}>
       {/* Header Container - Top Bar */}
-      <header className="flex items-center justify-between px-6 py-2" style={{ backgroundColor: '#1E2733' }}>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center justify-center overflow-hidden" style={{ width: '72px', height: '72px' }}>
-            <img 
-              src="/Logo.png" 
-              alt="Logo" 
-              className="object-contain"
-              style={{ 
-                width: '72px', 
-                height: '72px', 
-                maxWidth: '72px', 
-                maxHeight: '72px',
-                objectFit: 'contain'
-              }}
-            />
+      <header
+        className="flex items-center justify-between px-6 py-2 box-border shrink-0"
+        style={{
+          backgroundColor: '#1E2733',
+          height: '88px',
+          minHeight: '88px',
+          maxHeight: '88px',
+        }}
+      >
+        <div className="flex h-full min-h-0 flex-1 items-center gap-4 min-w-0">
+          <div className="flex h-full min-h-0 max-w-[min(280px,42vw)] items-center justify-center overflow-hidden">
+            <img src="/Logo.png" alt="Logo" className="block h-auto max-h-full w-auto max-w-full object-contain" />
           </div>
         </div>
         {/* Profile picture */}
@@ -241,7 +239,7 @@ const DashboardGlovesConnected = () => {
       </header>
 
       {/* Main Layout Container */}
-      <div className="flex" style={{ minHeight: 'calc(100vh - 72px)' }}>
+      <div className="flex" style={{ minHeight: 'calc(100vh - 88px)' }}>
         {/* Sidebar Container - Left Navigation */}
         <aside className="w-64" style={{ backgroundColor: '#1E2733' }}>
           <nav className="py-6">
@@ -371,18 +369,7 @@ const DashboardGlovesConnected = () => {
                       type="button"
                       onClick={handleConnectGloves}
                       disabled={isConnecting}
-                      style={{
-                        alignSelf: 'flex-start',
-                        padding: '8px 16px',
-                        borderRadius: '8px',
-                        fontSize: '14px',
-                        fontWeight: 500,
-                        border: 'none',
-                        cursor: isConnecting ? 'not-allowed' : 'pointer',
-                        opacity: isConnecting ? 0.6 : 1,
-                        backgroundColor: '#1DA5FF',
-                        color: 'white',
-                      }}
+                      className={`mt-4 px-4 py-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed ${dashboardStyles.traineeDashboardButtonChrome} ${dashboardStyles.gloveConnectButton}`}
                     >
                       {isConnecting ? 'Connecting…' : 'Connect gloves'}
                     </button>
@@ -471,9 +458,8 @@ const DashboardGlovesConnected = () => {
 
             {/* Box 2: Explore Modules Card - carousel for each of the 3 modules */}
             <div
+              className="flex flex-col"
               style={{
-                display: 'flex',
-                flexDirection: 'column',
                 borderRadius: '8px',
                 backgroundColor: '#1E2733',
                 height: '400px',
@@ -547,28 +533,17 @@ const DashboardGlovesConnected = () => {
                       >
                         {module.description}
                       </p>
-                      <div style={{ marginTop: '12px', flexShrink: 0 }}>
+                      <div className="mt-auto flex-shrink-0" style={{ marginTop: '12px' }}>
                         <button
                           type="button"
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            padding: '8px 16px',
-                            borderRadius: '8px',
-                            fontWeight: 500,
-                            fontSize: '14px',
-                            cursor: 'pointer',
-                            border: 'none',
-                            backgroundColor: '#1DA5FF',
-                            color: 'white',
-                          }}
+                          className={`inline-flex items-center gap-2 px-4 py-2 font-medium text-sm cursor-pointer hover:opacity-90 border-0 ${dashboardStyles.traineeDashboardButtonChrome}`}
+                          style={{ backgroundColor: '#1DA5FF', color: 'white' }}
                           onClick={() => navigate(module.route)}
                         >
                           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M6 12l4-4-4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
-                          <span style={{ fontSize: '14px' }}>Go to Module</span>
+                          <span className="text-sm">Go to Module</span>
                         </button>
                       </div>
                     </>
@@ -583,9 +558,8 @@ const DashboardGlovesConnected = () => {
             
             {/* Box 3: My Skills Card */}
             <div
+              className="flex flex-col"
               style={{
-                display: 'flex',
-                flexDirection: 'column',
                 borderRadius: '8px',
                 backgroundColor: '#1E2733',
                 height: '400px',
@@ -617,31 +591,20 @@ const DashboardGlovesConnected = () => {
                     moduleId={MY_SKILLS_MODULES[mySkillsModuleIndex].moduleId}
                     moduleTitle={MY_SKILLS_MODULES[mySkillsModuleIndex].title}
                   />
-                <div style={{ marginTop: '12px', flexShrink: 0 }}>
-                  <button
-                    type="button"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '8px 16px',
-                      borderRadius: '8px',
-                      fontWeight: 500,
-                      fontSize: '14px',
-                      cursor: 'pointer',
-                      border: 'none',
-                      backgroundColor: '#1DA5FF',
-                      color: 'white',
-                    }}
-                    onClick={() => navigate(MY_SKILLS_ANALYTICS_ROUTES[mySkillsModuleIndex] ?? '/analytics')}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M6 12l4-4-4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    <span style={{ fontSize: '14px' }}>Go to Analytics</span>
-                  </button>
+                  <div style={{ marginTop: '12px', flexShrink: 0 }}>
+                    <button
+                      type="button"
+                      className={`inline-flex items-center gap-2 px-4 py-2 font-medium text-sm cursor-pointer hover:opacity-90 border-0 ${dashboardStyles.traineeDashboardButtonChrome}`}
+                      style={{ backgroundColor: '#1DA5FF', color: 'white' }}
+                      onClick={() => navigate(MY_SKILLS_ANALYTICS_ROUTES[mySkillsModuleIndex] ?? '/analytics')}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M6 12l4-4-4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      <span className="text-sm">Go to Analytics</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
               </div>
             </div>
           </div>
@@ -649,9 +612,9 @@ const DashboardGlovesConnected = () => {
 
           {/* Box 5: Continue Module 1 Card */}
           <div
+            className="p-4"
             style={{
               borderRadius: '8px',
-              padding: '16px',
               backgroundColor: '#1E2733',
               boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3)',
               width: '1008px',
@@ -715,16 +678,8 @@ const DashboardGlovesConnected = () => {
                 </div>
                 <button
                   type="button"
-                  style={{
-                    padding: '8px 24px',
-                    borderRadius: '8px',
-                    fontWeight: 500,
-                    fontSize: '14px',
-                    cursor: 'pointer',
-                    border: 'none',
-                    backgroundColor: '#1DA5FF',
-                    color: 'white',
-                  }}
+                  className={`inline-flex items-center px-6 py-2 font-medium text-sm cursor-pointer hover:opacity-90 border-0 ${dashboardStyles.traineeDashboardButtonChrome}`}
+                  style={{ backgroundColor: '#1DA5FF', color: 'white' }}
                   onClick={() => navigate('/module/1/instructions')}
                 >
                   Continue
