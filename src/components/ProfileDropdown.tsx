@@ -38,8 +38,7 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ size = 'sm' }) => {
 
   const handleViewProfile = () => {
     setIsOpen(false);
-    // TODO: Navigate to profile page when implemented
-    console.log('View Profile clicked');
+    navigate('/settings');
   };
 
   const svgSize = size === 'md' ? '40' : '36';

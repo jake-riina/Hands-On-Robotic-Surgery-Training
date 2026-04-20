@@ -25,6 +25,7 @@ import { CAMERA_FOV_MAX } from '../../pegTransfer/pegTransferCameraRig';
 import { pegTransferReferenceValues } from '../../pegTransfer/pegTransferReferenceValues';
 import { CameraControlInstruments } from './CameraControlInstruments';
 import { CameraControlRig } from './CameraControlRig';
+import { OrRoomBody } from './OrRoomBody';
 
 const ENDOSCOPE = pegTransferReferenceValues.lightingDefaults.endoscopePointLight;
 
@@ -867,7 +868,7 @@ const CameraControl = () => {
           }}
         >
           <p className="text-center text-lg leading-relaxed max-w-xl" style={{ color: '#e2e8f0', margin: 0 }}>
-            Place both styluses in the inkwell, then calibrate to enable instruments and start the exercise.
+            Place both styluses in the inkwell and click "Calibrate Devices"
           </p>
           <button
             type="button"
@@ -878,7 +879,7 @@ const CameraControl = () => {
             className="rounded-xl font-semibold text-2xl transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45 px-12 py-4"
             style={{ backgroundColor: '#1DA5FF', color: '#ffffff' }}
           >
-            Calibrate devices
+            Calibrate Devices
           </button>
         </div>
       )}
@@ -901,10 +902,8 @@ const CameraControl = () => {
           </svg>
           Back to Modules
         </button>
-        <h1 className="text-lg font-semibold" style={{ color: 'white' }}>Camera Control</h1>
-        <p className="text-sm" style={{ color: '#9CA3AF', maxWidth: '240px' }}>
-          Hold button1 on both handles for camera mode
-        </p>
+        <h1 className="text-lg font-semibold" style={{ color: 'white' }}>Module 2: Camera Control</h1>
+        <div style={{ minWidth: 240 }} />
       </header>
       <div
         className="flex-1 rounded-lg overflow-hidden min-h-0 relative"

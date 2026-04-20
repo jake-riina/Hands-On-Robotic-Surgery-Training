@@ -6,9 +6,7 @@ import DashboardLogout from '../pages/DashboardLogout';
 import DashboardLogoutConfirm from '../pages/DashboardLogoutConfirm';
 import ModulesGrid from '../pages/ModulesGrid';
 import Module1Instructions from '../pages/Module1Instructions';
-import Module1Exercise1Start from '../pages/Module1Exercise1Start';
 import Module1Exercise1Score from '../pages/Module1Exercise1Score';
-import Module1Exercise2Start from '../pages/Module1Exercise2Start';
 import Module1Exercise2Score from '../pages/Module1Exercise2Score';
 import ThreeDModule1 from '../pages/3DModule1';
 import Module2Instructions from '../pages/Module2Instructions';
@@ -109,16 +107,8 @@ export const router = createBrowserRouter([
     element: <ThreeDModule1 />,
   },
   {
-    path: '/module/1/3d',
-    element: <Module1Exercise1Start />,
-  },
-  {
     path: '/module/1/exercise/1/score',
     element: <Module1Exercise1Score />,
-  },
-  {
-    path: '/module/1/exercise/2/start',
-    element: <Module1Exercise2Start />,
   },
   {
     path: '/module/1/exercise/2/score',

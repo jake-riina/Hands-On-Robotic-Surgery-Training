@@ -14,7 +14,7 @@ const IncompleteModule2 = () => {
     { path: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
     { path: '/modules', label: 'Modules', icon: 'modules' },
     { path: '/analytics', label: 'Analytics', icon: 'analytics' },
-    { path: '/settings', label: 'Settings', icon: 'settings' },
+    { path: '/settings', label: 'Profile', icon: 'profile' },
   ];
 
   const DashboardIcon = () => (
@@ -39,10 +39,10 @@ const IncompleteModule2 = () => {
       <rect x="15" y="4" width="3" height="13" fill="currentColor" />
     </svg>
   );
-  const SettingsIcon = () => (
+  const ProfileIcon = () => (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" stroke="currentColor" strokeWidth="1.5" fill="none" />
-      <path d="M15.66 11.7l-.73-.42a3.5 3.5 0 000-1.56l.73-.42a.5.5 0 00.18-.68l-.68-1.18a.5.5 0 00-.69-.18l-.73.42a3.5 3.5 0 00-1.18-.68V6.5a.5.5 0 00-.5-.5H8.5a.5.5 0 00-.5.5v.84a3.5 3.5 0 00-1.18.68l-.73-.42a.5.5 0 00-.69.18l-.68 1.18a.5.5 0 00.18.68l.73.42a3.5 3.5 0 000 1.56l-.73.42a.5.5 0 00-.18.68l.68 1.18a.5.5 0 00.69.18l.73-.42a3.5 3.5 0 001.18.68v.84a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-.84a3.5 3.5 0 001.18-.68l.73.42a.5.5 0 00.69-.18l.68-1.18a.5.5 0 00-.18-.68z" stroke="currentColor" strokeWidth="1.5" fill="none" />
+      <circle cx="10" cy="6.5" r="3" stroke="currentColor" strokeWidth="1.5" fill="none" />
+      <path d="M4 16c0-3 2.7-5 6-5s6 2 6 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
     </svg>
   );
   const getIcon = (iconName: string) => {
@@ -50,7 +50,7 @@ const IncompleteModule2 = () => {
       case 'dashboard': return <DashboardIcon />;
       case 'modules': return <ModulesIcon />;
       case 'analytics': return <AnalyticsIcon />;
-      case 'settings': return <SettingsIcon />;
+      case 'profile': return <ProfileIcon />;
       default: return null;
     }
   };

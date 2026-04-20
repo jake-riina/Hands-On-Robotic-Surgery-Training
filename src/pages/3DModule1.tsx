@@ -385,10 +385,6 @@ const ThreeDModule1 = () => {
           }}
         >
           <style>{`
-          @keyframes timerThrob {
-            0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-            50% { transform: scale(1.06); box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.4); }
-          }
           @keyframes nextBandHintPulse {
             0%, 100% { opacity: 0.82; }
             50% { opacity: 1; }
@@ -398,19 +394,27 @@ const ThreeDModule1 = () => {
             className="flex-1 min-h-0 relative"
             style={{ pointerEvents: 'none' }}
           >
-            {/* Timer: top-left (right rail removed) */}
+            {/* Timer card: match Module 3 presentation */}
             <div
-              className="absolute top-3 left-3 flex items-center gap-2.5 rounded-lg px-5 py-2.5 font-mono font-semibold"
+              className="absolute"
               style={{
-                backgroundColor: timerActive && timeRemaining <= 10 ? '#2a1a1a' : '#1E2733',
-                color: timerActive && timeRemaining <= 10 ? '#fca5a5' : '#fff',
-                border: timerActive && timeRemaining <= 10 ? '1px solid #ef4444' : '1px solid #374151',
-                fontSize: '1.6rem',
-                animation: timerActive && timeRemaining <= 10 ? 'timerThrob 0.7s ease-in-out infinite' : undefined,
-                boxShadow: '0 4px 20px rgba(0,0,0,0.35)',
+                top: 16,
+                left: 16,
+                zIndex: 45,
+                minWidth: 160,
+                padding: '10px 14px',
+                borderRadius: 10,
+                backgroundColor: '#1E2733',
+                color: '#fff',
+                border: '1px solid #374151',
+                textAlign: 'center',
+                fontWeight: 700,
+                letterSpacing: 0.3,
+                userSelect: 'none',
               }}
             >
-              <span className="tabular-nums">{timerDisplay}</span>
+              <div style={{ fontSize: 12, opacity: 0.9, marginBottom: 2 }}>Time Remaining</div>
+              <div className="tabular-nums" style={{ fontSize: 26, lineHeight: 1.1 }}>{timerDisplay}</div>
             </div>
 
           </div>
