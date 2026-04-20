@@ -1,47 +1,47 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useBLE } from '../contexts/BLEContext';
 import { supabase } from '../lib/supabaseClient';
 import ProfileDropdown from '../components/ProfileDropdown';
 import ChevronNavButtons from '../components/ChevronNavButtons';
+import DashboardMySkillsProgressChart from '../components/DashboardMySkillsProgressChart';
+import { BRIDGE_DEVICE_STATUS_TYPE, BRIDGE_WS_URL } from '../types/geomagicBridge';
+import analyticsPageStyles from './Module1Analytics.module.css';
 import dashboardStyles from './AdminDashboard.module.css';
 
 const EXPLORE_MODULES = [
   {
     id: 1,
-    title: 'Module 1: Pressure',
-    description: 'Learn consistent, controlled pressure on the Da Vinci console.',
-    cover: '/Mod1Cover.png',
+    title: 'Module 1: Pressure Control',
+    description: 'Develop precise force control for safe tissue interaction.',
+    cover: '/module1-instruction-live-module.png',
     route: '/module/1/instructions',
   },
   {
     id: 2,
     title: 'Module 2: Camera Control',
-    description: 'Master camera positioning for an optimal surgical view.',
-    cover: '/CamControl.png',
+    description: 'Master camera navigation for optimal surgical visibility.',
+    cover: '/orb%20collection.png',
     route: '/module/2/instructions',
   },
   {
     id: 3,
     title: 'Module 3: Peg Transfer',
-    description: 'Build precision and dexterity with peg transfer between targets.',
-    cover: '/Peg.png',
+    description: 'Build bimanual dexterity with precise peg transfers.',
+    cover: '/peg-transfer.png',
     route: '/module/3/instructions',
   },
 ];
 
-// My Skills: different # of attempts per module (nonlinear upward), title, blurb
 const MY_SKILLS_MODULES = [
-  { title: 'Module 1: Pressure', scores: [56, 66, 78, 87, 94], highScoreBlurb: '94% high score on your latest attempt.' },           // 5 attempts
-  { title: 'Module 2: Camera Control', scores: [52, 68, 80, 89], highScoreBlurb: '89% high score on your latest attempt.' },          // 4 attempts
-  { title: 'Module 3: Peg Transfer', scores: [48, 58, 70, 78, 86, 92], highScoreBlurb: '92% high score on your latest attempt.' },   // 6 attempts
+  { moduleId: 1 as const, title: 'Module 1: Pressure' },
+  { moduleId: 2 as const, title: 'Module 2: Camera Control' },
+  { moduleId: 3 as const, title: 'Module 3: Peg Transfer' },
 ];
 const MY_SKILLS_ANALYTICS_ROUTES = ['/analytics', '/analytics/module2', '/analytics/module3'];
 
-const scoreToY = (score: number) => Math.round(158 - score * 1.38);
-const X_MIN = 44;
-const X_MAX = 252;
-const getGraphX = (n: number) => n <= 1 ? [148] : Array.from({ length: n }, (_, i) => Math.round(X_MIN + (X_MAX - X_MIN) * i / (n - 1)));
+/** Flat blue primary — same look as Connect controllers (no shadow). */
+const traineeDashboardFlatPrimaryClass = `${dashboardStyles.traineeDashboardButtonChrome} ${dashboardStyles.traineeDashboardFlatPrimary}`;
 
 const DashboardGlovesConnected = () => {
   const navigate = useNavigate();
@@ -49,7 +49,15 @@ const DashboardGlovesConnected = () => {
   const [exploreModuleIndex, setExploreModuleIndex] = useState(0);
   const [mySkillsModuleIndex, setMySkillsModuleIndex] = useState(0);
 
-  // Check user role and redirect if admin
+  const bridgeWsRef = useRef<WebSocket | null>(null);
+  /** Browser ↔ Node WebSocket open. */
+  const [bridgeSocketOpen, setBridgeSocketOpen] = useState(false);
+  /** Node ↔ C++ TCP, from bridge `bridgeDeviceStatus` messages. */
+  const [bridgeDeviceTcpConnected, setBridgeDeviceTcpConnected] = useState(false);
+  const [bridgeConnecting, setBridgeConnecting] = useState(false);
+  const [userFirstName, setUserFirstName] = useState('');
+
+  // Check user role and redirect if admin; load display name for dashboard titles
   useEffect(() => {
     const checkUserRole = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -60,9 +68,11 @@ const DashboardGlovesConnected = () => {
 
       const { data: profile } = await supabase
         .from('user_profiles')
-        .select('role')
+        .select('role, first_name')
         .eq('user_id', user.id)
         .single();
+
+      setUserFirstName(typeof profile?.first_name === 'string' ? profile.first_name.trim() : '');
 
       if (profile?.role === 'admin') {
         navigate('/admin/dashboard');
@@ -76,7 +86,6 @@ const DashboardGlovesConnected = () => {
   const { 
     isConnected, 
     isConnecting, 
-    connectionStatus,
     connect: connectBLE,
     disconnect: disconnectBLE
   } = useBLE();
@@ -89,6 +98,54 @@ const DashboardGlovesConnected = () => {
     await disconnectBLE();
   };
 
+  useEffect(() => {
+    return () => {
+      bridgeWsRef.current?.close();
+      bridgeWsRef.current = null;
+    };
+  }, []);
+
+  const handleConnectBridge = () => {
+    if (bridgeWsRef.current?.readyState === WebSocket.OPEN || bridgeConnecting) return;
+    setBridgeConnecting(true);
+    setBridgeDeviceTcpConnected(false);
+    const ws = new WebSocket(BRIDGE_WS_URL);
+    bridgeWsRef.current = ws;
+    ws.onopen = () => {
+      setBridgeSocketOpen(true);
+      setBridgeConnecting(false);
+    };
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(String(event.data)) as { type?: string; connected?: boolean };
+        if (msg.type === BRIDGE_DEVICE_STATUS_TYPE && typeof msg.connected === 'boolean') {
+          setBridgeDeviceTcpConnected(msg.connected);
+        }
+      } catch {
+        // ignore device NDJSON / malformed frames
+      }
+    };
+    ws.onclose = () => {
+      setBridgeSocketOpen(false);
+      setBridgeDeviceTcpConnected(false);
+      setBridgeConnecting(false);
+      if (bridgeWsRef.current === ws) bridgeWsRef.current = null;
+    };
+    ws.onerror = () => {
+      setBridgeConnecting(false);
+    };
+  };
+
+  const handleDisconnectBridge = () => {
+    bridgeWsRef.current?.close();
+    bridgeWsRef.current = null;
+    setBridgeSocketOpen(false);
+    setBridgeDeviceTcpConnected(false);
+    setBridgeConnecting(false);
+  };
+
+  const bridgeEndToEndOk = bridgeSocketOpen && bridgeDeviceTcpConnected;
+  const bridgeWaitingDevice = bridgeSocketOpen && !bridgeDeviceTcpConnected && !bridgeConnecting;
 
   // Navigation items with icons
   const navItems = [
@@ -109,8 +166,8 @@ const DashboardGlovesConnected = () => {
     },
     { 
       path: '/settings', 
-      label: 'Settings', 
-      icon: 'settings'
+      label: 'Profile', 
+      icon: 'profile'
     },
   ];
 
@@ -140,10 +197,10 @@ const DashboardGlovesConnected = () => {
     </svg>
   );
 
-  const SettingsIcon = () => (
+  const ProfileIcon = () => (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-      <path d="M15.66 11.7l-.73-.42a3.5 3.5 0 000-1.56l.73-.42a.5.5 0 00.18-.68l-.68-1.18a.5.5 0 00-.69-.18l-.73.42a3.5 3.5 0 00-1.18-.68V6.5a.5.5 0 00-.5-.5H8.5a.5.5 0 00-.5.5v.84a3.5 3.5 0 00-1.18.68l-.73-.42a.5.5 0 00-.69.18l-.68 1.18a.5.5 0 00.18.68l.73.42a3.5 3.5 0 000 1.56l-.73.42a.5.5 0 00-.18.68l.68 1.18a.5.5 0 00.69.18l.73-.42a3.5 3.5 0 001.18.68v.84a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-.84a3.5 3.5 0 001.18-.68l.73.42a.5.5 0 00.69-.18l.68-1.18a.5.5 0 00-.18-.68z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+      <circle cx="10" cy="6.5" r="3" stroke="currentColor" strokeWidth="1.5" fill="none" />
+      <path d="M4 16c0-3 2.7-5 6-5s6 2 6 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
     </svg>
   );
 
@@ -155,12 +212,32 @@ const DashboardGlovesConnected = () => {
         return <ModulesIcon />;
       case 'analytics':
         return <AnalyticsIcon />;
-      case 'settings':
-        return <SettingsIcon />;
+      case 'profile':
+        return <ProfileIcon />;
       default:
         return null;
     }
   };
+
+  const StatusConnectedIcon = () => (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+      <circle cx="10" cy="10" r="8" stroke="#10B981" strokeWidth="1.5" fill="none" />
+      <path d="M6.5 10.25L9 12.75L13.5 7.75" stroke="#10B981" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+
+  const StatusDisconnectedIcon = () => (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+      <circle cx="10" cy="10" r="8" stroke="#EF4444" strokeWidth="1.5" fill="none" />
+      <path d="M7 7l6 6M13 7l-6 6" stroke="#EF4444" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+
+  const StatusConnectingIcon = () => (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+      <circle cx="10" cy="10" r="8" stroke="#F59E0B" strokeWidth="1.5" strokeDasharray="4 3" fill="none" />
+    </svg>
+  );
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#26313E' }}>
@@ -219,129 +296,193 @@ const DashboardGlovesConnected = () => {
         </aside>
 
         {/* Main Content Area */}
-        <main className="flex-1" style={{ padding: '32px 48px' }}>
+        <main style={{ flex: 1, padding: '32px 48px' }}>
+          <div className={analyticsPageStyles.pageHeaderRow}>
+            <span className={analyticsPageStyles.backArrowDisabled} aria-hidden style={{ visibility: 'hidden' }} />
+            <h1 className={analyticsPageStyles.pageTitle}>
+              {userFirstName ? `Hello, ${userFirstName}` : 'Hello'}
+            </h1>
+            <span className={analyticsPageStyles.backArrowDisabled} aria-hidden style={{ visibility: 'hidden' }} />
+          </div>
           {/* Dashboard Cards Container */}
-          <div className="flex flex-col items-center">
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           {/* Top Row - 3 Cards */}
-          <div className="grid mb-6" style={{ gridTemplateColumns: '320px 24px 320px 24px 320px', gap: '0' }}>
-            {/* First Column: Jake's Hands On Gloves + Daily Challenge */}
-            <div className="flex flex-col" style={{ height: '400px', gap: '24px', width: '320px' }}>
-              {/* Box 1: Jake's Hands On Gloves Card */}
-              <div 
-                className="relative" 
-                style={{ 
-                  backgroundColor: '#1E2733',
-                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3)',
-                  height: '170px',
-                  width: '100%',
-                  borderRadius: '8px',
-                }}
-              >
-                {!isConnected && (
-                  <div className="absolute" style={{ top: '50px', right: '16px', width: '180px', height: '135px' }}>
-                    <img 
-                      src="/Screenshot-3.png" 
-                      alt="HandsOn Gloves" 
-                      className="object-contain"
-                      style={{ 
-                        width: '100%', 
-                        height: '100%',
-                        maxWidth: '180px',
-                        maxHeight: '135px'
-                      }}
-                    />
-                  </div>
-                )}
-                <div className="p-4" style={{ height: '100%', boxSizing: 'border-box' }}>
-                  <div className="flex items-start justify-between mb-4">
-                    <h3 className="text-lg font-semibold" style={{ color: 'white' }}>
-                      Jake's HandsOn Gloves
-                    </h3>
-                  </div>
-                  {/* Connection status row */}
-                  <div className="mb-2">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="rounded-full flex-shrink-0"
-                        style={{ 
-                          width: '8px', 
-                          height: '8px',
-                          backgroundColor: isConnected ? '#10B981' : '#EF4444' // green vs red
-                        }}
-                      ></div>
-                      <span className="text-sm" style={{ color: '#9CA3AF' }}>
-                        {isConnected ? 'Connected' : 'Not connected'}
-                      </span>
-                    </div>
-                  </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '320px 24px 320px 24px 320px',
+              gap: 0,
+              marginBottom: '24px',
+            }}
+          >
+            {/* First column: unified Devices setup (gloves + controllers) */}
+            <div
+              style={{
+                borderRadius: '8px',
+                backgroundColor: '#1E2733',
+                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3)',
+                height: '400px',
+                width: '320px',
+                display: 'flex',
+                flexDirection: 'column',
+                boxSizing: 'border-box',
+              }}
+            >
+              <div style={{ padding: '16px', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, boxSizing: 'border-box' }}>
+                <h3 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 600, lineHeight: 1.25, color: 'white' }}>
+                  Devices
+                </h3>
+                <p style={{ margin: '0 0 16px 0', fontSize: '13px', lineHeight: 1.4, color: '#9CA3AF' }}>
+                  Connect gloves and practice controllers before a session.
+                </p>
 
-                  {/* Connect / Disconnect button */}
+                {/* HandsOn Gloves */}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: 600, color: '#E5E7EB' }}>
+                    HandsOn Gloves
+                  </p>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      marginBottom: '10px',
+                      padding: '8px 10px',
+                      borderRadius: '8px',
+                      backgroundColor: isConnecting ? 'rgba(245, 158, 11, 0.12)' : isConnected ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                      border: `1px solid ${isConnecting ? 'rgba(245, 158, 11, 0.35)' : isConnected ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)'}`,
+                    }}
+                    role="status"
+                    aria-live="polite"
+                  >
+                    {isConnecting ? <StatusConnectingIcon /> : isConnected ? <StatusConnectedIcon /> : <StatusDisconnectedIcon />}
+                    <span
+                      style={{
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        color: isConnecting ? '#FBBF24' : isConnected ? '#34D399' : '#F87171',
+                      }}
+                    >
+                      {isConnecting ? 'Connecting…' : isConnected ? 'Connected' : 'Not Connected'}
+                    </span>
+                  </div>
                   {isConnected ? (
                     <button
                       type="button"
                       onClick={handleDisconnectGloves}
                       disabled={isConnecting}
-                      className="mt-2 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-60"
                       style={{
+                        alignSelf: 'flex-start',
+                        padding: '8px 16px',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        border: 'none',
+                        cursor: isConnecting ? 'not-allowed' : 'pointer',
+                        opacity: isConnecting ? 0.6 : 1,
                         backgroundColor: '#EF4444',
                         color: 'white',
                       }}
                     >
-                      Disconnect
+                      Disconnect gloves
                     </button>
                   ) : (
                     <button
                       type="button"
                       onClick={handleConnectGloves}
                       disabled={isConnecting}
-                      className={`mt-4 px-4 py-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed ${dashboardStyles.traineeDashboardButtonChrome} ${dashboardStyles.gloveConnectButton}`}
+                      className={`mt-4 self-start ${traineeDashboardFlatPrimaryClass}`}
                     >
-                      {isConnecting ? 'Connecting...' : 'Connect'}
+                      {isConnecting ? 'Connecting…' : 'Connect gloves'}
                     </button>
                   )}
-
-                  {/* Extra BLE detail (errors, connecting, etc.) — hide when same as the dot + label line */}
-                  {connectionStatus !== 'Not connected' && connectionStatus !== 'Connected' && (
-                    <p className="mt-2 text-xs" style={{ color: '#9CA3AF' }}>
-                      {connectionStatus}
-                    </p>
-                  )}
                 </div>
-              </div>
 
+                <div style={{ height: '1px', backgroundColor: '#374151', margin: '16px 0', flexShrink: 0 }} aria-hidden />
 
-              {/* Box 4: Daily Challenge Card */}
-              <div 
-                className="flex flex-col" 
-                style={{ 
-                  backgroundColor: '#1E2733',
-                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3)',
-                  height: '206px',
-                  width: '100%',
-                  borderRadius: '8px',
-                }}
-              >
-                <div className="p-4 flex flex-col flex-1" style={{ minHeight: 0, boxSizing: 'border-box' }}>
-                  <h3 className="text-lg font-semibold mb-4" style={{ color: 'white' }}>
-                    Daily Challenge
-                  </h3>
-                  <div className="flex items-start justify-between flex-1">
-                    <div className="flex-1 pr-4">
-                      <p className="text-sm mb-4 leading-relaxed" style={{ color: '#9CA3AF' }}>
-                        Mimic finger sequences on-screen to build speed, accuracy, and awareness.
-                      </p>
-                      <button 
-                        className="px-4 py-2 rounded-lg font-medium text-sm cursor-pointer hover:opacity-90 border-0"
-                        style={{ backgroundColor: '#1DA5FF', color: 'white' }}
-                      >
-                        Start
-                      </button>
-                    </div>
-                    <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0" style={{ backgroundColor: '#374151' }}>
-                      {/* Placeholder for hand image */}
-                      <div className="w-full h-full bg-gradient-to-br from-gray-600 to-gray-800"></div>
-                    </div>
+                {/* Practice Controllers (bridge) */}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: 600, color: '#E5E7EB' }}>
+                    Practice Controllers
+                  </p>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      marginBottom: '10px',
+                      padding: '8px 10px',
+                      borderRadius: '8px',
+                      backgroundColor:
+                        bridgeEndToEndOk
+                          ? 'rgba(16, 185, 129, 0.12)'
+                          : bridgeConnecting || bridgeWaitingDevice
+                            ? 'rgba(245, 158, 11, 0.12)'
+                            : 'rgba(239, 68, 68, 0.12)',
+                      border: `1px solid ${
+                        bridgeEndToEndOk
+                          ? 'rgba(16, 185, 129, 0.35)'
+                          : bridgeConnecting || bridgeWaitingDevice
+                            ? 'rgba(245, 158, 11, 0.35)'
+                            : 'rgba(239, 68, 68, 0.35)'
+                      }`,
+                    }}
+                    role="status"
+                    aria-live="polite"
+                  >
+                    {bridgeConnecting || bridgeWaitingDevice ? (
+                      <StatusConnectingIcon />
+                    ) : bridgeEndToEndOk ? (
+                      <StatusConnectedIcon />
+                    ) : (
+                      <StatusDisconnectedIcon />
+                    )}
+                    <span
+                      style={{
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        color: bridgeEndToEndOk ? '#34D399' : bridgeConnecting || bridgeWaitingDevice ? '#FBBF24' : '#F87171',
+                      }}
+                    >
+                      {bridgeConnecting
+                        ? 'Connecting…'
+                        : bridgeWaitingDevice
+                          ? 'Waiting for device…'
+                          : bridgeEndToEndOk
+                            ? 'Connected'
+                            : 'Not Connected'}
+                    </span>
                   </div>
+                  {bridgeSocketOpen ? (
+                    <button
+                      type="button"
+                      onClick={handleDisconnectBridge}
+                      disabled={bridgeConnecting}
+                      style={{
+                        alignSelf: 'flex-start',
+                        padding: '8px 16px',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        border: 'none',
+                        cursor: bridgeConnecting ? 'not-allowed' : 'pointer',
+                        opacity: bridgeConnecting ? 0.6 : 1,
+                        backgroundColor: '#EF4444',
+                        color: 'white',
+                      }}
+                    >
+                      Disconnect controllers
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleConnectBridge}
+                      disabled={bridgeConnecting}
+                      className={`mt-4 self-start ${traineeDashboardFlatPrimaryClass}`}
+                    >
+                      {bridgeConnecting ? 'Connecting…' : 'Connect controllers'}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -350,19 +491,26 @@ const DashboardGlovesConnected = () => {
             <div></div>
 
             {/* Box 2: Explore Modules Card - carousel for each of the 3 modules */}
-            <div 
-              className="flex flex-col" 
-              style={{ 
-                backgroundColor: '#1E2733', 
+            <div
+              className="flex flex-col"
+              style={{
+                borderRadius: '8px',
+                backgroundColor: '#1E2733',
                 height: '400px',
                 width: '320px',
                 boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3)',
-                borderRadius: '8px',
               }}
             >
-              <div className="p-4 flex flex-col flex-1" style={{ minHeight: 0, boxSizing: 'border-box' }}>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold" style={{ color: 'white' }}>
+              <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, boxSizing: 'border-box' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    justifyContent: 'space-between',
+                    marginBottom: '10px',
+                  }}
+                >
+                  <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600, lineHeight: 1.25, color: 'white' }}>
                     Explore Modules
                   </h3>
                   <ChevronNavButtons
@@ -372,55 +520,62 @@ const DashboardGlovesConnected = () => {
                     ariaLabelNext="Next module"
                   />
                 </div>
-                <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                 {(() => {
                   const module = EXPLORE_MODULES[exploreModuleIndex];
                   return (
                     <>
-                      <div className="flex-1 flex items-center min-h-0" style={{ minHeight: 0 }}>
-                        <div 
-                          className="w-full rounded-lg overflow-hidden bg-white flex-shrink-0" 
-                          style={{ 
-                            height: '212px',
+                      <div
+                        style={{
+                          height: '212px',
+                          width: '100%',
+                          flexShrink: 0,
+                          position: 'relative',
+                          boxSizing: 'border-box',
+                          borderRadius: '8px',
+                          overflow: 'hidden',
+                          backgroundColor: '#1E2733',
+                        }}
+                      >
+                        <img
+                          src={module.cover}
+                          alt={module.title}
+                          style={{
                             width: '100%',
-                            position: 'relative',
-                            paddingLeft: '16px',
-                            paddingRight: '16px',
-                            paddingTop: '12px',
-                            paddingBottom: '12px',
-                            boxSizing: 'border-box'
+                            height: '100%',
+                            objectFit: 'cover',
+                            objectPosition: 'center center',
+                            display: 'block',
                           }}
-                        >
-                          <img 
-                            src={module.cover} 
-                            alt={module.title} 
-                            style={{ 
-                              width: '100%',
-                              height: '100%',
-                              objectFit: 'cover',
-                              objectPosition: 'center center',
-                              display: 'block',
-                              borderRadius: '8px'
-                            }}
-                            onError={(e) => {
-                              e.currentTarget.src = '/Mod1Cover.png';
-                            }}
-                          />
-                        </div>
+                          onError={(e) => {
+                            e.currentTarget.src = '/module1-instruction-live-module.png';
+                          }}
+                        />
                       </div>
-                      <h4 className="text-base font-semibold flex-shrink-0" style={{ color: 'white', marginBottom: '4px' }}>
+                      <h4 style={{ margin: '12px 0 4px 0', fontSize: '16px', fontWeight: 600, flexShrink: 0, color: 'white' }}>
                         {module.title}
                       </h4>
-                      <p className="text-sm mb-4 leading-relaxed flex-shrink-0" style={{ color: '#9CA3AF' }}>
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: '14px',
+                          lineHeight: 1.625,
+                          flex: 1,
+                          minHeight: 0,
+                          color: '#9CA3AF',
+                        }}
+                      >
                         {module.description}
                       </p>
-                      <div className="mt-auto flex-shrink-0">
-                        <button 
+                      <div className="mt-auto flex-shrink-0" style={{ marginTop: '12px' }}>
+                        <button
                           type="button"
-                          className={`inline-flex items-center px-4 py-2 font-medium text-sm cursor-pointer hover:opacity-90 border-0 ${dashboardStyles.traineeDashboardButtonChrome}`}
-                          style={{ backgroundColor: '#1DA5FF', color: 'white' }}
+                          className={`inline-flex items-center gap-2 self-start ${traineeDashboardFlatPrimaryClass}`}
                           onClick={() => navigate(module.route)}
                         >
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M6 12l4-4-4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
                           <span className="text-sm">Go to Module</span>
                         </button>
                       </div>
@@ -435,19 +590,26 @@ const DashboardGlovesConnected = () => {
             <div></div>
             
             {/* Box 3: My Skills Card */}
-            <div 
-              className="flex flex-col" 
-              style={{ 
-                backgroundColor: '#1E2733', 
+            <div
+              className="flex flex-col"
+              style={{
+                borderRadius: '8px',
+                backgroundColor: '#1E2733',
                 height: '400px',
                 width: '320px',
                 boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3)',
-                borderRadius: '8px',
               }}
             >
-              <div className="p-4 flex flex-col flex-1" style={{ minHeight: 0, boxSizing: 'border-box' }}>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold" style={{ color: 'white' }}>
+              <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, boxSizing: 'border-box' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    justifyContent: 'space-between',
+                    marginBottom: '10px',
+                  }}
+                >
+                  <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600, lineHeight: 1.25, color: 'white' }}>
                     My Skills
                   </h3>
                   <ChevronNavButtons
@@ -457,125 +619,98 @@ const DashboardGlovesConnected = () => {
                     ariaLabelNext="Next module"
                   />
                 </div>
-                <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
-                {(() => {
-                  const skill = MY_SKILLS_MODULES[mySkillsModuleIndex];
-                  const graphX = getGraphX(skill.scores.length);
-                  const points = skill.scores.map((s, i) => `${graphX[i]},${scoreToY(s)}`).join(' ');
-                  return (
-                    <>
-                      <div className="flex-1 flex items-center min-h-0" style={{ minHeight: 0 }}>
-                        <div 
-                          className="w-full rounded-lg flex items-center justify-center flex-shrink-0" 
-                          style={{ height: '212px' }}
-                        >
-                          <svg width="100%" height="170" viewBox="0 0 260 190" preserveAspectRatio="xMidYMid meet" style={{ maxWidth: '280px', transform: 'translateX(-24px)' }}>
-                            <text x="14" y="95" textAnchor="middle" transform="rotate(-90 14 95)" style={{ fontSize: '10px', fill: '#9CA3AF' }}>Score</text>
-                            <line x1="44" y1="20" x2="44" y2="158" stroke="#374151" strokeWidth="1" />
-                            <text x="38" y="24" textAnchor="end" style={{ fontSize: '9px', fill: '#9CA3AF' }}>100</text>
-                            <text x="38" y="54" textAnchor="end" style={{ fontSize: '9px', fill: '#9CA3AF' }}>75</text>
-                            <text x="38" y="89" textAnchor="end" style={{ fontSize: '9px', fill: '#9CA3AF' }}>50</text>
-                            <text x="38" y="126" textAnchor="end" style={{ fontSize: '9px', fill: '#9CA3AF' }}>25</text>
-                            <text x="38" y="158" textAnchor="end" style={{ fontSize: '9px', fill: '#9CA3AF' }}>0</text>
-                            <line x1="44" y1="158" x2="252" y2="158" stroke="#374151" strokeWidth="1" />
-                            {graphX.map((x, i) => (
-                              <text key={i} x={x} y="170" textAnchor="middle" style={{ fontSize: '9px', fill: '#9CA3AF' }}>{i + 1}</text>
-                            ))}
-                            <text x="148" y="186" textAnchor="middle" style={{ fontSize: '10px', fill: '#9CA3AF' }}>Attempt #</text>
-                            <polyline points={points} fill="none" stroke="#1DA5FF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                            {skill.scores.map((s, i) => (
-                              <circle key={i} cx={graphX[i]} cy={scoreToY(s)} r="4" fill="#1DA5FF" />
-                            ))}
-                          </svg>
-                        </div>
-                      </div>
-                      <h4 
-                        className="text-base font-semibold flex-shrink-0" 
-                        style={{ color: 'white', marginBottom: '4px', transform: 'translateY(-22px)' }}
-                      >
-                        {skill.title}
-                      </h4>
-                      <p 
-                        className="text-sm mb-4 leading-relaxed flex-shrink-0" 
-                        style={{ color: '#9CA3AF', transform: 'translateY(-22px)' }}
-                      >
-                        {skill.highScoreBlurb}
-                      </p>
-                    </>
-                  );
-                })()}
-                <div className="mt-auto flex-shrink-0">
-                  <button 
-                    type="button"
-                    className={`inline-flex items-center px-4 py-2 font-medium text-sm cursor-pointer hover:opacity-90 border-0 ${dashboardStyles.traineeDashboardButtonChrome}`}
-                    style={{ backgroundColor: '#1DA5FF', color: 'white' }}
-                    onClick={() => navigate(MY_SKILLS_ANALYTICS_ROUTES[mySkillsModuleIndex] ?? '/analytics')}
-                  >
-                    <span className="text-sm">Go to Analytics</span>
-                  </button>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                  <DashboardMySkillsProgressChart
+                    moduleId={MY_SKILLS_MODULES[mySkillsModuleIndex].moduleId}
+                    moduleTitle={MY_SKILLS_MODULES[mySkillsModuleIndex].title}
+                  />
+                  <div style={{ marginTop: '12px', flexShrink: 0 }}>
+                    <button
+                      type="button"
+                      className={`inline-flex items-center gap-2 self-start ${traineeDashboardFlatPrimaryClass}`}
+                      onClick={() => navigate(MY_SKILLS_ANALYTICS_ROUTES[mySkillsModuleIndex] ?? '/analytics')}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M6 12l4-4-4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      <span className="text-sm">Go to Analytics</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
               </div>
             </div>
           </div>
 
 
           {/* Box 5: Continue Module 1 Card */}
-          <div 
-            className="p-4" 
-            style={{ 
+          <div
+            className="p-4"
+            style={{
+              borderRadius: '8px',
               backgroundColor: '#1E2733',
               boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3)',
               width: '1008px',
               marginTop: '24px',
               paddingBottom: '24px',
-              borderRadius: '8px',
             }}
           >
-            <div className="flex" style={{ gap: '48px', alignItems: 'flex-start' }}>
-              <div 
-                className="rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center" 
-                style={{ 
-                  backgroundColor: '#374151', 
-                  width: '136px', 
-                  height: '136px', 
+            <div style={{ display: 'flex', gap: '48px', alignItems: 'flex-start' }}>
+              <div
+                style={{
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: '#374151',
+                  width: '136px',
+                  height: '136px',
                   marginLeft: '16px',
                   marginTop: 'auto',
                   marginBottom: 'auto',
-                  transform: 'translateY(12px)'
+                  transform: 'translateY(12px)',
                 }}
               >
                 <img
-                  src="/Mod1Cover.png"
+                  src="/module1-instruction-live-module.png"
                   alt="Module 1: Pressure"
                   style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center center', display: 'block' }}
                 />
               </div>
-              <div className="flex-1">
-                <h3 className="text-xl font-semibold mb-2" style={{ color: 'white' }}>
+              <div style={{ flex: 1 }}>
+                <h3 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: 600, color: 'white' }}>
                   Continue Module 1: Pressure Control
                 </h3>
-                <p className="text-sm mb-3" style={{ color: '#9CA3AF' }}>
+                <p style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#9CA3AF' }}>
                   In Progress • Started 03 Nov 2025
                 </p>
-                <p className="text-sm mb-4 leading-relaxed" style={{ color: '#9CA3AF' }}>
+                <p style={{ margin: '0 0 16px 0', fontSize: '14px', lineHeight: 1.625, color: '#9CA3AF' }}>
                   Enhance your robotic surgery skills by mastering precise pressure control to ensure safe, accurate instrument handling.
                 </p>
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ backgroundColor: '#374151' }}>
-                    <div 
-                      className="h-full rounded-full"
-                      style={{ 
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                  <div
+                    style={{
+                      flex: 1,
+                      height: '8px',
+                      borderRadius: '9999px',
+                      overflow: 'hidden',
+                      backgroundColor: '#374151',
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: '100%',
+                        borderRadius: '9999px',
                         width: '0%',
-                        backgroundColor: '#1DA5FF'
+                        backgroundColor: '#1DA5FF',
                       }}
-                    ></div>
+                    />
                   </div>
                 </div>
-                <button 
+                <button
                   type="button"
-                  className={`inline-flex items-center px-6 py-2 font-medium text-sm cursor-pointer hover:opacity-90 border-0 ${dashboardStyles.traineeDashboardButtonChrome}`}
-                  style={{ backgroundColor: '#1DA5FF', color: 'white' }}
+                  className={`inline-flex items-center self-start ${traineeDashboardFlatPrimaryClass}`}
                   onClick={() => navigate('/module/1/instructions')}
                 >
                   Continue

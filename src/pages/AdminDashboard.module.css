@@ -46,6 +46,47 @@
   border-radius: 8px !important;
 }
 
+/* Trainee dashboard primary CTAs — flat blue (matches Connect controllers; no drop shadow) */
+
+.traineeDashboardFlatPrimary {
+  border: none;
+  background-color: #1da5ff;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.traineeDashboardFlatPrimary:hover:not(:disabled) {
+  background-color: #3eb4ff;
+}
+
+.traineeDashboardFlatPrimary:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.45);
+  outline-offset: 2px;
+}
+
+.traineeDashboardFlatPrimary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Modules grid — locked Start: same footprint as flat primary, neutral surface */
+
+.traineeDashboardFlatLocked {
+  border: none;
+  background-color: #374151;
+  color: #9ca3af;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 8px 16px;
+  cursor: not-allowed;
+}
+
 /* Jake's HandsOn Gloves — Connect: same blue, shadow, hover, focus as .addTraineeButton; padding/font-size stay on the element */
 
 .gloveConnectButton {

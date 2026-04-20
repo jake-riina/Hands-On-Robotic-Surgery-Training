@@ -4,8 +4,9 @@ import type { Module, Exercise, ModuleProgress, ExerciseScore } from './types';
 const mockModules: Module[] = [
   {
     id: 1,
-    title: 'Pressure',
-    description: 'Learn to control and maintain consistent pressure with the robotic instruments.',
+    title: 'Pressure Control',
+    description:
+      "Develop precise force control to safely interact with delicate tissue. This module trains your ability to apply consistent pressure—an essential skill for minimizing damage and bleeding.\n\nSkills\n\n• Maintain steady pressure within a target range\n• Prevent excessive force that could damage tissue\n• Improve consistency during sustained interactions",
     instructions: 'This module covers pressure control fundamentals. Follow the instructions carefully.',
     exercises: [
       {
@@ -34,7 +35,8 @@ const mockModules: Module[] = [
   {
     id: 2,
     title: 'Camera Control',
-    description: 'Master camera positioning and navigation for optimal surgical view.',
+    description:
+      "Master camera navigation to maintain optimal visibility throughout a procedure. This module sharpens your ability to position and stabilize the camera for clear, efficient surgical viewing.\n\nSkills\n\n• Precise camera positioning using hand controllers\n• Efficient target acquisition using crosshair alignment\n• Minimizing unnecessary camera motion",
     instructions: 'This module covers camera control and ergonomics.',
     exercises: [
       {
@@ -54,7 +56,8 @@ const mockModules: Module[] = [
   {
     id: 3,
     title: 'Peg Transfer',
-    description: 'Develop precision and dexterity by transferring pegs between targets.',
+    description:
+      "Build dexterity and coordination by transferring objects between hands with precision. This module simulates bimanual instrument use, reinforcing control, accuracy, and fluid motion.\n\nSkills\n\n• Ambidexterity through hand-to-hand coordination\n• Smooth, controlled object manipulation\n• Spatial awareness during placement tasks",
     instructions: 'This module builds hand-eye coordination and instrument control.',
     exercises: [
       {

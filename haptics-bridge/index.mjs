@@ -9,8 +9,19 @@ const WS_PORT = 4000; // WebSocket port for React clients
 let deviceSocket = null;
 let deviceConnected = false;
 
+const BRIDGE_DEVICE_STATUS_TYPE = 'bridgeDeviceStatus';
+
 const httpServer = http.createServer();
 const wss = new WebSocketServer({ server: httpServer });
+
+function broadcastDeviceStatus() {
+  const msg = JSON.stringify({ type: BRIDGE_DEVICE_STATUS_TYPE, connected: deviceConnected });
+  for (const client of wss.clients) {
+    if (client.readyState === 1) {
+      client.send(msg);
+    }
+  }
+}
 
 function broadcast(line) {
   for (const client of wss.clients) {
@@ -27,6 +38,7 @@ function connectToDevice() {
   deviceSocket = net.createConnection({ host: TCP_HOST, port: TCP_PORT }, () => {
     deviceConnected = true;
     console.log('✅ Connected to C++ device server');
+    broadcastDeviceStatus();
   });
 
   let buffer = '';
@@ -47,11 +59,13 @@ function connectToDevice() {
 
   deviceSocket.on('error', (err) => {
     deviceConnected = false;
+    broadcastDeviceStatus();
     console.error('Device TCP error:', err.message);
   });
 
   deviceSocket.on('close', () => {
     deviceConnected = false;
+    broadcastDeviceStatus();
     console.log('Device TCP disconnected. Reconnecting in 2s...');
     setTimeout(connectToDevice, 2000);
   });
@@ -60,6 +74,7 @@ function connectToDevice() {
 // WebSocket side (React clients)
 wss.on('connection', (ws) => {
   console.log('🌐 React client connected');
+  ws.send(JSON.stringify({ type: BRIDGE_DEVICE_STATUS_TYPE, connected: deviceConnected }));
 
   ws.on('message', (data) => {
     // For now: the device server only streams state.

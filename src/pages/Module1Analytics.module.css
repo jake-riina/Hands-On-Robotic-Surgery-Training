@@ -75,32 +75,33 @@
   padding-bottom: 32px;
 }
 
-/* Two-column grid: 3 equal-height rows, fixed row-gap; right card spans rows 1–3 only (matches left column height) */
+/* Stacked: three metric cards in one row, full-width My Progress below (matches modules 2 & 3) */
 .analyticsLayout {
-  display: grid;
-  grid-template-columns: 30% 1fr;
-  grid-template-rows: repeat(3, 1fr);
-  row-gap: 24px;
-  column-gap: 24px;
-  align-items: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
   height: 100%;
   min-height: 0;
 }
 
-.leftColumnWrapper {
-  grid-column: 1;
-  grid-row: 1 / span 3;
+.topMetricsRow {
   display: grid;
-  grid-template-rows: repeat(3, 1fr);
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 24px;
-  min-height: 0;
+  align-items: stretch;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.topMetricsRow .card {
+  min-width: 0;
 }
 
 .analyticsLayout > .rightCard {
-  grid-column: 2;
-  grid-row: 1 / span 3;
-  align-self: stretch;
+  flex: 1;
+  min-height: 280px;
+  width: 100%;
+  min-width: 0;
 }
 
 .card {
@@ -119,7 +120,7 @@
   border-radius: 0;
   padding: 20px;
   box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.25);
-  overflow: hidden;
+  overflow: visible;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -135,7 +136,39 @@
   width: 100%;
   min-height: 0;
   flex: 1;
-  overflow: hidden;
+  overflow: visible;
+  position: relative;
+}
+
+.chartTooltip {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  margin-top: -8px;
+  background-color: #1E2733;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  min-width: 220px;
+  max-width: 320px;
+  color: #ffffff;
+  font-size: 14px;
+  line-height: 1.35;
+  text-align: left;
+  pointer-events: none;
+}
+
+.chartTooltipArrow {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid #1E2733;
 }
 
 .progressChart {
@@ -144,6 +177,27 @@
   height: 100%;
   max-width: 100%;
   min-height: 0;
+}
+
+/* Line-chart points: easy targets, tooltip on hit circle, dim fill on hover */
+.chartNodeGroup {
+  cursor: pointer;
+}
+
+.chartNodeHit {
+  fill: transparent;
+}
+
+.chartNode {
+  fill: #ef4444;
+  stroke: #1e2733;
+  stroke-width: 1px;
+  pointer-events: none;
+  transition: filter 0.2s ease;
+}
+
+.chartNodeGroup:hover .chartNode {
+  filter: brightness(0.78);
 }
 
 .cardTitle {
@@ -213,18 +267,7 @@
 }
 
 @media (max-width: 900px) {
-  .analyticsLayout {
+  .topMetricsRow {
     grid-template-columns: 1fr;
-    grid-template-rows: auto auto auto auto;
-  }
-
-  .leftColumnWrapper {
-    grid-column: 1;
-    grid-row: 1 / span 3;
-  }
-
-  .analyticsLayout > .rightCard {
-    grid-column: 1;
-    grid-row: 4;
   }
 }

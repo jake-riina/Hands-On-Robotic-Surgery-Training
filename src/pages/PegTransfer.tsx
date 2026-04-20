@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Canvas } from '@react-three/fiber';
-import { ContactShadows, Environment, FlyControls } from '@react-three/drei';
+import { ContactShadows, Environment } from '@react-three/drei';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useGeomagicLatestRef, type GeomagicBridgeEvents } from '../hooks/useGeomagicLatestRef';
@@ -23,13 +23,7 @@ import { pegTransferBoardCenterWorld } from '../pegTransfer/pegTransferWorldRig'
 
 /** WebGL + R3F scene background (plan Step 7) */
 const SCENE_CLEAR_HEX = '#1b1d22';
-const CLEAR_HEX = '#0a0c12';
 const MODULE_3_SECONDS = 60;
-/**
- * Production: always constrained surgical camera (`PegTransferScene`).
- * Dev (`npm run dev`): optional FlyControls + toggle for layout/debug only.
- */
-const DEBUG_FREE_NAV = import.meta.env.DEV;
 
 type RingTransferRuntime = {
   activeHandToHandTransferId: string | null;
@@ -59,7 +53,6 @@ export default function PegTransfer() {
   const completedDbRingIdsRef = useRef<Set<string>>(new Set());
   const [completedRings, setCompletedRings] = useState(0);
 
-  const [freeNavEnabled, setFreeNavEnabled] = useState(false);
   const [devicesCalibrated, setDevicesCalibrated] = useState(false);
   const [toolMotionEpoch, setToolMotionEpoch] = useState(0);
   const [inkwellReady, setInkwellReady] = useState(false);
@@ -290,16 +283,50 @@ export default function PegTransfer() {
 
   return (
     <div
+      className="flex flex-col overflow-hidden"
       style={{
-        position: 'fixed',
-        inset: 0,
-        width: '100%',
-        height: '100%',
-        margin: 0,
-        overflow: 'hidden',
-        background: CLEAR_HEX,
+        height: '100vh',
+        backgroundColor: '#26313E',
+        padding: '8px',
+        boxSizing: 'border-box',
       }}
     >
+      <header
+        className="flex items-center justify-between px-3 py-1.5"
+        style={{
+          flexShrink: 0,
+          zIndex: 50,
+          backgroundColor: '#1E2733',
+          borderRadius: '6px',
+          marginBottom: '8px',
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => navigate('/modules')}
+          className="flex items-center gap-2 hover:opacity-80 transition-opacity bg-transparent border-none cursor-pointer text-sm font-medium"
+          style={{ color: '#ffffff' }}
+        >
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 16L8 10l4-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          Back to Modules
+        </button>
+        <h1 className="text-lg font-semibold m-0" style={{ color: 'white' }}>
+          Module 3: Peg Transfer
+        </h1>
+        <div style={{ minWidth: 200 }} />
+      </header>
+
+      <div
+        className="flex-1 rounded-lg min-h-0 relative"
+        style={{
+          width: '100%',
+          backgroundColor: '#1E2733',
+          overflow: 'hidden',
+        }}
+      >
+
       {!devicesCalibrated && (
         <div
           style={{
@@ -320,7 +347,7 @@ export default function PegTransfer() {
             className="text-center text-lg leading-relaxed max-w-xl"
             style={{ color: '#e2e8f0', margin: 0 }}
           >
-            Ensure both styluses are in the inkwell.
+            Place both styluses in the inkwell and click "Calibrate Devices"
           </p>
           <button
             type="button"
@@ -336,35 +363,11 @@ export default function PegTransfer() {
         </div>
       )}
 
-      {DEBUG_FREE_NAV && (
-        <button
-          type="button"
-          onClick={() => setFreeNavEnabled((v) => !v)}
-          style={{
-            position: 'fixed',
-            top: 16,
-            right: 16,
-            zIndex: 40,
-            padding: '8px 12px',
-            borderRadius: 8,
-            border: '1px solid rgba(148,163,184,0.45)',
-            background: 'rgba(15,23,42,0.78)',
-            color: '#e2e8f0',
-            fontSize: 12,
-            letterSpacing: 0.2,
-            cursor: 'pointer',
-            userSelect: 'none',
-          }}
-        >
-          {freeNavEnabled ? 'Debug: Free fly' : 'Debug: Surgical camera'}
-        </button>
-      )}
-
       <div
         style={{
-          position: 'fixed',
+          position: 'absolute',
           top: 16,
-          right: DEBUG_FREE_NAV ? 160 : 16,
+          left: 16,
           zIndex: 45,
           minWidth: 160,
           padding: '10px 14px',
@@ -432,11 +435,8 @@ export default function PegTransfer() {
           far={4}
         />
 
-        {DEBUG_FREE_NAV && freeNavEnabled && (
-          <FlyControls movementSpeed={0.6} rollSpeed={0.45} dragToLook />
-        )}
         <PegTransferScene
-          disableConstrainedCamera={DEBUG_FREE_NAV && freeNavEnabled}
+          disableConstrainedCamera={false}
           geomagicLatestRef={geomagicLatestRef}
           simulationEnabled={devicesCalibrated}
           pendingCalibrateRef={pendingCalibrateRef}
@@ -454,6 +454,7 @@ export default function PegTransfer() {
           onRingInteractionEvent={handleRingEvent}
         />
       </Canvas>
+      </div>
     </div>
   );
 }

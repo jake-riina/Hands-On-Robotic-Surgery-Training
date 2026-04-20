@@ -67,32 +67,92 @@
   padding-bottom: 32px;
 }
 
-/* Two-column grid: 3 equal-height rows, fixed row-gap; right card spans rows 1–3 only */
+/* Stacked layout: 3 metric cards on top, then My Progress, then Transfers */
 .analyticsLayout {
-  display: grid;
-  grid-template-columns: 30% 1fr;
-  grid-template-rows: repeat(3, 1fr);
-  row-gap: 24px;
-  column-gap: 24px;
-  align-items: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
   height: 100%;
   min-height: 0;
 }
 
-.leftColumnWrapper {
-  grid-column: 1;
-  grid-row: 1 / span 3;
+.topMetricsRow {
   display: grid;
-  grid-template-rows: repeat(3, 1fr);
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 24px;
-  min-height: 0;
+  align-items: stretch;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.topMetricsRow .card {
+  min-width: 0;
 }
 
 .analyticsLayout > .rightCard {
-  grid-column: 2;
-  grid-row: 1 / span 3;
-  align-self: stretch;
+  flex: 1;
+  min-height: 280px;
+  width: 100%;
+  min-width: 0;
+}
+
+.transfersCard {
+  background-color: #1e2733;
+  border-radius: 0;
+  padding: 20px;
+  box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.25);
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  min-height: 280px;
+  min-width: 0;
+}
+
+.transfersGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+}
+
+.transfersPanel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.transfersPanelChartTitle {
+  margin: 0 0 10px 0;
+  width: 100%;
+  text-align: center;
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.transfersRightHeader {
+  color: #9CA3AF;
+  font-size: 12px;
+  text-align: center;
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.transfersChartWrapper {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: visible;
+  padding: 12px 14px;
+  box-sizing: border-box;
 }
 
 .card {
@@ -111,7 +171,7 @@
   border-radius: 0;
   padding: 20px;
   box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.25);
-  overflow: hidden;
+  overflow: visible;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -127,7 +187,39 @@
   width: 100%;
   min-height: 0;
   flex: 1;
-  overflow: hidden;
+  overflow: visible;
+  position: relative;
+}
+
+.chartTooltip {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  margin-top: -8px;
+  background-color: #1E2733;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  min-width: 220px;
+  max-width: 320px;
+  color: #ffffff;
+  font-size: 14px;
+  line-height: 1.35;
+  text-align: left;
+  pointer-events: none;
+}
+
+.chartTooltipArrow {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid #1E2733;
 }
 
 .progressChart {
@@ -136,6 +228,47 @@
   height: 100%;
   max-width: 100%;
   min-height: 0;
+}
+
+.chartNodeGroup {
+  cursor: pointer;
+}
+
+.chartNodeHit {
+  fill: transparent;
+}
+
+.chartNode {
+  fill: #ef4444;
+  stroke: #1e2733;
+  stroke-width: 1px;
+  pointer-events: none;
+  transition: filter 0.2s ease;
+}
+
+.chartNodeGroup:hover .chartNode {
+  filter: brightness(0.78);
+}
+
+.chartBarInteractive {
+  cursor: pointer;
+  transition: filter 0.2s ease;
+}
+
+.chartBarInteractive:hover {
+  filter: brightness(0.82);
+}
+
+.chartBarGroup {
+  cursor: pointer;
+}
+
+.chartBarVisible {
+  transition: filter 0.2s ease;
+}
+
+.chartBarGroup:hover .chartBarVisible {
+  filter: brightness(0.8);
 }
 
 .cardTitle {
@@ -204,18 +337,11 @@
 }
 
 @media (max-width: 900px) {
-  .analyticsLayout {
+  .topMetricsRow {
     grid-template-columns: 1fr;
-    grid-template-rows: auto auto auto auto;
   }
 
-  .leftColumnWrapper {
-    grid-column: 1;
-    grid-row: 1 / span 3;
-  }
-
-  .analyticsLayout > .rightCard {
-    grid-column: 1;
-    grid-row: 4;
+  .transfersGrid {
+    grid-template-columns: 1fr;
   }
 }

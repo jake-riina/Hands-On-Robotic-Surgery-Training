@@ -2,23 +2,37 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import ProfileDropdown from '../components/ProfileDropdown';
+import TraineeModuleProgressModal from '../components/TraineeModuleProgressModal';
 import styles from './TrainerDashboard.module.css';
 import adminDashboardStyles from './AdminDashboard.module.css';
 
-const PLACEHOLDER_TRAINEES = [
-  'John Doe',
-  'Jane Doe',
-  'John Smith',
-  'Jane Smith',
-  'Alex Johnson',
-];
+type TraineeListItem = {
+  user_id: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+};
 
-const MODULE_AVERAGE_PERCENT = 75;
+const MODULE_CARDS = [
+  { title: 'Module 1', viewName: 'module1_department_percentile' },
+  { title: 'Module 2', viewName: 'module2_department_percentile' },
+  { title: 'Module 3', viewName: 'module3_department_percentile' },
+] as const;
 
 const TrainerDashboard: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [currentRole, setCurrentRole] = useState<string>('');
+  const [firstName, setFirstName] = useState<string>('');
+  const [moduleAveragePercent, setModuleAveragePercent] = useState<number>(0);
+  const [departmentTrainees, setDepartmentTrainees] = useState<TraineeListItem[]>([]);
+  const [trainerDepartmentId, setTrainerDepartmentId] = useState<string | null>(null);
+  const [activeModuleIndex, setActiveModuleIndex] = useState<number>(0);
+  const [progressModalTrainee, setProgressModalTrainee] = useState<TraineeListItem | null>(null);
+
+  const activeModule = MODULE_CARDS[activeModuleIndex];
+  const activeModuleNumber = (activeModuleIndex + 1) as 1 | 2 | 3;
+
   useEffect(() => {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -29,7 +43,7 @@ const TrainerDashboard: React.FC = () => {
 
       const { data: profile } = await supabase
         .from('user_profiles')
-        .select('role, email, first_name')
+        .select('role, email, first_name, department_id, program_id')
         .eq('user_id', user.id)
         .single();
 
@@ -42,17 +56,81 @@ const TrainerDashboard: React.FC = () => {
         return;
       }
       setCurrentRole(profile.role || '');
+      setFirstName(typeof profile.first_name === 'string' ? profile.first_name.trim() : '');
 
+      // Module averages remain department-scoped.
+      if (profile.department_id) {
+        setTrainerDepartmentId(profile.department_id);
+      } else {
+        setTrainerDepartmentId(null);
+        setModuleAveragePercent(0);
+      }
+
+      let traineesQuery = supabase
+        .from('user_profiles')
+        .select('user_id, first_name, last_name, email')
+        .eq('role', 'trainee');
+
+      if (profile.role === 'admin') {
+        if (!profile.program_id) {
+          setDepartmentTrainees([]);
+          return;
+        }
+        traineesQuery = traineesQuery.eq('program_id', profile.program_id);
+      } else {
+        if (!profile.department_id) {
+          setDepartmentTrainees([]);
+          return;
+        }
+        traineesQuery = traineesQuery.eq('department_id', profile.department_id);
+      }
+
+      const { data: traineeRows, error: traineesError } = await traineesQuery
+        .order('first_name', { ascending: true })
+        .order('last_name', { ascending: true });
+
+      if (traineesError) {
+        setDepartmentTrainees([]);
+      } else {
+        setDepartmentTrainees((traineeRows ?? []) as TraineeListItem[]);
+      }
     };
 
     checkUser();
   }, [navigate]);
 
+  useEffect(() => {
+    const fetchModuleAverage = async () => {
+      if (!trainerDepartmentId) {
+        setModuleAveragePercent(0);
+        return;
+      }
+
+      const { data: rows, error: averageError } = await supabase
+        .from(activeModule.viewName)
+        .select('score')
+        .eq('department_id', trainerDepartmentId)
+        .not('score', 'is', null);
+
+      if (averageError || !rows?.length) {
+        setModuleAveragePercent(0);
+        return;
+      }
+
+      const totalScore = rows.reduce((sum, row) => sum + Number(row.score ?? 0), 0);
+      const averageScorePercent = Math.round((totalScore / rows.length) * 100);
+      const normalizedAverage = Math.max(0, Math.min(100, averageScorePercent));
+      setModuleAveragePercent(normalizedAverage);
+    };
+
+    fetchModuleAverage();
+  }, [activeModule.viewName, trainerDepartmentId]);
+
   const navItems = [
     { path: '/admin/dashboard', label: 'Admin Dashboard', icon: 'dashboard' },
     { path: '/admin/trainees', label: 'Trainer Dashboard', icon: 'trainees' },
     { path: '/admin/analytics', label: 'Analytics', icon: 'analytics' },
-    { path: '/settings', label: 'Settings', icon: 'settings' },
+    { path: '/settings', label: 'Profile', icon: 'profile' },
   ];
 
   const DashboardIcon = () => (
@@ -84,10 +162,10 @@ const TrainerDashboard: React.FC = () => {
     </svg>
   );
 
-  const SettingsIcon = () => (
+  const ProfileIcon = () => (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-      <path d="M15.66 11.7l-.73-.42a3.5 3.5 0 000-1.56l.73-.42a.5.5 0 00.18-.68l-.68-1.18a.5.5 0 00-.69-.18l-.73.42a3.5 3.5 0 00-1.18-.68V6.5a.5.5 0 00-.5-.5H8.5a.5.5 0 00-.5.5v.84a3.5 3.5 0 00-1.18.68l-.73-.42a.5.5 0 00-.69.18l-.68 1.18a.5.5 0 00.18.68l.73.42a3.5 3.5 0 000 1.56l-.73.42a.5.5 0 00-.18.68l.68 1.18a.5.5 0 00.69.18l.73-.42a3.5 3.5 0 001.18.68v.84a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-.84a3.5 3.5 0 001.18-.68l.73.42a.5.5 0 00.69-.18l.68-1.18a.5.5 0 00-.18-.68z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+      <circle cx="10" cy="6.5" r="3" stroke="currentColor" strokeWidth="1.5" fill="none" />
+      <path d="M4 16c0-3 2.7-5 6-5s6 2 6 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
     </svg>
   );
 
@@ -99,8 +177,8 @@ const TrainerDashboard: React.FC = () => {
         return <TraineesIcon />;
       case 'analytics':
         return <AnalyticsIcon />;
-      case 'settings':
-        return <SettingsIcon />;
+      case 'profile':
+        return <ProfileIcon />;
       default:
         return null;
     }
@@ -119,7 +197,13 @@ const TrainerDashboard: React.FC = () => {
 
   const r = 76;
   const dash = 2 * Math.PI * r;
-  const offset = dash * (1 - MODULE_AVERAGE_PERCENT / 100);
+  const offset = dash * (1 - moduleAveragePercent / 100);
+
+  const progressModalDisplayName = progressModalTrainee
+    ? `${progressModalTrainee.first_name ?? ''} ${progressModalTrainee.last_name ?? ''}`.trim() ||
+      progressModalTrainee.email ||
+      'Trainee'
+    : '';
 
   return (
     <div className={styles.page}>
@@ -184,20 +268,36 @@ const TrainerDashboard: React.FC = () => {
 
         <main className={styles.main}>
           <h2 className="text-2xl font-semibold" style={{ color: '#ffffff', margin: '0 0 28px 0' }}>
-            Hello, Trainer
+            Hello, {firstName || 'Trainer'}
           </h2>
 
           <div className={styles.grid}>
             <section className={styles.card} aria-label="Module 1 progress">
               <div className={styles.moduleCardHeader}>
                 <h2 className={adminDashboardStyles.chartCardTitle} style={{ margin: 0, textAlign: 'left' }}>
-                  Module 1
+                  {activeModule.title}
                 </h2>
                 <div className={styles.arrowGroup}>
-                  <button type="button" className={styles.arrowBtn} aria-label="Previous module">
+                  <button
+                    type="button"
+                    className={styles.arrowBtn}
+                    aria-label="Previous module"
+                    onClick={() =>
+                      setActiveModuleIndex(
+                        (prevIndex) => (prevIndex - 1 + MODULE_CARDS.length) % MODULE_CARDS.length
+                      )
+                    }
+                  >
                     <ArrowLeftIcon />
                   </button>
-                  <button type="button" className={styles.arrowBtn} aria-label="Next module">
+                  <button
+                    type="button"
+                    className={styles.arrowBtn}
+                    aria-label="Next module"
+                    onClick={() =>
+                      setActiveModuleIndex((prevIndex) => (prevIndex + 1) % MODULE_CARDS.length)
+                    }
+                  >
                     <ArrowRightIcon />
                   </button>
                 </div>
@@ -219,7 +319,7 @@ const TrainerDashboard: React.FC = () => {
                       strokeDashoffset={offset}
                     />
                   </svg>
-                  <span className={styles.donutLabel}>{MODULE_AVERAGE_PERCENT}%</span>
+                  <span className={styles.donutLabel}>{moduleAveragePercent}%</span>
                 </div>
                 <p className={styles.averageLabel}>Average Score</p>
               </div>
@@ -234,8 +334,12 @@ const TrainerDashboard: React.FC = () => {
                 My Trainees
               </h2>
               <div className={styles.traineeList}>
-                {PLACEHOLDER_TRAINEES.map((name) => (
-                  <div key={name} className={styles.traineeRow}>
+                {departmentTrainees.map((trainee) => {
+                  const fullName = `${trainee.first_name ?? ''} ${trainee.last_name ?? ''}`.trim();
+                  const displayName = fullName || trainee.email || 'Unnamed trainee';
+
+                  return (
+                  <div key={trainee.user_id} className={styles.traineeRow}>
                     <div className={styles.avatarWrap} aria-hidden>
                       <svg className={styles.avatarSvg} viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <circle cx="22" cy="22" r="21" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5"/>
@@ -243,17 +347,34 @@ const TrainerDashboard: React.FC = () => {
                         <path d="M9 37c0-7 6-12 13-12s13 5 13 12" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
                       </svg>
                     </div>
-                    <p className={styles.traineeName}>{name}</p>
-                    <button type="button" className={styles.rowBtn}>
+                    <p className={styles.traineeName}>{displayName}</p>
+                    <button
+                      type="button"
+                      className={styles.rowBtn}
+                      onClick={() => setProgressModalTrainee(trainee)}
+                    >
                       View Progress
                     </button>
                   </div>
-                ))}
+                );
+                })}
+                {departmentTrainees.length === 0 && (
+                  <p className={styles.emptyTraineeText}>No trainees found in your department.</p>
+                )}
               </div>
             </section>
           </div>
         </main>
       </div>
+
+      <TraineeModuleProgressModal
+        isOpen={progressModalTrainee !== null}
+        onClose={() => setProgressModalTrainee(null)}
+        traineeUserId={progressModalTrainee?.user_id ?? ''}
+        displayName={progressModalDisplayName}
+        moduleId={activeModuleNumber}
+        departmentId={trainerDepartmentId}
+      />
     </div>
   );
 };
