@@ -20,6 +20,7 @@ import type { RingInteractionEvent } from '../pegTransfer/ringInteraction';
 import { canCalibrateDevices } from '../pegTransfer/pegTransferDeviceCalibration';
 import { CAMERA_FOV_DEFAULT } from '../pegTransfer/pegTransferCameraRig';
 import { pegTransferBoardCenterWorld } from '../pegTransfer/pegTransferWorldRig';
+import { ModuleScoreCompletionModal } from '../components/ModuleScoreCompletionModal';
 
 /** WebGL + R3F scene background (plan Step 7) */
 const SCENE_CLEAR_HEX = '#1b1d22';
@@ -58,6 +59,7 @@ export default function PegTransfer() {
   const [inkwellReady, setInkwellReady] = useState(false);
   const [timerActive, setTimerActive] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(MODULE_3_SECONDS);
+  const [completionModalScore, setCompletionModalScore] = useState<number | null>(null);
 
   const pendingCalibrateRef = useRef(false);
   const timerSecondsRef = useRef(timerSeconds);
@@ -95,9 +97,25 @@ export default function PegTransfer() {
     finalizeOnceRef.current = true;
     exerciseEndedRef.current = true;
     setTimerActive(false);
-    await invokeModule3CompleteSession(sid);
-    navigate('/dashboard');
-  }, [navigate]);
+    const ringsDone = completedDbRingIdsRef.current.size;
+    let scorePct = Math.min(100, Math.max(0, Math.round((ringsDone / 5) * 100)));
+    try {
+      const res = await invokeModule3CompleteSession(sid);
+      if (res.ok) {
+        scorePct = Math.min(100, Math.max(0, Math.round(res.results.score)));
+      }
+    } catch (err) {
+      console.error('invokeModule3CompleteSession', err);
+    }
+    try {
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('module3_last_score', String(scorePct));
+      }
+    } catch {
+      // ignore
+    }
+    setCompletionModalScore(scorePct);
+  }, []);
 
   const handleAbandonSession = useCallback(async () => {
     const sid = sessionIdRef.current;
@@ -291,6 +309,15 @@ export default function PegTransfer() {
         boxSizing: 'border-box',
       }}
     >
+      {completionModalScore !== null ? (
+        <ModuleScoreCompletionModal
+          open
+          score={completionModalScore}
+          moduleSubtitle="Module 3: Peg Transfer"
+          onGoHome={() => navigate('/dashboard')}
+          onGoModules={() => navigate('/modules')}
+        />
+      ) : null}
       <header
         className="flex items-center justify-between px-3 py-1.5"
         style={{

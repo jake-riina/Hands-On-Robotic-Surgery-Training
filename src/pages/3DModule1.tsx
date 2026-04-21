@@ -18,6 +18,7 @@ import {
   type Module1PressureTelemetrySample,
 } from '../lib/module1PressureSessionService';
 import { Module1ORScene } from './module1/Module1ORScene';
+import { ModuleScoreCompletionModal } from '../components/ModuleScoreCompletionModal';
 
 /**
  * Standalone Module 1 experience: Module 2 OR scene (static camera) + pressure gauge,
@@ -33,6 +34,7 @@ const ThreeDModule1 = () => {
   const [exerciseStarted, setExerciseStarted] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(MODULE1_EXERCISE_DURATION_SECONDS);
   const [score, setScore] = useState<number | null>(null);
+  const [completionModalScore, setCompletionModalScore] = useState<number | null>(null);
   const [, setUiTick] = useState(0);
 
   const startTimeRef = useRef<number | null>(null);
@@ -239,11 +241,10 @@ const ThreeDModule1 = () => {
       } catch (e) {
         console.error('invokeModule1CompleteSession', e);
       } finally {
-        const path = score >= 80 ? '/module/1/completed' : '/module/1/incomplete';
-        navigate(path, { replace: true, state: { sessionId, score } });
+        setCompletionModalScore(score);
       }
     })();
-  }, [score, sessionId, navigate]);
+  }, [score, sessionId]);
 
   // Flush telemetry on unmount (legacy Module1Exercise1Start)
   useEffect(() => {
@@ -298,6 +299,15 @@ const ThreeDModule1 = () => {
         boxSizing: 'border-box',
       }}
     >
+      {completionModalScore !== null ? (
+        <ModuleScoreCompletionModal
+          open
+          score={completionModalScore}
+          moduleSubtitle="Module 1: Pressure Control"
+          onGoHome={() => navigate('/dashboard')}
+          onGoModules={() => navigate('/modules')}
+        />
+      ) : null}
       <header
         className="flex items-center justify-between px-3 py-1.5 flex-shrink-0"
         style={{

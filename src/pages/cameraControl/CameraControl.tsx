@@ -26,6 +26,7 @@ import { pegTransferReferenceValues } from '../../pegTransfer/pegTransferReferen
 import { CameraControlInstruments } from './CameraControlInstruments';
 import { CameraControlRig } from './CameraControlRig';
 import { OrRoomBody } from './OrRoomBody';
+import { ModuleScoreCompletionModal } from '../../components/ModuleScoreCompletionModal';
 
 const ENDOSCOPE = pegTransferReferenceValues.lightingDefaults.endoscopePointLight;
 
@@ -540,6 +541,7 @@ const CameraControl = () => {
     canvasW: number;
     canvasH: number;
   }>({ hint: null, canvasW: 1, canvasH: 1 });
+  const [completionModalScore, setCompletionModalScore] = useState<number | null>(null);
 
   const bridgeEventsRef = useRef<GeomagicBridgeEvents>({ reconnectAfterClose: true });
   /** After GO (timed orb phase); avoids false abandon on StrictMode remount / early WS close. */
@@ -692,7 +694,6 @@ const CameraControl = () => {
 
   useEffect(() => {
     if (orbsCollected !== 5) return;
-    const timeTakenSeconds = 60 - timerSecondsRef.current;
     const delay = 600;
     const id = setTimeout(() => {
       void (async () => {
@@ -705,13 +706,19 @@ const CameraControl = () => {
         }
         await flushTelemetryBuffer();
         if (sid) await invokeModule2CompleteSession(sid);
-        navigate('/module/2/complete', {
-          state: { orbsCollected: 5, totalOrbs: 5, timeTakenSeconds },
-        });
+        const scorePct = 100;
+        try {
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem('module2_last_score', String(scorePct));
+          }
+        } catch {
+          // ignore
+        }
+        setCompletionModalScore(scorePct);
       })();
     }, delay);
     return () => clearTimeout(id);
-  }, [orbsCollected, navigate, flushTelemetryBuffer]);
+  }, [orbsCollected, flushTelemetryBuffer]);
 
   useEffect(() => {
     if (!showRedOrb) setOrbHintState((prev) => ({ ...prev, hint: null }));
@@ -829,12 +836,20 @@ const CameraControl = () => {
       if (cancelled) return;
       if (sid) await invokeModule2CompleteSession(sid);
       if (cancelled) return;
-      navigate('/module/2/incomplete', { state: { orbsCollected: orbsForResult, totalOrbs: 5 } });
+      const scorePct = Math.min(100, Math.max(0, Math.round((orbsForResult / 5) * 100)));
+      try {
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem('module2_last_score', String(scorePct));
+        }
+      } catch {
+        // ignore
+      }
+      setCompletionModalScore(scorePct);
     })();
     return () => {
       cancelled = true;
     };
-  }, [timerActive, timerSeconds, orbsCollected, navigate, flushTelemetryBuffer]);
+  }, [timerActive, timerSeconds, orbsCollected, flushTelemetryBuffer]);
 
   const showCountdownOverlay = countdown !== null;
   const timerDisplay = timerActive
@@ -851,6 +866,15 @@ const CameraControl = () => {
         boxSizing: 'border-box',
       }}
     >
+      {completionModalScore !== null ? (
+        <ModuleScoreCompletionModal
+          open
+          score={completionModalScore}
+          moduleSubtitle="Module 2: Camera Control"
+          onGoHome={() => navigate('/dashboard')}
+          onGoModules={() => navigate('/modules')}
+        />
+      ) : null}
       {!devicesCalibrated && (
         <div
           style={{
