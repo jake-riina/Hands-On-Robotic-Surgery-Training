@@ -237,6 +237,7 @@ export function PegTransferScene({
   module3SessionId = null,
   onModule3PegRingsInserted,
   onRingInteractionEvent,
+  controlInputs,
 }: {
   disableConstrainedCamera?: boolean;
   geomagicLatestRef: LatestByArmRef;
@@ -248,6 +249,12 @@ export function PegTransferScene({
   module3SessionId?: string | null;
   onModule3PegRingsInserted?: (sceneRingIdToDbRingId: Record<string, string>) => void;
   onRingInteractionEvent?: (event: RingInteractionEvent) => void;
+  controlInputs?: {
+    cameraModeActive: boolean;
+    clutchActive: boolean;
+    leftGripClosed: boolean;
+    rightGripClosed: boolean;
+  };
 }) {
   const { camera } = useThree();
   const simulationEnabledRef = useRef(simulationEnabled);
@@ -291,7 +298,7 @@ export function PegTransferScene({
   const wasCameraModeActiveRef = useRef(false);
 
   // Keep the same trocar/fulcrum distance so camera starts stable.
-  const armLengthRef = useRef(pegTransferReferenceValues.worldRig.cameraConstrainedArmLengthM);
+  const armLengthRef = useRef<number>(pegTransferReferenceValues.worldRig.cameraConstrainedArmLengthM);
 
   useEffect(() => {
     if (rigCalibratedRef.current) return;
@@ -430,7 +437,7 @@ export function PegTransferScene({
       return;
     }
 
-    const cameraModeActive = !!(leftRaw.buttons.button1 && rightRaw.buttons.button1);
+    const cameraModeActive = controlInputs?.cameraModeActive ?? !!(leftRaw.buttons.button1 && rightRaw.buttons.button1);
 
     if (!disableConstrainedCamera) {
       updateCameraRigFromDevice({
@@ -477,6 +484,7 @@ export function PegTransferScene({
       boardCenterWorld: pegTransferBoardCenterWorld,
       useTipSpaceMapping: pegTransferReferenceValues.worldRig.useTipSpaceMapping,
       motionLimits: PEG_TRANSFER_DEFAULT_RCM_LIMITS,
+        controlInputs,
     });
   });
 

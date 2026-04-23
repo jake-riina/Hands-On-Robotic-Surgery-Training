@@ -4,15 +4,16 @@ import { smoothBlePsi } from '../lib/blePressureSmooth';
 import { fsrToPsi } from '../lib/fsrToPsi';
 
 type BleUuid = number | string;
+type ControlMode = 'styluses' | 'gloves';
+type GloveSide = 'left' | 'right';
 
 /** Force-sensor peripheral primary service (128-bit UUID). */
 const BLE_FORCE_SENSOR_SERVICE_UUID = '5202e1a0-d2ac-b548-e166-94962a931eed';
-
 /** Standard Environmental Sensing (pressure / sensor data on many gloves). */
 const BLE_ENVIRONMENTAL_SENSING_SERVICE = 0x181a;
-
 /** Standard Environmental Sensing pressure characteristic when present on the device. */
 const BLE_PRESSURE_CHARACTERISTIC_UUID = 0x2a6e;
+const CONTROL_MODE_STORAGE_KEY = 'control_mode';
 
 /** Services we access after pairing; must be listed when the scan filter is by name only. */
 const BLE_OPTIONAL_SERVICES: BleUuid[] = [
@@ -34,7 +35,7 @@ async function resolveForceSensorService(
     try {
       return await server.getPrimaryService(uuid);
     } catch {
-      /* try next */
+      // try next
     }
   }
   throw new Error(
@@ -57,7 +58,6 @@ async function pickForceSensorCharacteristic(
   }
 }
 
-// Web Bluetooth API types
 declare global {
   interface Navigator {
     bluetooth?: Bluetooth;
@@ -79,6 +79,7 @@ interface BluetoothDevice extends EventTarget {
   name?: string;
   id?: string;
   addEventListener(type: 'gattserverdisconnected', listener: () => void): void;
+  removeEventListener(type: 'gattserverdisconnected', listener: () => void): void;
 }
 
 interface BluetoothRemoteGATTServer {
@@ -99,10 +100,34 @@ interface BluetoothRemoteGATTCharacteristic extends EventTarget {
   readValue(): Promise<DataView>;
   value?: DataView;
   service?: BluetoothRemoteGATTService;
+  properties: {
+    notify: boolean;
+    indicate: boolean;
+    read: boolean;
+  };
   addEventListener(type: 'characteristicvaluechanged', listener: (event: Event) => void): void;
+  removeEventListener(type: 'characteristicvaluechanged', listener: (event: Event) => void): void;
 }
 
+type BleChannelState = {
+  device: BluetoothDevice | null;
+  characteristic: BluetoothRemoteGATTCharacteristic | null;
+  isConnected: boolean;
+  isConnecting: boolean;
+  connectionStatus: string;
+  pressure: number;
+};
+
 interface BLEContextType {
+  leftGlove: BleChannelState;
+  rightGlove: BleChannelState;
+  connectLeftGlove: () => Promise<void>;
+  disconnectLeftGlove: () => Promise<void>;
+  connectRightGlove: () => Promise<void>;
+  disconnectRightGlove: () => Promise<void>;
+  controlMode: ControlMode;
+  setControlMode: (mode: ControlMode) => void;
+  // Backward-compatible aliases (legacy single-glove callers).
   device: BluetoothDevice | null;
   characteristic: BluetoothRemoteGATTCharacteristic | null;
   isConnected: boolean;
@@ -118,9 +143,7 @@ const BLEContext = createContext<BLEContextType | undefined>(undefined);
 
 export const useBLE = () => {
   const context = useContext(BLEContext);
-  if (!context) {
-    throw new Error('useBLE must be used within a BLEProvider');
-  }
+  if (!context) throw new Error('useBLE must be used within a BLEProvider');
   return context;
 };
 
@@ -128,360 +151,268 @@ interface BLEProviderProps {
   children: ReactNode;
 }
 
-export const BLEProvider = ({ children }: BLEProviderProps) => {
-  const [device, setDevice] = useState<BluetoothDevice | null>(null);
-  const [characteristic, setCharacteristic] = useState<BluetoothRemoteGATTCharacteristic | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<string>('Not connected');
-  const [pressure, setPressure] = useState(0);
+const createDefaultChannel = (): BleChannelState => ({
+  device: null,
+  characteristic: null,
+  isConnected: false,
+  isConnecting: false,
+  connectionStatus: 'Not connected',
+  pressure: 0,
+});
 
-  const pressureSmoothRef = useRef(0);
-  const ingestRawPsi = useCallback((rawPsi: number) => {
-    const next = smoothBlePsi(pressureSmoothRef.current, rawPsi);
-    pressureSmoothRef.current = next;
-    setPressure(next);
+export const BLEProvider = ({ children }: BLEProviderProps) => {
+  const [leftGlove, setLeftGlove] = useState<BleChannelState>(createDefaultChannel);
+  const [rightGlove, setRightGlove] = useState<BleChannelState>(createDefaultChannel);
+  const [controlMode, setControlModeState] = useState<ControlMode>(() => {
+    try {
+      const saved = window.localStorage.getItem(CONTROL_MODE_STORAGE_KEY);
+      return saved === 'gloves' ? 'gloves' : 'styluses';
+    } catch {
+      return 'styluses';
+    }
+  });
+
+  const stateRef = useRef<Record<GloveSide, BleChannelState>>({
+    left: createDefaultChannel(),
+    right: createDefaultChannel(),
+  });
+  const pressureSmoothRef = useRef<Record<GloveSide, number>>({ left: 0, right: 0 });
+  const valueListenerRef = useRef<Record<GloveSide, ((event: Event) => void) | null>>({
+    left: null,
+    right: null,
+  });
+  const disconnectListenerRef = useRef<Record<GloveSide, (() => void) | null>>({
+    left: null,
+    right: null,
+  });
+
+  const setSideState = useCallback((side: GloveSide, updater: (prev: BleChannelState) => BleChannelState) => {
+    const apply = (prev: BleChannelState) => {
+      const next = updater(prev);
+      stateRef.current[side] = next;
+      return next;
+    };
+    if (side === 'left') {
+      setLeftGlove(apply);
+    } else {
+      setRightGlove(apply);
+    }
   }, []);
 
-  const eventListenerRef = useRef<((event: Event) => void) | null>(null);
-
-  const connect = async () => {
-    if (!navigator.bluetooth) {
-      setConnectionStatus('Bluetooth not supported');
-      return;
-    }
-
-    // If already connected, ensure event listener and polling are active
-    if (device && device.gatt?.connected && characteristic) {
-      console.log('BLE already connected - ensuring listeners are active...');
-      setConnectionStatus('Connected');
-      setIsConnected(true);
-      
-      // Always re-setup event listener (safe to call multiple times, will overwrite)
-      console.log('Setting up event listener for existing connection...');
-      const handleValueChange = (event: Event) => {
-        const target = event.target as BluetoothRemoteGATTCharacteristic;
-        if (target.value) {
-          const dataView = target.value;
-          let jsonString = '';
-          for (let i = 0; i < dataView.byteLength; i++) {
-            jsonString += String.fromCharCode(dataView.getUint8(i));
-          }
-          try {
-            const data = JSON.parse(jsonString);
-            const adcValue = data.raw || 0;
-            const pressurePSI = fsrToPsi(adcValue);
-            const psi = Math.max(0, pressurePSI);
-            ingestRawPsi(psi);
-            console.log('BLE Reading - ADC:', adcValue, 'PSI:', psi.toFixed(2));
-          } catch (parseError) {
-            console.error('Error parsing JSON:', parseError);
-          }
-        }
-      };
-      
-      // Remove old listener if exists
-      if (eventListenerRef.current) {
-        try {
-          characteristic.removeEventListener('characteristicvaluechanged', eventListenerRef.current);
-        } catch (e) {
-          // Ignore if listener doesn't exist
-        }
-      }
-      
-      // Add new listener
-      characteristic.addEventListener('characteristicvaluechanged', handleValueChange);
-      eventListenerRef.current = handleValueChange;
-      
-      // Ensure notifications are started
-      try {
-        await characteristic.startNotifications();
-        console.log('Notifications confirmed active');
-      } catch (notifError) {
-        console.warn('Could not start notifications (might already be active):', notifError);
-      }
-
-      console.log('✅ Existing connection verified and listeners re-established');
-      return;
-    }
-
-    setIsConnecting(true);
-    setConnectionStatus('Connecting...');
-
+  const setControlMode = useCallback((mode: ControlMode) => {
+    setControlModeState(mode);
     try {
-      // If we have a device but it's not connected, try to reconnect
-      if (device && !device.gatt?.connected) {
-        console.log('Reconnecting to existing device...');
-        try {
-          const server = await device.gatt?.connect();
-          if (server && server.connected) {
-            // Re-setup the service and characteristic
-            const service = await resolveForceSensorService(server);
-            const newCharacteristic = await pickForceSensorCharacteristic(service);
-            await newCharacteristic.startNotifications();
-            setCharacteristic(newCharacteristic);
-            setIsConnected(true);
-            setConnectionStatus('Connected');
-            setIsConnecting(false);
-            
-            // Re-setup event listener
-            const handleValueChange = (event: Event) => {
-              const target = event.target as BluetoothRemoteGATTCharacteristic;
-              if (target.value) {
-                const dataView = target.value;
-                let jsonString = '';
-                for (let i = 0; i < dataView.byteLength; i++) {
-                  jsonString += String.fromCharCode(dataView.getUint8(i));
-                }
-                try {
-                  const data = JSON.parse(jsonString);
-                  const adcValue = data.raw || 0;
-                  const pressurePSI = fsrToPsi(adcValue);
-                  const psi = Math.max(0, pressurePSI);
-                  ingestRawPsi(psi);
-                  console.log('BLE Reading - ADC:', adcValue, 'PSI:', psi.toFixed(2));
-                } catch (parseError) {
-                  console.error('Error parsing JSON:', parseError);
-                }
-              }
-            };
-            newCharacteristic.addEventListener('characteristicvaluechanged', handleValueChange);
-            eventListenerRef.current = handleValueChange;
+      window.localStorage.setItem(CONTROL_MODE_STORAGE_KEY, mode);
+    } catch {
+      // ignore
+    }
+  }, []);
 
-            return; // Successfully reconnected
-          }
-        } catch (reconnectError: any) {
-          console.warn('Reconnection failed, will request new device:', reconnectError);
-          // Fall through to request new device
-        }
+  const ingestRawPsi = useCallback((side: GloveSide, rawPsi: number) => {
+    const next = smoothBlePsi(pressureSmoothRef.current[side], rawPsi);
+    pressureSmoothRef.current[side] = next;
+    setSideState(side, (prev) => ({ ...prev, pressure: next }));
+  }, [setSideState]);
+
+  const attachCharacteristicListener = useCallback((
+    side: GloveSide,
+    characteristic: BluetoothRemoteGATTCharacteristic
+  ) => {
+    if (valueListenerRef.current[side]) {
+      try {
+        characteristic.removeEventListener('characteristicvaluechanged', valueListenerRef.current[side]!);
+      } catch {
+        // ignore
       }
-
-      // Disconnect existing connection if any (but not connected)
-      if (device) {
-        await disconnect();
-        await new Promise(resolve => setTimeout(resolve, 300));
+    }
+    const handleValueChange = (event: Event) => {
+      const target = event.target as BluetoothRemoteGATTCharacteristic;
+      if (!target.value) return;
+      const dataView = target.value;
+      let jsonString = '';
+      for (let i = 0; i < dataView.byteLength; i++) {
+        jsonString += String.fromCharCode(dataView.getUint8(i));
       }
+      try {
+        const data = JSON.parse(jsonString);
+        const adcValue = data.raw || 0;
+        const pressurePSI = fsrToPsi(adcValue);
+        ingestRawPsi(side, Math.max(0, pressurePSI));
+      } catch (parseError) {
+        console.error('Error parsing BLE JSON payload:', parseError);
+      }
+    };
+    characteristic.addEventListener('characteristicvaluechanged', handleValueChange);
+    valueListenerRef.current[side] = handleValueChange;
+  }, [ingestRawPsi]);
 
-      console.log('Requesting BLE device (name starts with ESP32)...');
-      const newDevice = await navigator.bluetooth.requestDevice({
+  const connectSide = useCallback(async (side: GloveSide) => {
+    if (!navigator.bluetooth) {
+      setSideState(side, (prev) => ({ ...prev, connectionStatus: 'Bluetooth not supported' }));
+      return;
+    }
+
+    const current = stateRef.current[side];
+    if (current.device && current.device.gatt?.connected && current.characteristic) {
+      setSideState(side, (prev) => ({ ...prev, isConnected: true, connectionStatus: 'Connected' }));
+      attachCharacteristicListener(side, current.characteristic);
+      try {
+        await current.characteristic.startNotifications();
+      } catch {
+        // likely already started
+      }
+      return;
+    }
+
+    setSideState(side, (prev) => ({ ...prev, isConnecting: true, connectionStatus: 'Connecting...' }));
+    try {
+      const selectedDevice = await navigator.bluetooth.requestDevice({
         filters: BLE_DEVICE_NAME_FILTERS,
         optionalServices: BLE_OPTIONAL_SERVICES,
       });
 
-      console.log('Device selected:', newDevice.name || 'Unknown');
-
-      // Check if device is already connected (might happen if connected in another tab)
-      let server;
-      try {
-        server = await newDevice.gatt?.connect();
-      } catch (connectError: any) {
-        if (connectError?.name === 'NetworkError') {
-          // Device is connected elsewhere - but we can still try to use it if it shows as connected
-          if (newDevice.gatt?.connected) {
-            server = newDevice.gatt;
-            console.log('Device already connected elsewhere, but using existing connection');
-          } else {
-            throw new Error('Device is connected to another application. Please disconnect from the Dashboard first.');
-          }
-        } else {
-          throw connectError;
-        }
-      }
-      
+      const server = await selectedDevice.gatt?.connect();
       if (!server) {
         throw new Error('Failed to connect to device.');
       }
 
-      console.log('Connected to GATT server');
-      pressureSmoothRef.current = 0;
-      setPressure(0);
-      setDevice(newDevice);
-      setIsConnected(true);
-      setConnectionStatus('Connected');
-
       const service = await resolveForceSensorService(server);
-      console.log('Service obtained');
+      const characteristic = await pickForceSensorCharacteristic(service);
+      await characteristic.startNotifications();
+      attachCharacteristicListener(side, characteristic);
 
-      const newCharacteristic = await pickForceSensorCharacteristic(service);
-      console.log('Characteristic obtained');
-      setCharacteristic(newCharacteristic);
-
-      // Enable notifications
-      await newCharacteristic.startNotifications();
-      console.log('Notifications started');
-
-      // Set up event listener for pressure data
-      const handleValueChange = (event: Event) => {
-        const target = event.target as BluetoothRemoteGATTCharacteristic;
-        if (target.value) {
-          const dataView = target.value;
-          
-          // Convert DataView to JSON string
-          let jsonString = '';
-          for (let i = 0; i < dataView.byteLength; i++) {
-            jsonString += String.fromCharCode(dataView.getUint8(i));
-          }
-          
-          try {
-            const data = JSON.parse(jsonString);
-            const adcValue = data.raw || 0;
-            const pressurePSI = fsrToPsi(adcValue);
-            const psi = Math.max(0, pressurePSI);
-            ingestRawPsi(psi);
-            console.log('BLE Reading - ADC:', adcValue, 'PSI:', psi.toFixed(2));
-          } catch (parseError) {
-            console.error('Error parsing JSON:', parseError);
-          }
+      if (disconnectListenerRef.current[side]) {
+        try {
+          selectedDevice.removeEventListener('gattserverdisconnected', disconnectListenerRef.current[side]!);
+        } catch {
+          // ignore
         }
-      };
-
-      newCharacteristic.addEventListener('characteristicvaluechanged', handleValueChange);
-      eventListenerRef.current = handleValueChange;
-
-      // Handle disconnection
-      newDevice.addEventListener('gattserverdisconnected', () => {
-        console.log('BLE device disconnected');
-        setIsConnected(false);
-        setConnectionStatus('Disconnected');
-        pressureSmoothRef.current = 0;
-        setPressure(0);
-      });
-
-    } catch (error: any) {
-      console.error('BLE connection error:', error);
-      setIsConnected(false);
-      setIsConnecting(false);
-      
-      if (error?.name === 'NetworkError' || error?.message?.includes('connected to another application')) {
-        setConnectionStatus('Error: Device already connected elsewhere');
-      } else if (error?.name === 'NotFoundError') {
-        setConnectionStatus('Error: Device not found');
-      } else if (error?.name === 'SecurityError') {
-        setConnectionStatus('Error: Bluetooth permission denied');
-      } else {
-        setConnectionStatus(`Error: ${error?.message || error?.name || 'Unknown'}`);
       }
+      const onDisconnected = () => {
+        pressureSmoothRef.current[side] = 0;
+        setSideState(side, (prev) => ({
+          ...prev,
+          isConnected: false,
+          connectionStatus: 'Disconnected',
+          pressure: 0,
+        }));
+      };
+      selectedDevice.addEventListener('gattserverdisconnected', onDisconnected);
+      disconnectListenerRef.current[side] = onDisconnected;
+
+      pressureSmoothRef.current[side] = 0;
+      setSideState(side, (prev) => ({
+        ...prev,
+        device: selectedDevice,
+        characteristic,
+        isConnected: true,
+        isConnecting: false,
+        connectionStatus: 'Connected',
+        pressure: 0,
+      }));
+    } catch (error: any) {
+      const message =
+        error?.name === 'NotFoundError'
+          ? 'Error: Device not found'
+          : error?.name === 'SecurityError'
+            ? 'Error: Bluetooth permission denied'
+            : `Error: ${error?.message || error?.name || 'Unknown'}`;
+      setSideState(side, (prev) => ({
+        ...prev,
+        isConnected: false,
+        isConnecting: false,
+        connectionStatus: message,
+      }));
     } finally {
-      setIsConnecting(false);
+      setSideState(side, (prev) => ({ ...prev, isConnecting: false }));
     }
-  };
+  }, [attachCharacteristicListener, setSideState]);
 
-  const disconnect = async () => {
-    console.log('Disconnecting BLE device...');
-
-    if (characteristic && eventListenerRef.current) {
+  const disconnectSide = useCallback(async (side: GloveSide) => {
+    const current = stateRef.current[side];
+    const { characteristic, device } = current;
+    if (characteristic && valueListenerRef.current[side]) {
       try {
         await characteristic.stopNotifications();
-        characteristic.removeEventListener('characteristicvaluechanged', eventListenerRef.current);
-      } catch (e) {
-        console.warn('Error stopping notifications:', e);
+      } catch {
+        // ignore
       }
-      setCharacteristic(null);
-    }
-
-    if (device) {
       try {
-        if (device.gatt?.connected) {
-          device.gatt.disconnect();
-        }
-        device.removeEventListener('gattserverdisconnected', () => {});
-      } catch (e) {
-        console.warn('Error disconnecting:', e);
+        characteristic.removeEventListener('characteristicvaluechanged', valueListenerRef.current[side]!);
+      } catch {
+        // ignore
       }
-      setDevice(null);
+    }
+    if (device && disconnectListenerRef.current[side]) {
+      try {
+        device.removeEventListener('gattserverdisconnected', disconnectListenerRef.current[side]!);
+      } catch {
+        // ignore
+      }
+    }
+    if (device?.gatt?.connected) {
+      try {
+        device.gatt.disconnect();
+      } catch {
+        // ignore
+      }
     }
 
-    setIsConnected(false);
-    setConnectionStatus('Disconnected');
-    pressureSmoothRef.current = 0;
-    setPressure(0);
-    console.log('BLE device disconnected');
-  };
+    valueListenerRef.current[side] = null;
+    disconnectListenerRef.current[side] = null;
+    pressureSmoothRef.current[side] = 0;
+    setSideState(side, () => ({
+      ...createDefaultChannel(),
+      connectionStatus: 'Disconnected',
+    }));
+  }, [setSideState]);
 
-  // Ensure listeners are always active when connection exists
-  useEffect(() => {
-    if (device && device.gatt?.connected && characteristic) {
-      console.log('🔧 Ensuring BLE listeners are active...');
-      
-      // Set up event listener
-      const handleValueChange = (event: Event) => {
-        const target = event.target as BluetoothRemoteGATTCharacteristic;
-        if (target.value) {
-          const dataView = target.value;
-          let jsonString = '';
-          for (let i = 0; i < dataView.byteLength; i++) {
-            jsonString += String.fromCharCode(dataView.getUint8(i));
-          }
-          try {
-            const data = JSON.parse(jsonString);
-            const adcValue = data.raw || 0;
-            const pressurePSI = fsrToPsi(adcValue);
-            const psi = Math.max(0, pressurePSI);
-            ingestRawPsi(psi);
-            console.log('📊 BLE Reading - ADC:', adcValue, 'PSI:', psi.toFixed(2));
-          } catch (parseError) {
-            console.error('Error parsing JSON:', parseError);
-          }
-        }
-      };
-
-      // Remove old listener if exists
-      if (eventListenerRef.current) {
-        try {
-          characteristic.removeEventListener('characteristicvaluechanged', eventListenerRef.current);
-        } catch (e) {
-          // Ignore
-        }
-      }
-
-      // Add new listener
-      characteristic.addEventListener('characteristicvaluechanged', handleValueChange);
-      eventListenerRef.current = handleValueChange;
-
-      // Ensure notifications are started
-      characteristic.startNotifications().catch(err => {
-        console.warn('Notifications might already be active:', err);
-      });
-
-      console.log('✅ BLE listeners are now active');
-
-      // Cleanup
-      return () => {
-        if (eventListenerRef.current) {
-          try {
-            characteristic.removeEventListener('characteristicvaluechanged', eventListenerRef.current);
-          } catch (e) {
-            // Ignore
-          }
-        }
-      };
-    }
-  }, [device, characteristic, ingestRawPsi]);
-
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (characteristic && eventListenerRef.current) {
-        characteristic.removeEventListener('characteristicvaluechanged', eventListenerRef.current);
-      }
-      if (device && device.gatt?.connected) {
-        device.gatt.disconnect();
-      }
+      void disconnectSide('left');
+      void disconnectSide('right');
     };
-  }, []);
+  }, [disconnectSide]);
+
+  const connectLeftGlove = useCallback(async () => connectSide('left'), [connectSide]);
+  const connectRightGlove = useCallback(async () => connectSide('right'), [connectSide]);
+  const disconnectLeftGlove = useCallback(async () => disconnectSide('left'), [disconnectSide]);
+  const disconnectRightGlove = useCallback(async () => disconnectSide('right'), [disconnectSide]);
+
+  const legacyDevice = leftGlove.device ?? rightGlove.device;
+  const legacyCharacteristic = leftGlove.characteristic ?? rightGlove.characteristic;
+  const legacyConnected = leftGlove.isConnected || rightGlove.isConnected;
+  const legacyConnecting = leftGlove.isConnecting || rightGlove.isConnecting;
+  const legacyStatus =
+    leftGlove.connectionStatus !== 'Not connected'
+      ? leftGlove.connectionStatus
+      : rightGlove.connectionStatus;
+  const legacyPressure = leftGlove.pressure;
+  const setLegacyPressure = useCallback((value: number) => {
+    pressureSmoothRef.current.left = value;
+    setSideState('left', (prev) => ({ ...prev, pressure: value }));
+  }, [setSideState]);
 
   return (
     <BLEContext.Provider
       value={{
-        device,
-        characteristic,
-        isConnected,
-        isConnecting,
-        connectionStatus,
-        connect,
-        disconnect,
-        pressure,
-        setPressure,
+        leftGlove,
+        rightGlove,
+        connectLeftGlove,
+        disconnectLeftGlove,
+        connectRightGlove,
+        disconnectRightGlove,
+        controlMode,
+        setControlMode,
+        device: legacyDevice,
+        characteristic: legacyCharacteristic,
+        isConnected: legacyConnected,
+        isConnecting: legacyConnecting,
+        connectionStatus: legacyStatus,
+        connect: connectLeftGlove,
+        disconnect: disconnectLeftGlove,
+        pressure: legacyPressure,
+        setPressure: setLegacyPressure,
       }}
     >
       {children}
@@ -489,3 +420,4 @@ export const BLEProvider = ({ children }: BLEProviderProps) => {
   );
 };
 
+export type { ControlMode };

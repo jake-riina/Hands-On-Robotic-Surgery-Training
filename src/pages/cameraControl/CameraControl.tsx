@@ -27,6 +27,7 @@ import { CameraControlInstruments } from './CameraControlInstruments';
 import { CameraControlRig } from './CameraControlRig';
 import { OrRoomBody } from './OrRoomBody';
 import { ModuleScoreCompletionModal } from '../../components/ModuleScoreCompletionModal';
+import { useBLE } from '../../contexts/BLEContext';
 
 const ENDOSCOPE = pegTransferReferenceValues.lightingDefaults.endoscopePointLight;
 
@@ -414,6 +415,12 @@ interface CameraControlSceneProps {
   module2SessionId?: string | null;
   module2TelemetryRecording?: boolean;
   module2TelemetryApiRef?: MutableRefObject<{ push: (s: CameraTelemetrySample) => void }>;
+  controlInputs?: {
+    cameraModeActive: boolean;
+    clutchActive: boolean;
+    leftGripClosed: boolean;
+    rightGripClosed: boolean;
+  };
 }
 
 function CameraControlScene({
@@ -432,6 +439,7 @@ function CameraControlScene({
   module2SessionId = null,
   module2TelemetryRecording = false,
   module2TelemetryApiRef,
+  controlInputs,
 }: CameraControlSceneProps) {
   const organTexture = useLoader(TextureLoader, organsImage);
   const whiteboardTexture = useLoader(TextureLoader, whiteboardImage);
@@ -455,6 +463,7 @@ function CameraControlScene({
         geomagicLatestRef={geomagicLatestRef}
         fovRef={fov}
         onCameraModeActiveChange={onCameraModeActiveChange}
+        cameraModeOverride={controlInputs?.cameraModeActive}
       />
       <CameraControlInstruments
         geomagicLatestRef={geomagicLatestRef}
@@ -462,6 +471,7 @@ function CameraControlScene({
         pendingCalibrateRef={pendingCalibrateRef}
         onDeviceCalibrationApplied={onDeviceCalibrationApplied}
         toolMotionEpoch={toolMotionEpoch}
+        controlInputs={controlInputs}
       />
       {showRedOrb && (
         <ProjectOrb
@@ -507,6 +517,7 @@ function pickNewOrbPosition(current: [number, number, number]): [number, number,
 const CameraControl = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { controlMode, leftGlove, rightGlove } = useBLE();
   const sessionIdFromState = (location.state as { sessionId?: string } | null)?.sessionId ?? null;
 
   const [countdown, setCountdown] = useState<number | 'GO!' | null>(null);
@@ -855,6 +866,17 @@ const CameraControl = () => {
   const timerDisplay = timerActive
     ? `${Math.floor(timerSeconds / 60)}:${(timerSeconds % 60).toString().padStart(2, '0')}`
     : '1:00';
+  const leftGripClosed = leftGlove.pressure > 10;
+  const rightGripClosed = rightGlove.pressure > 10;
+  const cameraModeFromGloves = leftGripClosed && rightGripClosed;
+  const controlInputs = controlMode === 'gloves'
+    ? {
+      cameraModeActive: cameraModeFromGloves,
+      clutchActive: false,
+      leftGripClosed,
+      rightGripClosed,
+    }
+    : undefined;
 
   return (
     <div
@@ -963,6 +985,7 @@ const CameraControl = () => {
                   Boolean(sessionIdFromState && timerActive && showRedOrb && !sessionDbEnded)
                 }
                 module2TelemetryApiRef={telemetryApiRef}
+                controlInputs={controlInputs}
               />
             </Suspense>
           </Canvas>

@@ -21,6 +21,7 @@ import { canCalibrateDevices } from '../pegTransfer/pegTransferDeviceCalibration
 import { CAMERA_FOV_DEFAULT } from '../pegTransfer/pegTransferCameraRig';
 import { pegTransferBoardCenterWorld } from '../pegTransfer/pegTransferWorldRig';
 import { ModuleScoreCompletionModal } from '../components/ModuleScoreCompletionModal';
+import { useBLE } from '../contexts/BLEContext';
 
 /** WebGL + R3F scene background (plan Step 7) */
 const SCENE_CLEAR_HEX = '#1b1d22';
@@ -39,6 +40,7 @@ function oppositeSide(side: Side): Side {
 export default function PegTransfer() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { controlMode, leftGlove, rightGlove } = useBLE();
   const routeState = location.state as Module3PegTransferRouteState | undefined;
   const module3SessionId = routeState?.sessionId ?? null;
 
@@ -298,6 +300,16 @@ export default function PegTransfer() {
   }
 
   const timerText = `${Math.floor(timerSeconds / 60)}:${(timerSeconds % 60).toString().padStart(2, '0')}`;
+  const leftGripClosed = leftGlove.pressure > 10;
+  const rightGripClosed = rightGlove.pressure > 10;
+  const controlInputs = controlMode === 'gloves'
+    ? {
+      cameraModeActive: leftGripClosed && rightGripClosed,
+      clutchActive: false,
+      leftGripClosed,
+      rightGripClosed,
+    }
+    : undefined;
 
   return (
     <div
@@ -479,6 +491,7 @@ export default function PegTransfer() {
           module3SessionId={module3SessionId}
           onModule3PegRingsInserted={onModule3PegRingsInserted}
           onRingInteractionEvent={handleRingEvent}
+          controlInputs={controlInputs}
         />
       </Canvas>
       </div>

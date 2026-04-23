@@ -7,6 +7,7 @@ import ProfileDropdown from '../components/ProfileDropdown';
 import analyticsPageStyles from './Module1Analytics.module.css';
 import dashboardStyles from './AdminDashboard.module.css';
 import { supabase } from '../lib/supabaseClient';
+import { useBLE } from '../contexts/BLEContext';
 
 const modulesFlatPrimaryBtnClass = `${dashboardStyles.traineeDashboardButtonChrome} ${dashboardStyles.traineeDashboardFlatPrimary}`;
 const modulesFlatLockedBtnClass = `${dashboardStyles.traineeDashboardButtonChrome} ${dashboardStyles.traineeDashboardFlatLocked}`;
@@ -215,6 +216,7 @@ function ModuleDescriptionContent({ moduleId, description }: { moduleId: number;
 const ModulesGrid = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { controlMode, setControlMode } = useBLE();
   const [modules, setModules] = useState<Module[]>([]);
   const [loading, setLoading] = useState(true);
   const [unlockedModuleIds, setUnlockedModuleIds] = useState<Set<number>>(new Set());
@@ -415,6 +417,40 @@ const ModulesGrid = () => {
                 <span className={analyticsPageStyles.backArrowDisabled} aria-hidden style={{ visibility: 'hidden' }} />
                 <h1 className={analyticsPageStyles.pageTitle}>Modules</h1>
                 <span className={analyticsPageStyles.backArrowDisabled} aria-hidden style={{ visibility: 'hidden' }} />
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 10,
+                  marginBottom: 18,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <span style={{ color: '#cbd5e1', fontSize: 14, fontWeight: 600 }}>Control Mode</span>
+                <button
+                  type="button"
+                  className={modulesFlatPrimaryBtnClass}
+                  onClick={() => setControlMode('styluses')}
+                  style={{
+                    opacity: controlMode === 'styluses' ? 1 : 0.65,
+                    outline: controlMode === 'styluses' ? '2px solid #7dd3fc' : 'none',
+                  }}
+                >
+                  Styluses Mode
+                </button>
+                <button
+                  type="button"
+                  className={modulesFlatPrimaryBtnClass}
+                  onClick={() => setControlMode('gloves')}
+                  style={{
+                    opacity: controlMode === 'gloves' ? 1 : 0.65,
+                    outline: controlMode === 'gloves' ? '2px solid #7dd3fc' : 'none',
+                  }}
+                >
+                  Glove Mode
+                </button>
               </div>
 
               {loading ? (

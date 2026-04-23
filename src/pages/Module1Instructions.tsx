@@ -12,7 +12,7 @@ import { module1InstructionVisualForStepId } from './module1/Module1InstructionV
 const Module1Instructions = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { device } = useBLE();
+  const { leftGlove, rightGlove } = useBLE();
   const [starting, setStarting] = useState(false);
 
   const navItems = [
@@ -115,7 +115,8 @@ const Module1Instructions = () => {
   const handleStartModule = useCallback(async () => {
     setStarting(true);
     try {
-      const result = await createModule1Session(device?.id ?? null);
+      const activeDeviceId = leftGlove.device?.id ?? rightGlove.device?.id ?? null;
+      const result = await createModule1Session(activeDeviceId);
       if (!result.ok) {
         alert(result.error);
         return;
@@ -124,7 +125,7 @@ const Module1Instructions = () => {
     } finally {
       setStarting(false);
     }
-  }, [device?.id, navigate]);
+  }, [leftGlove.device?.id, navigate, rightGlove.device?.id]);
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#26313E' }}>
