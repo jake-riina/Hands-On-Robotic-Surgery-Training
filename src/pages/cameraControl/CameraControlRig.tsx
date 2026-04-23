@@ -19,10 +19,12 @@ export function CameraControlRig({
   geomagicLatestRef,
   fovRef,
   onCameraModeActiveChange,
+  cameraModeOverride,
 }: {
   geomagicLatestRef: LatestByArmRef;
   fovRef: MutableRefObject<number>;
   onCameraModeActiveChange?: (active: boolean) => void;
+  cameraModeOverride?: boolean;
 }) {
   const { camera } = useThree();
   const cameraTrocarWorldRef = useRef(new THREE.Vector3());
@@ -87,7 +89,11 @@ export function CameraControlRig({
       !!rightRaw.position &&
       !!leftRaw.buttons &&
       !!rightRaw.buttons;
-    const cameraModeActive = inputValid && !!(leftRaw.buttons!.button1 && rightRaw.buttons!.button1);
+    const cameraModeActive = inputValid
+      ? (typeof cameraModeOverride === 'boolean'
+        ? cameraModeOverride
+        : !!(leftRaw.buttons!.button1 && rightRaw.buttons!.button1))
+      : false;
 
     if (prevCameraModeUiRef.current !== cameraModeActive) {
       prevCameraModeUiRef.current = cameraModeActive;

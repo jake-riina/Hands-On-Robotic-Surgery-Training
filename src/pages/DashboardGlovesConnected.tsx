@@ -83,20 +83,14 @@ const DashboardGlovesConnected = () => {
   }, [navigate]);
   
   // Use shared BLE context
-  const { 
-    isConnected, 
-    isConnecting, 
-    connect: connectBLE,
-    disconnect: disconnectBLE
+  const {
+    leftGlove,
+    rightGlove,
+    connectLeftGlove,
+    disconnectLeftGlove,
+    connectRightGlove,
+    disconnectRightGlove,
   } = useBLE();
-
-  const handleConnectGloves = async () => {
-    await connectBLE();
-  };
-  
-  const handleDisconnectGloves = async () => {
-    await disconnectBLE();
-  };
 
   useEffect(() => {
     return () => {
@@ -341,61 +335,106 @@ const DashboardGlovesConnected = () => {
                   <p style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: 600, color: '#E5E7EB' }}>
                     HandsOn Gloves
                   </p>
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      marginBottom: '10px',
-                      padding: '8px 10px',
-                      borderRadius: '8px',
-                      backgroundColor: isConnecting ? 'rgba(245, 158, 11, 0.12)' : isConnected ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
-                      border: `1px solid ${isConnecting ? 'rgba(245, 158, 11, 0.35)' : isConnected ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)'}`,
-                    }}
-                    role="status"
-                    aria-live="polite"
-                  >
-                    {isConnecting ? <StatusConnectingIcon /> : isConnected ? <StatusConnectedIcon /> : <StatusDisconnectedIcon />}
-                    <span
-                      style={{
-                        fontSize: '14px',
-                        fontWeight: 600,
-                        color: isConnecting ? '#FBBF24' : isConnected ? '#34D399' : '#F87171',
-                      }}
-                    >
-                      {isConnecting ? 'Connecting…' : isConnected ? 'Connected' : 'Not Connected'}
-                    </span>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    {([
+                      {
+                        key: 'left',
+                        label: 'Left glove (BLE)',
+                        state: leftGlove,
+                        connect: connectLeftGlove,
+                        disconnect: disconnectLeftGlove,
+                      },
+                      {
+                        key: 'right',
+                        label: 'Right glove (BLE)',
+                        state: rightGlove,
+                        connect: connectRightGlove,
+                        disconnect: disconnectRightGlove,
+                      },
+                    ] as const).map((item) => (
+                      <div key={item.key} style={{ display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ fontSize: 13, color: '#cbd5e1', marginBottom: 6, lineHeight: 1.2 }}>{item.label}</div>
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            marginBottom: 8,
+                            padding: '6px 8px',
+                            borderRadius: '8px',
+                            backgroundColor: item.state.isConnecting
+                              ? 'rgba(245, 158, 11, 0.12)'
+                              : item.state.isConnected
+                                ? 'rgba(16, 185, 129, 0.12)'
+                                : 'rgba(239, 68, 68, 0.12)',
+                            border: `1px solid ${
+                              item.state.isConnecting
+                                ? 'rgba(245, 158, 11, 0.35)'
+                                : item.state.isConnected
+                                  ? 'rgba(16, 185, 129, 0.35)'
+                                  : 'rgba(239, 68, 68, 0.35)'
+                            }`,
+                            minHeight: 34,
+                          }}
+                          role="status"
+                          aria-live="polite"
+                        >
+                          {item.state.isConnecting ? (
+                            <StatusConnectingIcon />
+                          ) : item.state.isConnected ? (
+                            <StatusConnectedIcon />
+                          ) : (
+                            <StatusDisconnectedIcon />
+                          )}
+                          <span
+                            style={{
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              color: item.state.isConnecting
+                                ? '#FBBF24'
+                                : item.state.isConnected
+                                  ? '#34D399'
+                                  : '#F87171',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {item.state.isConnecting ? 'Connecting…' : item.state.isConnected ? 'Connected' : 'Not Connected'}
+                          </span>
+                        </div>
+                        {item.state.isConnected ? (
+                          <button
+                            type="button"
+                            onClick={() => void item.disconnect()}
+                            disabled={item.state.isConnecting}
+                            style={{
+                              alignSelf: 'flex-start',
+                              padding: '8px 12px',
+                              borderRadius: '8px',
+                              fontSize: '13px',
+                              fontWeight: 500,
+                              border: 'none',
+                              cursor: item.state.isConnecting ? 'not-allowed' : 'pointer',
+                              opacity: item.state.isConnecting ? 0.6 : 1,
+                              backgroundColor: '#EF4444',
+                              color: 'white',
+                            }}
+                          >
+                            Disconnect
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => void item.connect()}
+                            disabled={item.state.isConnecting}
+                            className={traineeDashboardFlatPrimaryClass}
+                            style={{ padding: '8px 12px', fontSize: '13px' }}
+                          >
+                            {item.state.isConnecting ? 'Connecting…' : 'Connect'}
+                          </button>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                  {isConnected ? (
-                    <button
-                      type="button"
-                      onClick={handleDisconnectGloves}
-                      disabled={isConnecting}
-                      style={{
-                        alignSelf: 'flex-start',
-                        padding: '8px 16px',
-                        borderRadius: '8px',
-                        fontSize: '14px',
-                        fontWeight: 500,
-                        border: 'none',
-                        cursor: isConnecting ? 'not-allowed' : 'pointer',
-                        opacity: isConnecting ? 0.6 : 1,
-                        backgroundColor: '#EF4444',
-                        color: 'white',
-                      }}
-                    >
-                      Disconnect gloves
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={handleConnectGloves}
-                      disabled={isConnecting}
-                      className={`mt-4 self-start ${traineeDashboardFlatPrimaryClass}`}
-                    >
-                      {isConnecting ? 'Connecting…' : 'Connect gloves'}
-                    </button>
-                  )}
                 </div>
 
                 <div style={{ height: '1px', backgroundColor: '#374151', margin: '16px 0', flexShrink: 0 }} aria-hidden />

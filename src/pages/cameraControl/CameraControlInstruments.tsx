@@ -27,12 +27,19 @@ export function CameraControlInstruments({
   pendingCalibrateRef,
   onDeviceCalibrationApplied,
   toolMotionEpoch = 0,
+  controlInputs,
 }: {
   geomagicLatestRef: LatestByArmRef;
   simulationEnabled: boolean;
   pendingCalibrateRef: PendingCalibrateRef;
   onDeviceCalibrationApplied?: () => void;
   toolMotionEpoch?: number;
+  controlInputs?: {
+    cameraModeActive: boolean;
+    clutchActive: boolean;
+    leftGripClosed: boolean;
+    rightGripClosed: boolean;
+  };
 }) {
   const controller = useMemo(() => initRcmKinematicsController(), []);
   const worldFrameRef = useMemo(() => createWorldFrameRef(), []);
@@ -91,6 +98,7 @@ export function CameraControlInstruments({
         boardCenterWorld: taskCenterRef.current,
         useTipSpaceMapping: useTipSpaceRef.current,
         motionLimits: CAMERA_CONTROL_RCM_MOTION_LIMITS,
+        controlInputs,
       });
       pendingCalibrateRef.current = false;
       onDeviceCalibrationApplied?.();
@@ -122,6 +130,7 @@ export function CameraControlInstruments({
       boardCenterWorld: taskCenterRef.current,
       useTipSpaceMapping: useTipSpaceRef.current,
       motionLimits: CAMERA_CONTROL_RCM_MOTION_LIMITS,
+      controlInputs,
     });
   });
 

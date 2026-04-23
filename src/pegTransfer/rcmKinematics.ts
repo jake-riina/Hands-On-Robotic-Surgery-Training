@@ -280,6 +280,7 @@ export function updateRcmKinematics({
   boardCenterWorld,
   useTipSpaceMapping = false,
   motionLimits = PEG_TRANSFER_DEFAULT_RCM_LIMITS,
+  controlInputs,
 }: {
   controller: RcmKinematicsController;
   leftRaw: TouchStateMessage | null;
@@ -294,6 +295,13 @@ export function updateRcmKinematics({
   useTipSpaceMapping?: boolean;
   /** Defaults to peg tuning; Camera Control passes a wider preset. */
   motionLimits?: RcmKinematicsLimits;
+  /** Optional control override (used by Glove Mode). */
+  controlInputs?: {
+    cameraModeActive: boolean;
+    clutchActive: boolean;
+    leftGripClosed: boolean;
+    rightGripClosed: boolean;
+  };
 }) {
   const L = motionLimits;
   const tipSpaceScaleX = L.mmToViewX;
@@ -301,8 +309,8 @@ export function updateRcmKinematics({
   const leftButtons = leftRaw?.buttons;
   const rightButtons = rightRaw?.buttons;
 
-  const cameraModeActive = !!(leftButtons?.button1 && rightButtons?.button1);
-  const clutchActive = !!(leftButtons?.button2 && rightButtons?.button2);
+  const cameraModeActive = controlInputs?.cameraModeActive ?? !!(leftButtons?.button1 && rightButtons?.button1);
+  const clutchActive = controlInputs?.clutchActive ?? !!(leftButtons?.button2 && rightButtons?.button2);
   const clutchReleasedThisFrame = !clutchActive && controller.clutchWasActiveRef.current;
 
   // Handle clutch freeze (global tool freeze).
@@ -398,15 +406,20 @@ export function updateRcmKinematics({
   controller.clutchWasActiveRef.current = false;
 
   // Grip closure + camera-mode jaw freeze.
-  const computeGripForArm = (arm: ToolArmSide, buttons?: { button1: boolean; button2: boolean }) => {
+  const computeGripForArm = (
+    arm: ToolArmSide,
+    buttons: { button1: boolean; button2: boolean } | undefined,
+    forceClosed?: boolean
+  ) => {
     if (cameraModeActive) return controller.lastGripClosureRef[arm];
+    if (typeof forceClosed === 'boolean') return forceClosed ? 1 : 0;
     // Jaw closure driven by per-device button1; camera mode is handled above.
     const closed = !!buttons?.button1;
     return closed ? 1 : 0;
   };
 
-  const leftGrip = computeGripForArm('left', leftButtons);
-  const rightGrip = computeGripForArm('right', rightButtons);
+  const leftGrip = computeGripForArm('left', leftButtons, controlInputs?.leftGripClosed);
+  const rightGrip = computeGripForArm('right', rightButtons, controlInputs?.rightGripClosed);
 
   if (!cameraModeActive) {
     controller.lastGripClosureRef.left = leftGrip;
